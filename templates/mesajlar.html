@@ -87,11 +87,10 @@ mesajForm.addEventListener("submit", function(e) {
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Gonderiliyor...';
     }
 
-    fetch("/send_message", {
+    csrfFetch("/send_message", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
             alici_id: alici_id,

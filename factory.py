@@ -88,6 +88,18 @@ def create_app(config_overrides=None):
     csrf.init_app(app)
     limiter.init_app(app)
 
+    from flask_wtf.csrf import CSRFError
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(error):
+        from flask import flash, jsonify, redirect, request, url_for
+
+        message = "Güvenlik doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin."
+        if request.path.startswith("/api/") or request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"error": message}), 400
+        flash(message, "danger")
+        return redirect(request.referrer or url_for("main.anasayfa"))
+
     if behind_proxy:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
