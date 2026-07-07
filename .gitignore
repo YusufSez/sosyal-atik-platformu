@@ -31,7 +31,11 @@ htmlcov/
 *.sqlite
 *.sqlite3
 backup.sql
+backups/
 instance/
+
+# Günlükler
+logs/
 
 # Kullanıcı yüklemeleri (varsayılan görseller hariç)
 static/item_pics/*

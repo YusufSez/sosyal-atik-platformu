@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="content-section fade-in" style="max-width:800px;margin:0 auto;">
+<div class="content-section fade-in content-narrow">
     <div class="page-header mb-4 text-center">
         <h3 class="fw-bold"><i class="bi bi-award me-2"></i>Rozetlerim</h3>
         <p class="text-muted">{{ seviye.ad }} — {{ seviye.xp }} XP</p>
-        <div class="progress mx-auto" style="height:10px; max-width:400px;">
-            <div class="progress-bar bg-success" style="width:{{ seviye.ilerleme_yuzde }}%"></div>
+        <div class="progress mx-auto progress-thin">
+            <div class="progress-bar bg-success" data-progress="{{ seviye.ilerleme_yuzde }}"></div>
         </div>
         {% if seviye.sonraki_esik %}
         <small class="text-muted">Sonraki seviye: {{ seviye.sonraki_esik }} XP</small>

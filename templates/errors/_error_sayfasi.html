@@ -1,0 +1,38 @@
+{% macro error_sayfasi(kod, baslik, aciklama, ikon, variant='primary', ipuclari=None, birincil_url=None, birincil_metin='Anasayfaya Dön', ikincil_url=None, ikincil_metin=None) %}
+<div class="error-page">
+    <div class="error-page-card error-page-card--{{ variant }}">
+        <div class="error-page-glow" aria-hidden="true"></div>
+        <div class="error-page-icon-wrap">
+            <i class="bi {{ ikon }} error-page-icon"></i>
+        </div>
+        <p class="error-page-code">{{ kod }}</p>
+        <h1 class="error-page-title">{{ baslik }}</h1>
+        <p class="error-page-desc">{{ aciklama }}</p>
+
+        {% if ipuclari %}
+        <ul class="error-page-tips">
+            {% for ipucu in ipuclari %}
+            <li><i class="bi bi-check2-circle"></i> {{ ipucu }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <div class="error-page-actions">
+            {% if birincil_url %}
+            <a href="{{ birincil_url }}" class="btn btn-{{ variant if variant != 'warning' else 'primary' }} btn-lg">
+                <i class="bi bi-house-door me-1"></i>{{ birincil_metin }}
+            </a>
+            {% endif %}
+            {% if ikincil_url and ikincil_metin %}
+            <a href="{{ ikincil_url }}" class="btn btn-outline-secondary btn-lg">
+                {{ ikincil_metin }}
+            </a>
+            {% endif %}
+        </div>
+
+        <p class="error-page-brand">
+            <span aria-hidden="true">♻️</span> AtıkPort — Sürdürülebilir paylaşım platformu
+        </p>
+    </div>
+</div>
+{% endmacro %}

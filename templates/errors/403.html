@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% from "errors/_error_sayfasi.html" import error_sayfasi %}
+{% block content %}
+{{ error_sayfasi(
+    kod='403',
+    baslik='Erişim Reddedildi',
+    aciklama='Bu sayfayı veya işlemi görüntüleme yetkiniz bulunmuyor. Giriş yapmış olsanız bile bu alan size kapalı olabilir.',
+    ikon='bi-shield-lock',
+    variant='danger',
+    ipuclari=[
+        'Yönetici paneli yalnızca yetkili hesaplara açıktır',
+        'Başka bir hesapla giriş yaptıysanız çıkış yapıp tekrar deneyin',
+        'Yetki sorunu olduğunu düşünüyorsanız destek ile iletişime geçin'
+    ],
+    birincil_url=url_for('main.anasayfa'),
+    birincil_metin='Anasayfaya Dön',
+    ikincil_url=url_for('auth.giris') if not current_user.is_authenticated else url_for('auth.profil'),
+    ikincil_metin='Giriş Yap' if not current_user.is_authenticated else 'Profilim'
+) }}
+{% endblock %}

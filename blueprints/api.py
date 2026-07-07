@@ -4,8 +4,9 @@ import requests
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from constants import RATE_PUBLIC_API
 from extensions import db, limiter
-from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Sikayet
+from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
 from services.notifications import bildirim_olustur
 from utils import mesafe_hesapla, sanitize_input
 
@@ -65,11 +66,13 @@ def get_yerel_merkezler():
 
 
 @api_bp.route("/api/ibb_atik_merkezleri")
+@limiter.limit(RATE_PUBLIC_API)
 def ibb_atik_merkezleri():
     return jsonify(get_ibb_merkezleri())
 
 
 @api_bp.route("/api/atik_merkezleri")
+@limiter.limit(RATE_PUBLIC_API)
 def api_atik_merkezleri():
     merkezler = AtikMerkezi.query.all()
     return jsonify([
@@ -79,6 +82,7 @@ def api_atik_merkezleri():
 
 
 @api_bp.route("/api/en_yakin_merkezler/<float:lat>/<float:lng>")
+@limiter.limit(RATE_PUBLIC_API)
 def en_yakin_merkezler(lat, lng):
     merkezler = get_ibb_merkezleri()
     if not merkezler:
@@ -119,6 +123,13 @@ def favori_ekle():
     atik_id = data.get("atik_id")
     if not kaynak_id and not atik_id:
         return jsonify({"error": "Geçersiz istek"}), 400
+
+    if kaynak_id:
+        if not db.session.get(Kaynak, kaynak_id):
+            return jsonify({"error": "İlan bulunamadı"}), 404
+    elif atik_id:
+        if not db.session.get(Atik, atik_id):
+            return jsonify({"error": "İlan bulunamadı"}), 404
 
     existing = Favori.query.filter_by(
         user_id=current_user.id,
@@ -238,6 +249,13 @@ def goruntulenme_ekle():
     if not kaynak_id and not atik_id:
         return jsonify({"error": "Geçersiz istek"}), 400
 
+    if kaynak_id:
+        if not db.session.get(Kaynak, kaynak_id):
+            return jsonify({"error": "İlan bulunamadı"}), 404
+    elif atik_id:
+        if not db.session.get(Atik, atik_id):
+            return jsonify({"error": "İlan bulunamadı"}), 404
+
     db.session.add(Goruntulenme(
         kaynak_id=kaynak_id if kaynak_id else None,
         atik_id=atik_id if atik_id else None,
@@ -281,6 +299,41 @@ def sikayet_olustur():
         kaynak_id=kaynak_id if kaynak_id else None,
         atik_id=atik_id if atik_id else None,
         sebep=sanitize_input(sebep, max_length=500),
+    ))
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@api_bp.route("/api/mesaj_sikayet", methods=["POST"])
+@login_required
+@limiter.limit("15 per hour")
+def mesaj_sikayet():
+    data = request.get_json() or {}
+    mesaj_id = data.get("mesaj_id")
+    ek_sebep = sanitize_input(data.get("sebep", ""), max_length=400)
+
+    if not mesaj_id:
+        return jsonify({"error": "Mesaj seçilmedi."}), 400
+
+    mesaj = Mesaj.query.get_or_404(int(mesaj_id))
+    if current_user.id not in (mesaj.sender_id, mesaj.receiver_id):
+        return jsonify({"error": "Bu mesajı şikayet etme yetkiniz yok."}), 403
+
+    mevcut = Sikayet.query.filter_by(user_id=current_user.id, mesaj_id=mesaj.id).first()
+    if mevcut:
+        return jsonify({"error": "Bu mesajı zaten şikayet ettiniz."}), 400
+
+    ozet = sanitize_input(mesaj.content, max_length=200)
+    sebep = f"Mesaj şikayeti (#{mesaj.id}): {ozet}"
+    if ek_sebep:
+        sebep += f" | Açıklama: {ek_sebep}"
+
+    db.session.add(Sikayet(
+        user_id=current_user.id,
+        kaynak_id=mesaj.kaynak_id,
+        atik_id=mesaj.atik_id,
+        mesaj_id=mesaj.id,
+        sebep=sebep[:500],
     ))
     db.session.commit()
     return jsonify({"success": True})

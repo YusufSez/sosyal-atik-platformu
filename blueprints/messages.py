@@ -1,8 +1,11 @@
-from flask import Blueprint, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from extensions import db, limiter
+from constants import RATE_MESSAGE
+from decorators import email_verified_required
+from extensions import db, limiter, rate_limit_user_or_ip
 from models import Atik, Kaynak, Mesaj, User
+from services.content_filter import mesaj_uygun_mu
 from services.notifications import bildirim_olustur
 from utils import sanitize_input
 
@@ -19,6 +22,8 @@ def before_request():
 
 @messages_bp.route("/mesajlar/<int:user_id>/<int:kaynak_id>/<int:atik_id>", methods=["GET", "POST"])
 @login_required
+@email_verified_required
+@limiter.limit(RATE_MESSAGE, methods=["POST"], key_func=rate_limit_user_or_ip)
 def mesajlar(user_id, kaynak_id, atik_id):
     alici = User.query.get_or_404(user_id)
     urun = None
@@ -30,6 +35,10 @@ def mesajlar(user_id, kaynak_id, atik_id):
 
     if request.method == "POST":
         icerik = sanitize_input(request.form.get("icerik"), max_length=2000)
+        uygun, hata = mesaj_uygun_mu(icerik)
+        if icerik and not uygun:
+            flash(hata, "danger")
+            return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
         if icerik:
             db.session.add(Mesaj(
                 sender_id=current_user.id,
@@ -124,7 +133,8 @@ def mesajlarim():
 
 @messages_bp.route("/send_message", methods=["POST"])
 @login_required
-@limiter.limit("60 per hour")
+@email_verified_required
+@limiter.limit(RATE_MESSAGE, methods=["POST"], key_func=rate_limit_user_or_ip)
 def send_message():
     data = request.get_json() or {}
     alici_id = data.get("alici_id")
@@ -134,6 +144,10 @@ def send_message():
 
     if not alici_id or not content:
         return jsonify({"error": "Eksik veri"}), 400
+
+    uygun, hata = mesaj_uygun_mu(content)
+    if not uygun:
+        return jsonify({"error": hata}), 400
 
     db.session.add(Mesaj(
         sender_id=current_user.id,

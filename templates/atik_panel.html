@@ -46,7 +46,8 @@
     </form>
 
     <!-- HARITA -->
-    <div id="map" class="map-container mb-2"></div>
+    {% from '_map_locate.html' import map_with_locate %}
+    {{ map_with_locate() }}
     {% if konumsuz_sayisi > 0 %}
     <p class="text-muted small mb-1">
         <i class="bi bi-info-circle"></i>
@@ -55,7 +56,7 @@
     {% endif %}
     <p class="text-muted small mb-3">
         <span class="badge bg-danger">●</span> İBB atık toplama merkezleri &nbsp;
-        <span class="badge bg-success">♻</span> Kullanıcı ilanları
+        <span class="badge bg-success">●</span> Kullanıcı ilanları
     </p>
 
     <!-- ATIK KARTLARI -->
@@ -68,8 +69,6 @@
                     {% set kapak = atik|kapak_resim %}
                     {% if kapak != 'default.jpg' %}
                     <img src="{{ url_for('static', filename='item_pics/' + kapak) }}"
-                         class="w-100 h-100"
-                         style="object-fit: cover;"
                          alt="{{ atik.baslik }}"
                          loading="lazy">
                     {% set foto_say = atik|ilan_fotograflari|length %}
@@ -79,14 +78,14 @@
                     </span>
                     {% endif %}
                     {% else %}
-                    <div class="d-flex align-items-center justify-content-center h-100">
-                        <i class="bi bi-recycle text-secondary" style="font-size: 3rem;"></i>
+                    <div class="card-img-placeholder">
+                        <i class="bi bi-recycle"></i>
                     </div>
                     {% endif %}
 
                     <!-- FAVORI BUTONU -->
-                    <button class="position-absolute top-0 end-0 m-2 btn btn-light btn-sm rounded-circle shadow"
-                            onclick="favoriToggleAtik({{ atik.id }}, this)"
+                    <button class="position-absolute top-0 end-0 m-2 btn btn-light btn-sm rounded-circle shadow favori-toggle-btn"
+                            data-atik-id="{{ atik.id }}"
                             title="Favorilere Ekle">
                         <i class="bi bi-heart"></i>
                     </button>
@@ -125,167 +124,14 @@
 
     {% include '_pagination.html' %}
 </div>
+{% endblock %}
 
-<!-- LEAFLET -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<script>
-(function() {
-    var haritaNoktalari = {{ harita_nokta | tojson }};
-    var detayPrefix = '/atik/';
-
-    function popupIcerik(nokta) {
-        var html = '';
-        nokta.ilanlar.forEach(function(i) {
-            html += '<div class="mb-1"><b>' + i.baslik + '</b><br><a href="' + detayPrefix + i.id + '">İncele</a></div>';
-        });
-        return html;
-    }
-
-    function markerKonumlari(noktalar) {
-        var sonuc = [];
-        noktalar.forEach(function(nokta) {
-            if (nokta.ilanlar.length === 1) {
-                sonuc.push({ lat: nokta.lat, lng: nokta.lng, nokta: nokta });
-                return;
-            }
-            var adim = (2 * Math.PI) / nokta.ilanlar.length;
-            var yaricap = 0.0015 * Math.min(nokta.ilanlar.length, 10);
-            nokta.ilanlar.forEach(function(_, idx) {
-                sonuc.push({
-                    lat: nokta.lat + yaricap * Math.cos(idx * adim),
-                    lng: nokta.lng + yaricap * Math.sin(idx * adim),
-                    nokta: nokta,
-                });
-            });
-        });
-        return sonuc;
-    }
-
-    var map = L.map('map').setView([41.015, 28.979], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    var tumSinirlar = [];
-
-    // Kullanıcı ilanları (yeşil)
-    markerKonumlari(haritaNoktalari).forEach(function(m) {
-        L.marker([m.lat, m.lng], { icon: L.divIcon({
-            className: 'atik-marker',
-            html: '<div style="background:#198754;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">♻</div>',
-            iconSize: [28, 28], iconAnchor: [14, 14]
-        })})
-        .addTo(map)
-        .bindPopup('<span class="badge bg-success">Kullanıcı İlanı</span><br>' + popupIcerik(m.nokta));
-        tumSinirlar.push([m.lat, m.lng]);
-    });
-
-    function merkezleriEkle(merkezler) {
-        merkezler.forEach(function(m) {
-            L.circleMarker([m.lat, m.lng], {
-                radius: 7, color: '#dc3545', fillColor: '#ff4444', fillOpacity: 0.8, weight: 2
-            })
-            .addTo(map)
-            .bindPopup(
-                '🔴 <b>İBB Atık Merkezi</b><br><b>' + m.ad + '</b><br>' + (m.adres || '') +
-                (m.mesafe !== undefined ? '<br><small>~' + m.mesafe + ' km</small>' : '')
-            );
-            tumSinirlar.push([m.lat, m.lng]);
-        });
-    }
-
-    function haritayiOrtala() {
-        if (tumSinirlar.length > 0) {
-            map.fitBounds(tumSinirlar, { padding: [40, 40], maxZoom: 13 });
-        }
-    }
-
-    function ibbMerkezleriniYukle(userLat, userLng) {
-        fetch('/api/ibb_atik_merkezleri')
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-                if (!data || !data.length) {
-                    console.warn('İBB merkez verisi alınamadı.');
-                    haritayiOrtala();
-                    return;
-                }
-                if (userLat !== null && userLng !== null) {
-                    data.forEach(function(m) {
-                        m.mesafe = Math.round(
-                            Math.sqrt(
-                                Math.pow(m.lat - userLat, 2) + Math.pow(m.lng - userLng, 2)
-                            ) * 111 * 10
-                        ) / 10;
-                    });
-                    data.sort(function(a, b) { return a.mesafe - b.mesafe; });
-                }
-                merkezleriEkle(data);
-                haritayiOrtala();
-            })
-            .catch(function(err) {
-                console.error('İBB harita hatası:', err);
-                haritayiOrtala();
-            });
-    }
-
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            var userLat = pos.coords.latitude;
-            var userLng = pos.coords.longitude;
-            L.marker([userLat, userLng], {
-                icon: L.divIcon({
-                    className: 'user-marker',
-                    html: '<div style="background:#0d6efd;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;">📍</div>',
-                    iconSize: [26, 26], iconAnchor: [13, 13],
-                }),
-            }).addTo(map).bindPopup('📍 Sen buradasın');
-            tumSinirlar.push([userLat, userLng]);
-            ibbMerkezleriniYukle(userLat, userLng);
-        }, function() {
-            ibbMerkezleriniYukle(null, null);
-        });
-    } else {
-        ibbMerkezleriniYukle(null, null);
-    }
-
-    function favoriToggleAtik(atikId, btn) {
-        if (!{{ 'true' if current_user.is_authenticated else 'false' }}) {
-            window.location.href = '{{ url_for("auth.giris") }}'; return;
-        }
-        var data = { atik_id: atikId };
-        csrfFetch('/api/favori_ekle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            var icon = btn.querySelector('i');
-            if (result.status === 'added') {
-                icon.className = 'bi bi-heart-fill text-danger';
-                btn.classList.add('btn-outline-danger');
-            } else {
-                icon.className = 'bi bi-heart';
-                btn.classList.remove('btn-outline-danger');
-            }
-        })
-        .catch(function(e) { console.error(e); });
-    }
-
-    window.favoriToggleAtik = favoriToggleAtik;
-})();
-</script>
-
-<style>
-.clamp-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    line-clamp: 3;
-    -webkit-line-clamp: 3;
-    overflow: hidden;
-}
-</style>
-
+{% block scripts %}
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets() }}
+<script type="application/json" id="atik-harita-config">{{ {
+    'harita_noktalari': harita_nokta,
+    'detay_prefix': '/atik/'
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/panel-atik-map.js') }}"></script>
 {% endblock %}

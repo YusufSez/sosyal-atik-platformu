@@ -48,59 +48,19 @@
                 <small class="text-muted">Birden fazla seçmek için Ctrl veya Shift tuşunu kullanın. Maks. 5 MB/dosya.</small>
             </div>
 
-            {% from "_recaptcha.html" import recaptcha_widget %}
-            {{ recaptcha_widget() }}
+            {% from "_turnstile.html" import turnstile_widget %}
+            {{ turnstile_widget() }}
             <button type="submit" class="btn btn-success w-100 mt-3">Atığı Yayınla</button>
         </form>
         </div>
     </div>
 </div>
 
-<script>
-function konumGuncelle(lat, lng, mesaj) {
-    document.getElementById('latitude').value = lat;
-    document.getElementById('longitude').value = lng;
-    document.getElementById('konumDurum').textContent = mesaj;
-}
-
-function konumAl() {
-    if (!navigator.geolocation) {
-        document.getElementById('konumDurum').textContent = 'Tarayıcı konum desteklemiyor.';
-        return;
-    }
-    navigator.geolocation.getCurrentPosition(function(pos) {
-        konumGuncelle(pos.coords.latitude, pos.coords.longitude, 'Konum alındı (GPS).');
-    }, function() {
-        var lat = document.getElementById('latitude').value;
-        var lng = document.getElementById('longitude').value;
-        if (lat && lng) {
-            document.getElementById('konumDurum').textContent = 'Profil konumu kullanılacak.';
-        } else {
-            document.getElementById('konumDurum').textContent = 'Konum izni verilmedi. Haritada görünmeyebilir.';
-        }
-    });
-}
-
-document.getElementById('konumAlBtn').addEventListener('click', konumAl);
-
-if (document.getElementById('latitude').value && document.getElementById('longitude').value) {
-    document.getElementById('konumDurum').textContent = 'Profil konumu yüklendi.';
-} else {
-    konumAl();
-}
-
-document.getElementById('atikForm').addEventListener('submit', function(e) {
-    if (!document.getElementById('latitude').value || !document.getElementById('longitude').value) {
-        e.preventDefault();
-        alert('Haritada görünmesi için lütfen konum izni verin veya "Konumumu Kullan" butonuna tıklayın.');
-        konumAl();
-    }
-});
-</script>
+<script src="{{ url_for('static', filename='js/yukle-atik.js') }}"></script>
 
 {% endblock %}
 
 {% block scripts %}
-{% from "_recaptcha.html" import recaptcha_script %}
-{{ recaptcha_script() }}
+{% from "_turnstile.html" import turnstile_script %}
+{{ turnstile_script() }}
 {% endblock %}

@@ -54,55 +54,12 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
-
-<script>
-    const illerData = JSON.parse('{{ iller | tojson | safe }}');
-    const seciliIlce = {{ (user.ilce or '') | tojson }};
-    const ilSelect = document.getElementById('il');
-    const ilceSelect = document.getElementById('ilce');
-
-    function ilceleriDoldur(ilAdi, secili) {
-        ilceSelect.innerHTML = '<option value="">İlçe Seçiniz</option>';
-        if (ilAdi && illerData[ilAdi]) {
-            illerData[ilAdi].forEach(function(ilceName) {
-                const option = document.createElement('option');
-                option.value = ilceName;
-                option.textContent = ilceName;
-                if (secili && secili === ilceName) option.selected = true;
-                ilceSelect.appendChild(option);
-            });
-        }
-    }
-
-    ilSelect.addEventListener('change', function() {
-        ilceleriDoldur(this.value, '');
-    });
-
-    if (ilSelect.value) {
-        ilceleriDoldur(ilSelect.value, seciliIlce);
-    }
-
-    document.getElementById('konumBtn').addEventListener('click', function() {
-        var durum = document.getElementById('konumDurum');
-        if (!navigator.geolocation) {
-            durum.textContent = 'Tarayıcı konum desteklemiyor.';
-            return;
-        }
-        durum.textContent = 'Konum alınıyor...';
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            document.getElementById('latitude').value = pos.coords.latitude;
-            document.getElementById('longitude').value = pos.coords.longitude;
-            durum.textContent = 'Konum kaydedildi.';
-        }, function() {
-            durum.textContent = 'Konum izni verilmedi.';
-        });
-    });
-
-    $(document).ready(function() {
-        $('#telefon').mask('(000) 000 00 00');
-    });
-</script>
+<script type="application/json" id="profil-config">{{ {
+    'iller': iller,
+    'secili_ilce': user.ilce or ''
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/jquery/3.6.0/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/jquery-mask/1.14.16/jquery.mask.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/profil-tamamla.js') }}"></script>
 
 {% endblock %}

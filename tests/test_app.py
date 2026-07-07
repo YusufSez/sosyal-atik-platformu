@@ -12,6 +12,8 @@ def _register_and_login(client, email="test@example.com", username="testuser"):
         "username": username,
         "email": email,
         "password": "TestPass1",
+        "password_tekrar": "TestPass1",
+        "kullanim_kosullari": "on",
     }, follow_redirects=True)
     client.post("/profil_tamamla", data={
         "dogum_tarihi": "2000-01-01",
@@ -31,6 +33,66 @@ def test_register_and_login(client):
     _register_and_login(client)
     response = client.get("/anasayfa")
     assert response.status_code == 200
+
+
+def test_kayit_parola_eslesmiyor(client):
+    response = client.post("/kayit", data={
+        "username": "mismatch",
+        "email": "mismatch@test.com",
+        "password": "TestPass1",
+        "password_tekrar": "TestPass2",
+        "kullanim_kosullari": "on",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "eşleşmiyor" in response.data.decode("utf-8")
+
+
+def test_kayit_smtp_hatasi_500_vermez(client, app, monkeypatch):
+    import smtplib
+
+    def fail_send(_msg):
+        raise smtplib.SMTPAuthenticationError(525, b"5.7.1 Unauthorized IP address")
+
+    monkeypatch.setattr("services.email.mail.send", fail_send)
+    app.config["MAIL_SUPPRESS_SEND"] = False
+    app.config["EMAIL_VERIFICATION_REQUIRED"] = True
+
+    response = client.post("/kayit", data={
+        "username": "smtpfail",
+        "email": "smtpfail@test.com",
+        "password": "TestPass1",
+        "password_tekrar": "TestPass1",
+        "kullanim_kosullari": "on",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"500" not in response.data
+    assert "gönderilemedi" in response.data.decode("utf-8").lower() or "Kay" in response.data.decode("utf-8")
+
+
+def test_kayit_gecersiz_eposta(client):
+    response = client.post("/kayit", data={
+        "username": "mailuser",
+        "email": "gecersiz-eposta",
+        "password": "TestPass1",
+        "password_tekrar": "TestPass1",
+        "kullanim_kosullari": "on",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert "e-posta" in response.data.decode("utf-8").lower()
+
+
+def test_kayit_zayif_parola_once_kontrol(client):
+    response = client.post("/kayit", data={
+        "username": "weakuser",
+        "email": "weak@test.com",
+        "password": "abc",
+        "password_tekrar": "xyz",
+        "kullanim_kosullari": "on",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    text = response.data.decode("utf-8")
+    assert "8 karakter" in text
+    assert "eşleşmiyor" not in text
 
 
 def test_kaynak_panel_public(client):
@@ -55,11 +117,11 @@ def test_anasayfa_footer_linkleri(client):
     assert b"Kurumsal" in response.data
 
 
-def test_navbar_kurumsal_giris_yapinca_gizli(client):
+def test_navbar_kurumsal_giris_yapinca_gorunur(client):
     _register_and_login(client)
     response = client.get("/anasayfa")
     assert response.status_code == 200
-    assert b"kurumsalNavDropdown" not in response.data
+    assert b"kurumsalNavDropdown" in response.data
     assert b"profilDropdown" in response.data
 
 

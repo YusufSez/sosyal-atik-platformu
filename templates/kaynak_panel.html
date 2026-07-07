@@ -48,7 +48,8 @@
         </div>
     </form>
 
-    <div id="map" class="map-container mb-2"></div>
+    {% from '_map_locate.html' import map_with_locate %}
+    {{ map_with_locate() }}
     {% if konumsuz_sayisi > 0 %}
     <p class="text-muted small mb-3">
         <i class="bi bi-info-circle"></i>
@@ -64,12 +65,10 @@
         <div class="col-sm-6 col-lg-4 col-xl-3">
             <div class="card item-card hover-card h-100 shadow-sm">
                 <!-- RESIM -->
-                <div class="position-relative card-img-wrap" style="height:180px;">
+                <div class="position-relative card-img-wrap">
                     {% set kapak = item|kapak_resim %}
                     {% if kapak != 'default.jpg' %}
                     <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" 
-                         class="w-100 h-100" 
-                         style="object-fit: cover;"
                          alt="{{ item.baslik }}"
                          loading="lazy">
                     {% set foto_say = item|ilan_fotograflari|length %}
@@ -79,8 +78,8 @@
                     </span>
                     {% endif %}
                     {% else %}
-                    <div class="d-flex align-items-center justify-content-center h-100">
-                        <i class="bi bi-box-seam text-secondary" style="font-size: 3rem;"></i>
+                    <div class="card-img-placeholder">
+                        <i class="bi bi-box-seam"></i>
                     </div>
                     {% endif %}
 
@@ -90,8 +89,8 @@
                     </span>
 
                     <!-- FAVORI BUTONU -->
-                    <button class="position-absolute top-0 end-0 m-2 btn btn-light btn-sm rounded-circle shadow"
-                            onclick="favoriToggle({{ item.id }}, null, this)"
+                    <button class="position-absolute top-0 end-0 m-2 btn btn-light btn-sm rounded-circle shadow favori-toggle-btn"
+                            data-kaynak-id="{{ item.id }}"
                             title="Favorilere Ekle">
                         <i class="bi bi-heart"></i>
                     </button>
@@ -131,114 +130,14 @@
 
     {% include '_pagination.html' %}
 </div>
+{% endblock %}
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<script>
-var isLoggedIn = {{ 'true' if current_user.is_authenticated else 'false' }};
-var haritaNoktalari = {{ harita_nokta | tojson }};
-var detayPrefix = '/kaynak/';
-
-function popupIcerik(nokta) {
-    var html = '';
-    nokta.ilanlar.forEach(function(i) {
-        html += '<div class="mb-1"><b>' + i.baslik + '</b><br><a href="' + detayPrefix + i.id + '">İncele</a></div>';
-    });
-    return html;
-}
-
-function markerKonumlari(noktalar) {
-    var sonuc = [];
-    noktalar.forEach(function(nokta) {
-        if (nokta.ilanlar.length === 1) {
-            sonuc.push({ lat: nokta.lat, lng: nokta.lng, nokta: nokta });
-            return;
-        }
-        var adim = (2 * Math.PI) / nokta.ilanlar.length;
-        var yaricap = 0.0015 * Math.min(nokta.ilanlar.length, 10);
-        nokta.ilanlar.forEach(function(_, idx) {
-            sonuc.push({
-                lat: nokta.lat + yaricap * Math.cos(idx * adim),
-                lng: nokta.lng + yaricap * Math.sin(idx * adim),
-                nokta: nokta,
-            });
-        });
-    });
-    return sonuc;
-}
-
-(function() {
-    var map = L.map('map').setView([41.015, 28.979], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-    var bounds = [];
-    markerKonumlari(haritaNoktalari).forEach(function(m) {
-        var marker = L.marker([m.lat, m.lng]).addTo(map).bindPopup(popupIcerik(m.nokta));
-        bounds.push([m.lat, m.lng]);
-    });
-    if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-    }
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(pos) {
-            L.marker([pos.coords.latitude, pos.coords.longitude], {
-                icon: L.divIcon({
-                    className: 'user-marker',
-                    html: '<div style="background:#0d6efd;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">📍</div>',
-                    iconSize: [24, 24], iconAnchor: [12, 12],
-                }),
-            }).addTo(map).bindPopup('Sen buradasın');
-        });
-    }
-})();
-
-function favoriToggle(kaynakId, atikId, btn) {
-    if (!isLoggedIn) { window.location.href = '{{ url_for("auth.giris") }}'; return; }
-    var data = {};
-    if (kaynakId) data.kaynak_id = kaynakId;
-    if (atikId) data.atik_id = atikId;
-
-    csrfFetch('/api/favori_ekle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(result) {
-        var icon = btn.querySelector('i');
-        if (result.status === 'added') {
-            icon.className = 'bi bi-heart-fill text-danger';
-            btn.classList.add('btn-outline-danger');
-        } else {
-            icon.className = 'bi bi-heart';
-            btn.classList.remove('btn-outline-danger');
-        }
-    })
-    .catch(function(e) { console.error(e); });
-}
-
-// Sayfa yuklendiginde favori durumlarini kontrol et
-document.addEventListener('DOMContentLoaded', function() {
-    if (!isLoggedIn) return;
-    var cards = document.querySelectorAll('.hover-card');
-    cards.forEach(function(card) {
-        var btn = card.querySelector('button[onclick*="favoriToggle"]');
-        if (btn) {
-            var match = btn.getAttribute('onclick').match(/favoriToggle\((\d+)/);
-            if (match) {
-                fetch('/api/favori_kontrol?kaynak_id=' + match[1])
-                    .then(function(r) { return r.json(); })
-                    .then(function(result) {
-                        if (result.is_favori) {
-                            var icon = btn.querySelector('i');
-                            icon.className = 'bi bi-heart-fill text-danger';
-                            btn.classList.add('btn-outline-danger');
-                        }
-                    });
-            }
-        }
-    });
-});
-</script>
-
+{% block scripts %}
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets() }}
+<script type="application/json" id="kaynak-harita-config">{{ {
+    'harita_noktalari': harita_nokta,
+    'detay_prefix': '/kaynak/'
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/panel-kaynak-map.js') }}"></script>
 {% endblock %}

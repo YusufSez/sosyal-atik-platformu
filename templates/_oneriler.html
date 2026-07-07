@@ -13,9 +13,10 @@
                 <div class="position-relative card-img-wrap">
                     {% set kapak = ilan|kapak_resim %}
                     {% if kapak != 'default.jpg' %}
-                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ ilan.baslik }}">
+                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" alt="{{ ilan.baslik }}">
                     {% else %}
-                    <div class="d-flex align-items-center justify-content-center h-100 text-muted"><i class="bi bi-image fs-2"></i></div>
+                    <div class="card-img-placeholder">
+                        <i class="bi bi-image"></i>
                     {% endif %}
                     <span class="badge bg-warning text-dark category-badge">{{ o.neden }}</span>
                 </div>

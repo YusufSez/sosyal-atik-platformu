@@ -47,7 +47,7 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-bold"><i class="bi bi-thermometer-half me-2"></i>Paylaşım Yoğunluk Haritası (Isı Haritası)</div>
         <div class="card-body p-0">
-            <div id="kurumIsiHaritasi" class="map-container" style="height:420px;"></div>
+            <div id="kurumIsiHaritasi" class="map-container map-container-tall"></div>
         </div>
         <div class="card-footer small text-muted">
             Koyu renkler daha yoğun paylaşım ve teslim bölgelerini gösterir.
@@ -94,22 +94,11 @@
     </div>
 </div>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script>
-(function() {
-    var noktalar = {{ isi_noktalari | tojson }};
-    var map = L.map('kurumIsiHaritasi').setView([39.0, 35.0], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
-    if (noktalar.length) {
-        L.heatLayer(noktalar, { radius: 22, blur: 18, maxZoom: 12, gradient: {0.2:'#3b82f6',0.5:'#10b981',0.8:'#f59e0b',1:'#ef4444'} }).addTo(map);
-        var bounds = noktalar.map(function(p) { return [p[0], p[1]]; });
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
-    }
-})();
-</script>
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets(heat=true) }}
+<script type="application/json" id="kurum-analiz-config">{{ {
+    'isi_noktalari': isi_noktalari
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/kurum-analiz-map.js') }}"></script>
 
 {% endblock %}

@@ -1,9 +1,11 @@
-from flask import Blueprint, abort, render_template
+from flask import Blueprint, abort, jsonify, redirect, render_template, url_for
 from flask_login import current_user
 
-from sqlalchemy import or_
+from sqlalchemy import or_, text
+from sqlalchemy.orm import selectinload
 
 from content.kurumsal import KURUMSAL_SAYFALAR, SITE_HARITASI_GRUPLARI
+from extensions import db
 from models import Atik, Kaynak, User
 from services.impact import platform_ozeti
 from services.recommendations import kullanici_onerileri
@@ -14,7 +16,7 @@ main_bp = Blueprint("main", __name__)
 @main_bp.route("/")
 @main_bp.route("/anasayfa")
 def anasayfa():
-    kaynaklar = Kaynak.query.filter(
+    kaynaklar = Kaynak.query.options(selectinload(Kaynak.fotograflar)).filter(
         or_(Kaynak.ilan_durumu == "Aktif", Kaynak.ilan_durumu.is_(None))
     ).order_by(Kaynak.id.desc()).limit(8).all()
     stats = {
@@ -45,7 +47,11 @@ def anasayfa():
 
 @main_bp.route("/health")
 def health():
-    return {"status": "ok"}, 200
+    try:
+        db.session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "up"}, 200
+    except Exception:
+        return {"status": "degraded", "database": "down"}, 503
 
 
 @main_bp.route("/kurumsal/<slug>")
@@ -73,3 +79,13 @@ def site_haritasi():
 @main_bp.route("/kurumsal/iletisim")
 def iletisim():
     return render_template("kurumsal/iletisim.html", title="İletişim")
+
+
+@main_bp.route("/gizlilik")
+def gizlilik():
+    return redirect(url_for("main.kurumsal_sayfa", slug="gizlilik-kvkk"))
+
+
+@main_bp.route("/kullanim-kosullari")
+def kullanim_kosullari():
+    return redirect(url_for("main.kurumsal_sayfa", slug="kullanim-kosullari"))

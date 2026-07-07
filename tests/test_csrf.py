@@ -12,7 +12,7 @@ def csrf_app():
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "WTF_CSRF_ENABLED": True,
-        "RECAPTCHA_ENABLED": False,
+        "TURNSTILE_ENABLED": False,
     })
     with app.app_context():
         db.create_all()

@@ -11,9 +11,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p static/item_pics static/profile_pics
+# Windows CRLF → LF; COPY . sonrası çalıştırılmalı (üzerine yazılmasın)
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh \
+    && chmod +x /app/docker-entrypoint.sh \
+    && mkdir -p static/item_pics static/profile_pics logs
 
 ENV FLASK_APP=app.py
+ENV AUTO_CREATE_DB=False
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]

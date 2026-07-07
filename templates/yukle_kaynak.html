@@ -59,33 +59,19 @@
                 <small class="text-muted">Birden fazla seçmek için Ctrl veya Shift tuşunu kullanın. Maks. 5 MB/dosya.</small>
             </div>
 
-            {% from "_recaptcha.html" import recaptcha_widget %}
-            {{ recaptcha_widget() }}
+            {% from "_turnstile.html" import turnstile_widget %}
+            {{ turnstile_widget() }}
             <button type="submit" class="btn btn-primary w-100 mt-3">Kaynağı Paylaş</button>
         </form>
         </div>
     </div>
 </div>
 
-<script>
-document.getElementById('konumAlBtn').addEventListener('click', function() {
-    if (!navigator.geolocation) {
-        document.getElementById('konumDurum').textContent = 'Tarayıcı konum desteklemiyor.';
-        return;
-    }
-    navigator.geolocation.getCurrentPosition(function(pos) {
-        document.getElementById('latitude').value = pos.coords.latitude;
-        document.getElementById('longitude').value = pos.coords.longitude;
-        document.getElementById('konumDurum').textContent = 'Konum alındı.';
-    }, function() {
-        document.getElementById('konumDurum').textContent = 'Konum izni verilmedi.';
-    });
-});
-</script>
+<script src="{{ url_for('static', filename='js/yukle-kaynak.js') }}"></script>
 
 {% endblock %}
 
 {% block scripts %}
-{% from "_recaptcha.html" import recaptcha_script %}
-{{ recaptcha_script() }}
+{% from "_turnstile.html" import turnstile_script %}
+{{ turnstile_script() }}
 {% endblock %}

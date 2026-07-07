@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% from "errors/_error_sayfasi.html" import error_sayfasi %}
+{% block content %}
+{{ error_sayfasi(
+    kod='404',
+    baslik='Sayfa Bulunamadı',
+    aciklama='Aradığınız sayfa taşınmış, silinmiş veya hiç var olmamış olabilir. Adresi kontrol edip tekrar deneyin.',
+    ikon='bi-compass',
+    variant='primary',
+    ipuclari=[
+        'URL yazımını kontrol edin',
+        'Anasayfadan ilanlara göz atabilirsiniz',
+        'Kayıtlı bir bağlantıysa süresi dolmuş olabilir'
+    ],
+    birincil_url=url_for('main.anasayfa'),
+    birincil_metin='Anasayfaya Dön',
+    ikincil_url=url_for('kaynak.kaynak_panel'),
+    ikincil_metin='Kaynak İlanları'
+) }}
+{% endblock %}

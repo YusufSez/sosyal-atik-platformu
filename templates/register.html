@@ -8,7 +8,7 @@
             <h3>Kayıt Ol</h3>
         </div>
         <div class="card-body p-4">
-            <form method="POST" action="">
+            <form method="POST" action="" id="registerForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label for="username" class="form-label fw-medium">Kullanıcı Adı</label>
@@ -16,17 +16,43 @@
                 </div>
                 <div class="mb-3">
                     <label for="email" class="form-label fw-medium">E-posta</label>
-                    <input type="email" id="email" name="email" class="form-control" required>
+                    <input type="email" id="email" name="email" class="form-control" required
+                           autocomplete="email" inputmode="email" spellcheck="false"
+                           aria-describedby="emailFeedback">
+                    <div id="emailFeedback" class="email-feedback small mt-2 text-muted"></div>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label fw-medium">Parola</label>
                     <input type="password" id="password" name="password" class="form-control"
-                           autocomplete="new-password" required>
-                    <small class="text-muted">En az 8 karakter, büyük/küçük harf ve rakam içermeli.</small>
+                           autocomplete="new-password" required minlength="8"
+                           aria-describedby="passwordRules">
+                    <ul id="passwordRules" class="password-rules list-unstyled small mt-2 mb-0">
+                        <li data-rule="length"><span class="rule-icon" aria-hidden="true">○</span> En az 8 karakter</li>
+                        <li data-rule="upper"><span class="rule-icon" aria-hidden="true">○</span> En az 1 büyük harf (A-Z)</li>
+                        <li data-rule="lower"><span class="rule-icon" aria-hidden="true">○</span> En az 1 küçük harf (a-z)</li>
+                        <li data-rule="digit"><span class="rule-icon" aria-hidden="true">○</span> En az 1 rakam (0-9)</li>
+                    </ul>
                 </div>
-                {% from "_recaptcha.html" import recaptcha_widget %}
-                {{ recaptcha_widget() }}
-                <button type="submit" class="btn btn-primary w-100 py-2">Devam Et</button>
+                <div class="mb-3">
+                    <label for="password_tekrar" class="form-label fw-medium">Parola (Tekrar)</label>
+                    <input type="password" id="password_tekrar" name="password_tekrar" class="form-control"
+                           autocomplete="new-password" required minlength="8"
+                           aria-describedby="passwordMatch">
+                    <div id="passwordMatch" class="password-match small mt-2 text-muted"></div>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="kullanim_kosullari"
+                           name="kullanim_kosullari" value="on" required>
+                    <label class="form-check-label small" for="kullanim_kosullari">
+                        <a href="{{ url_for('main.kullanim_kosullari') }}" target="_blank" rel="noopener">Kullanım Koşulları</a>
+                        ve
+                        <a href="{{ url_for('main.gizlilik') }}" target="_blank" rel="noopener">Gizlilik Politikası</a>'nı
+                        okudum ve kabul ediyorum.
+                    </label>
+                </div>
+                {% from "_turnstile.html" import turnstile_widget %}
+                {{ turnstile_widget() }}
+                <button type="submit" id="registerSubmit" class="btn btn-primary w-100 py-2" disabled>Devam Et</button>
             </form>
             <div class="mt-4 text-center border-top pt-3">
                 <small class="text-muted">
@@ -40,6 +66,9 @@
 {% endblock %}
 
 {% block scripts %}
-{% from "_recaptcha.html" import recaptcha_script %}
-{{ recaptcha_script() }}
+{% from "_turnstile.html" import turnstile_script %}
+{{ turnstile_script() }}
+<script src="{{ url_for('static', filename='js/email-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/password-validation.js') }}"></script>
+<script src="{{ url_for('static', filename='js/register-form.js') }}"></script>
 {% endblock %}

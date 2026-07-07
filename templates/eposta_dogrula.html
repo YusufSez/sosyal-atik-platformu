@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-center py-4">
+    <div class="card auth-card w-100">
+        <div class="card-header-custom">
+            <i class="bi bi-envelope-check fs-3 d-block mb-2"></i>
+            <h3>E-posta Doğrulama</h3>
+        </div>
+        <div class="card-body p-4">
+            {% if current_user.email_verified %}
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle me-1"></i>
+                E-posta adresiniz doğrulandı.
+            </div>
+            <a href="{{ url_for('main.anasayfa') }}" class="btn btn-primary">Anasayfaya Dön</a>
+            {% else %}
+            <p class="text-muted">
+                <strong>{{ current_user.email }}</strong> adresine bir doğrulama bağlantısı gönderdik.
+                İlan vermek, mesaj göndermek ve yorum yapmak için e-postanızı doğrulamanız gerekir.
+            </p>
+            <form method="POST" action="{{ url_for('auth.eposta_dogrula_tekrar') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-arrow-repeat me-1"></i> Doğrulama E-postasını Tekrar Gönder
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

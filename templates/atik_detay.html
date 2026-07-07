@@ -21,16 +21,20 @@
                 </li>
             </ul>
 
-            <div class="d-flex gap-2 mt-auto">
+            <div class="d-flex flex-wrap gap-2 mt-auto">
 
                 {% if current_user.is_authenticated and current_user.id != item.sahip.id %}
                    <a href="{{ url_for('messages.mesajlar', user_id=item.sahip.id, kaynak_id=0, atik_id=item.id) }}" 
                         class="btn btn-outline-success btn-sm">
-                        Sahiple İletişime Geç
+                        <i class="bi bi-chat-dots"></i> Sahiple İletişime Geç
                     </a>
+                    <button type="button" class="btn btn-outline-danger btn-sm favori-toggle-btn"
+                            data-atik-id="{{ item.id }}" title="Favorilere Ekle">
+                        <i class="bi bi-heart"></i> Favori
+                    </button>
                 {% endif %}
                 {% if current_user.is_authenticated and current_user.id != item.sahip.id %}
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="sikayetEt(null, {{ item.id }})">Şikayet Et</button>
+                <button type="button" class="btn btn-outline-danger btn-sm sikayet-btn" data-atik-id="{{ item.id }}">Şikayet Et</button>
                 {% endif %}
                 <a href="{{ url_for('atik.atik_panel') }}" class="btn btn-success btn-sm">Geri Dön</a>
             </div>
@@ -50,15 +54,8 @@
 
 <h4 class="detail-alt-bolum">💬 Yorumlar</h4>
 <div class="detail-alt-bolum">
-{% for y in item.comments %}
-<div class="border p-2 rounded mb-2">
-    <strong>{{ y.user.username }}</strong>
-    <small class="text-muted">{{ y.timestamp.strftime('%d-%m-%Y %H:%M') }}</small>
-    <p>{{ y.content|display_text }}</p>
-</div>
-{% else %}
-<p class="text-muted">Henüz yorum yok.</p>
-{% endfor %}
+{% from "_yorum_listesi.html" import yorum_listesi with context %}
+{{ yorum_listesi(kok_yorumlar, item.sahip.id, 'atik', item.id) }}
 </div>
 {% if current_user.is_authenticated %}
 <form method="POST" action="{{ url_for('atik.yorum_ekle_atik', atik_id=item.id) }}" class="detail-alt-bolum">
@@ -70,36 +67,11 @@
 <p class="text-muted text-center">Yorum yapmak için <a href="{{ url_for('auth.giris') }}">giriş yapın</a>.</p>
 {% endif %}
 
-<script>
-function sikayetEt(kaynakId, atikId) {
-    var sebep = prompt('Şikayet sebebinizi yazın:');
-    if (!sebep) return;
-    csrfFetch('/api/sikayet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kaynak_id: kaynakId, atik_id: atikId, sebep: sebep })
-    }).then(function() { alert('Şikayetiniz alındı.'); });
-}
-(function() {
-    var atikId = {{ item.id }};
-    function guncelleSayac() {
-        fetch('/api/goruntulenme_sayisi?atik_id=' + atikId)
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                var el = document.getElementById('goruntulenmeSayisi');
-                if (el) el.textContent = d.count || 0;
-            });
-    }
-    {% if current_user.is_authenticated %}
-    csrfFetch('/api/goruntulenme_ekle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ atik_id: atikId })
-    }).then(guncelleSayac).catch(guncelleSayac);
-    {% else %}
-    guncelleSayac();
-    {% endif %}
-})();
-</script>
+<script type="application/json" id="detay-config">{{ {
+    'type': 'atik',
+    'id': item.id,
+    'authenticated': current_user.is_authenticated
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/ilan-detay.js') }}"></script>
 
 {% endblock %}

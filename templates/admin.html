@@ -139,10 +139,16 @@
                 <td>{{ u.email }}</td>
                 <td>{% if u.is_admin %}<span class="badge bg-warning">Admin</span>{% else %}-{% endif %}</td>
                 <td>
+                    {% if super_admin and u.id != current_user.id %}
                     <form method="POST" action="{{ url_for('admin.admin_toggle_admin', user_id=u.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-sm btn-outline-secondary">Admin Aç/Kapat</button>
                     </form>
+                    {% elif u.id == current_user.id %}
+                    <span class="text-muted small">—</span>
+                    {% else %}
+                    <span class="text-muted small">Yalnızca süper admin</span>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -167,6 +173,34 @@
         <li class="list-group-item text-muted">Şikayet yok.</li>
         {% endfor %}
     </ul>
+
+    <h5 class="mt-4">Yönetim Kayıtları</h5>
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Admin</th>
+                    <th>İşlem</th>
+                    <th>Hedef</th>
+                    <th>Detay</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in audit_kayitlari %}
+            <tr>
+                <td><small>{{ log.tarih.strftime('%d.%m.%Y %H:%M') if log.tarih else '-' }}</small></td>
+                <td>{{ log.admin.username if log.admin else '-' }}</td>
+                <td><code>{{ log.action }}</code></td>
+                <td>{{ log.target or '-' }}</td>
+                <td><small class="text-muted">{{ log.detail or '' }}</small></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Henüz kayıt yok.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 {% endblock %}

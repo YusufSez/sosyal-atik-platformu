@@ -3,8 +3,9 @@ from flask_login import current_user, login_required
 
 from sqlalchemy import or_
 
-from constants import ILAN_DURUMLARI, KATEGORILER_ATIK, MAX_ILAN_FOTOSU
-from extensions import db, limiter
+from constants import ILAN_DURUMLARI, KATEGORILER_ATIK, MAX_ILAN_FOTOSU, RATE_COMMENT, RATE_ILAN_CREATE
+from decorators import email_verified_required
+from extensions import db, ai_analiz_limit, limiter, rate_limit_user_or_ip
 from models import Atik, Comment
 from services.captcha import captcha_hatasi
 from services.ilan_images import (
@@ -15,7 +16,10 @@ from services.ilan_images import (
     save_ilan_fotograflari,
 )
 from services.notifications import bildirim_olustur
+from services.yorumlar import kok_yorumlari_getir, yorum_cevapla as yorum_cevabi_kaydet
+from services.content_filter import yorum_uygun_mu
 from services.recommendations import kullanici_onerileri
+from services.query_options import ilan_detay_options, ilan_listesi_options
 from utils import ilan_erisilebilir_mi, parse_coordinates, sanitize_input, harita_noktalari
 
 atik_bp = Blueprint("atik", __name__)
@@ -40,7 +44,9 @@ def atik_panel():
     else:
         query = query.order_by(Atik.id.desc())
 
-    pagination = query.paginate(page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False)
+    pagination = query.options(*ilan_listesi_options(Atik)).paginate(
+        page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False
+    )
     harita_atiklar = Atik.query.filter(
         or_(Atik.ilan_durumu == "Aktif", Atik.ilan_durumu.is_(None))
     ).all()
@@ -60,7 +66,9 @@ def atik_panel():
 
 @atik_bp.route("/yukle_atik", methods=["GET", "POST"])
 @login_required
-@limiter.limit("30 per hour")
+@email_verified_required
+@limiter.limit(RATE_ILAN_CREATE, methods=["POST"], key_func=rate_limit_user_or_ip)
+@ai_analiz_limit
 def yukle_atik():
     if request.method == "POST":
         captcha_err = captcha_hatasi()
@@ -134,20 +142,32 @@ def yukle_atik():
 
 @atik_bp.route("/atik/<int:id>")
 def atik_detay(id):
-    item = Atik.query.get_or_404(id)
+    item = Atik.query.options(*ilan_detay_options(Atik)).filter_by(id=id).first_or_404()
     if not ilan_erisilebilir_mi(item, current_user):
         flash("Bu ilan artık aktif değil.", "warning")
         return redirect(url_for("atik.atik_panel"))
-    return render_template("atik_detay.html", item=item, ilan_durumlari=ILAN_DURUMLARI)
+    return render_template(
+        "atik_detay.html",
+        item=item,
+        ilan_durumlari=ILAN_DURUMLARI,
+        kok_yorumlar=kok_yorumlari_getir(atik_id=item.id),
+    )
 
 
 @atik_bp.route("/yorum_ekle_atik/<int:atik_id>", methods=["POST"])
 @login_required
+@email_verified_required
+@limiter.limit(RATE_COMMENT, methods=["POST"], key_func=rate_limit_user_or_ip)
 def yorum_ekle_atik(atik_id):
     atik = Atik.query.get_or_404(atik_id)
     content = sanitize_input(request.form.get("yorum"), max_length=1000)
     if not content:
         flash("Yorum boş olamaz!", "danger")
+        return redirect(url_for("atik.atik_detay", id=atik_id))
+
+    uygun, hata = yorum_uygun_mu(content)
+    if not uygun:
+        flash(hata, "danger")
         return redirect(url_for("atik.atik_detay", id=atik_id))
 
     yorum = Comment(content=content, user_id=current_user.id, atik_id=atik_id)
@@ -165,3 +185,25 @@ def yorum_ekle_atik(atik_id):
 
     flash("Yorum başarıyla eklendi!", "success")
     return redirect(url_for("atik.atik_detay", id=atik_id))
+
+
+@atik_bp.route("/yorum_cevapla/<int:atik_id>/<int:parent_id>", methods=["POST"])
+@login_required
+@email_verified_required
+@limiter.limit(RATE_COMMENT, methods=["POST"], key_func=rate_limit_user_or_ip)
+def yorum_cevapla(atik_id, parent_id):
+    Atik.query.get_or_404(atik_id)
+    content = sanitize_input(request.form.get("yorum"), max_length=1000)
+    if not content:
+        flash("Cevap boş olamaz!", "danger")
+        return redirect(url_for("atik.atik_detay", id=atik_id, _anchor=f"yorum-{parent_id}"))
+
+    try:
+        yorum_cevabi_kaydet(current_user, parent_id, content)
+        flash("Cevabınız eklendi!", "success")
+    except PermissionError:
+        flash("Yalnızca ilan sahibi yorumlara cevap verebilir.", "danger")
+    except ValueError as exc:
+        flash(str(exc), "danger")
+
+    return redirect(url_for("atik.atik_detay", id=atik_id, _anchor=f"yorum-{parent_id}"))

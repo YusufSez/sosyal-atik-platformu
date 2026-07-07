@@ -44,11 +44,11 @@
                 <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart text-primary me-2"></i>Aylık CO₂e (kg)</h5>
                 {% set max_co2 = aylik|map(attribute='co2e_kg')|max if aylik else 1 %}
                 {% if max_co2 == 0 %}{% set max_co2 = 1 %}{% endif %}
-                <div class="d-flex align-items-end gap-2" style="height: 160px;">
+                <div class="d-flex align-items-end gap-2 chart-bars">
                     {% for ay in aylik %}
                     <div class="flex-fill text-center">
-                        <div class="bg-success rounded-top mx-auto" style="width: 80%; height: {{ (ay.co2e_kg / max_co2 * 120)|int }}px; min-height: 4px;"></div>
-                        <small class="text-muted d-block mt-1" style="font-size:0.65rem;">{{ ay.etiket }}</small>
+                        <div class="bg-success rounded-top mx-auto chart-bar" data-bar-height="{{ (ay.co2e_kg / max_co2 * 120)|int }}"></div>
+                        <small class="text-muted d-block mt-1 chart-bar-label">{{ ay.etiket }}</small>
                     </div>
                     {% endfor %}
                 </div>
@@ -101,7 +101,7 @@
         </div>
         {% else %}
         <div class="empty-state text-center m-3">
-            <i class="bi bi-inbox text-muted" style="font-size:2rem;"></i>
+            <i class="bi bi-inbox text-muted empty-icon-lg"></i>
             <p class="text-muted mt-2 mb-0">Henüz teslim edilmiş ilanınız yok. İlk paylaşımınızı yapın!</p>
             <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
                 <a href="{{ url_for('kaynak.yukle_kaynak') }}" class="btn btn-sm btn-primary">Kaynak Ekle</a>

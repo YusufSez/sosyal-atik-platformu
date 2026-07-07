@@ -1,3 +1,7 @@
+import os
+
+os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
+
 import pytest
 
 from factory import create_app
@@ -10,7 +14,7 @@ def app():
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "WTF_CSRF_ENABLED": False,
-        "RECAPTCHA_ENABLED": False,
+        "TURNSTILE_ENABLED": False,
     })
     with app.app_context():
         db.create_all()

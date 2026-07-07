@@ -1,14 +1,29 @@
 import json
 import os
 import re
+from datetime import datetime
 
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from auth_utils import hash_password, needs_password_update, verify_password
-from extensions import db, limiter
+from constants import (
+    RATE_EMAIL_RESEND,
+    RATE_LOGIN,
+    RATE_PASSWORD_RESET,
+    RATE_REGISTER,
+)
+from extensions import db, limiter, rate_limit_user_or_ip
 from models import User
 from services.captcha import captcha_hatasi
+from services.email import dogrulama_epostasi_gonder, sifre_sifirlama_epostasi_gonder
+from services.email_tokens import (
+    create_reset_token,
+    create_verify_token,
+    peek_token,
+    verify_email_token,
+    verify_reset_token,
+)
 from utils import (
     delete_profile_picture,
     parse_coordinates,
@@ -21,7 +36,7 @@ auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.route("/kayit", methods=["GET", "POST"])
-@limiter.limit("10 per hour")
+@limiter.limit(RATE_REGISTER, methods=["POST"])
 def kayit():
     if current_user.is_authenticated:
         return redirect(url_for("main.anasayfa"))
@@ -35,6 +50,7 @@ def kayit():
         username = sanitize_input(request.form.get("username"), max_length=30)
         email = sanitize_input(request.form.get("email"), max_length=150).lower().strip()
         password = request.form.get("password")
+        password_tekrar = request.form.get("password_tekrar")
 
         if len(username) < 3:
             flash("Kullanıcı adı en az 3 karakter olmalıdır.", "danger")
@@ -51,6 +67,14 @@ def kayit():
             flash(msg, "danger")
             return redirect(url_for("auth.kayit"))
 
+        if password != password_tekrar:
+            flash("Parolalar eşleşmiyor.", "danger")
+            return redirect(url_for("auth.kayit"))
+
+        if not request.form.get("kullanim_kosullari"):
+            flash("Kayıt için Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmelisiniz.", "danger")
+            return redirect(url_for("auth.kayit"))
+
         if User.query.filter_by(email=email).first():
             flash("Bu e-posta zaten kayıtlı!", "danger")
             return redirect(url_for("auth.kayit"))
@@ -58,11 +82,34 @@ def kayit():
             flash("Bu kullanıcı adı zaten alınmış!", "danger")
             return redirect(url_for("auth.kayit"))
 
-        new_user = User(username=username, email=email, password=hash_password(password))
+        new_user = User(
+            username=username,
+            email=email,
+            password=hash_password(password),
+            terms_accepted_at=datetime.now(),
+        )
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+        if admin_email and email == admin_email:
+            new_user.is_admin = True
         db.session.add(new_user)
         db.session.commit()
+
+        if not new_user.email_verified:
+            token = create_verify_token(new_user)
+            if dogrulama_epostasi_gonder(new_user, token):
+                flash(
+                    "Kayıt başarılı! E-posta adresinize doğrulama bağlantısı gönderildi.",
+                    "success",
+                )
+            else:
+                flash(
+                    "Kayıt başarılı! Doğrulama e-postası gönderilemedi. "
+                    "Giriş yaptıktan sonra E-posta Doğrulama sayfasından tekrar deneyebilirsiniz.",
+                    "warning",
+                )
+        else:
+            flash("Kayıt başarılı! Şimdi profilinizi tamamlayın.", "success")
         session["temp_user_id"] = new_user.id
-        flash("Kayıt başarılı! Şimdi profilinizi tamamlayın.", "success")
         return redirect(url_for("auth.profil_tamamla"))
 
     return render_template("register.html", title="Kayıt Ol")
@@ -108,7 +155,7 @@ def profil_tamamla():
 
 
 @auth_bp.route("/giris", methods=["GET", "POST"])
-@limiter.limit("20 per hour")
+@limiter.limit(RATE_LOGIN, methods=["POST"])
 def giris():
     if current_user.is_authenticated:
         return redirect(url_for("main.anasayfa"))
@@ -127,10 +174,7 @@ def giris():
             return redirect(url_for("auth.giris"))
 
         user = User.query.filter_by(email=email).first()
-        if not user:
-            flash("Bu e-posta ile kayıtlı bir kullanıcı bulunamadı. Lütfen kayıt olun.", "warning")
-            return redirect(url_for("auth.kayit"))
-        if not verify_password(password, user.password):
+        if not user or not verify_password(password, user.password):
             flash("Hatalı e-posta veya şifre!", "danger")
             return redirect(url_for("auth.giris"))
 
@@ -197,6 +241,7 @@ def profil_foto():
 
 @auth_bp.route("/sifre_degistir", methods=["GET", "POST"])
 @login_required
+@limiter.limit(RATE_PASSWORD_RESET, methods=["POST"], key_func=rate_limit_user_or_ip)
 def sifre_degistir():
     if request.method == "POST":
         mevcut = request.form.get("mevcut_sifre", "")
@@ -220,3 +265,112 @@ def sifre_degistir():
         return redirect(url_for("auth.profil"))
 
     return render_template("sifre_degistir.html", title="Şifre Değiştir")
+
+
+def _send_verification_to_user(user):
+    token = create_verify_token(user)
+    return dogrulama_epostasi_gonder(user, token)
+
+
+@auth_bp.route("/eposta-dogrula")
+@login_required
+def eposta_dogrula_bekle():
+    return render_template("eposta_dogrula.html", title="E-posta Doğrulama")
+
+
+@auth_bp.route("/eposta-dogrula/onay/<token>")
+def eposta_dogrula_onay(token):
+    user, error = verify_email_token(token)
+    if error == "expired":
+        flash("Doğrulama bağlantısının süresi dolmuş. Yeni bağlantı isteyin.", "warning")
+        return redirect(url_for("auth.eposta_dogrula_bekle") if current_user.is_authenticated else url_for("auth.giris"))
+    if not user:
+        flash("Geçersiz veya kullanılmış doğrulama bağlantısı.", "danger")
+        return redirect(url_for("auth.giris"))
+
+    user.email_verified = True
+    user.email_verified_at = datetime.now()
+    db.session.commit()
+    flash("E-posta adresiniz başarıyla doğrulandı!", "success")
+    if current_user.is_authenticated and current_user.id == user.id:
+        return redirect(url_for("main.anasayfa"))
+    return redirect(url_for("auth.giris"))
+
+
+@auth_bp.route("/eposta-dogrula/tekrar-gonder", methods=["POST"])
+@login_required
+@limiter.limit(RATE_EMAIL_RESEND, methods=["POST"], key_func=rate_limit_user_or_ip)
+def eposta_dogrula_tekrar():
+    if current_user.email_verified:
+        flash("E-posta adresiniz zaten doğrulanmış.", "info")
+        return redirect(url_for("auth.profil"))
+
+    if _send_verification_to_user(current_user):
+        flash("Doğrulama e-postası tekrar gönderildi.", "success")
+    else:
+        flash("E-posta gönderilemedi. SMTP ayarlarını kontrol edin.", "danger")
+    return redirect(url_for("auth.eposta_dogrula_bekle"))
+
+
+@auth_bp.route("/sifremi-unuttum", methods=["GET", "POST"])
+@limiter.limit(RATE_PASSWORD_RESET, methods=["POST"])
+def sifremi_unuttum():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.anasayfa"))
+
+    if request.method == "POST":
+        captcha_err = captcha_hatasi()
+        if captcha_err:
+            flash(captcha_err, "danger")
+            return redirect(url_for("auth.sifremi_unuttum"))
+
+        email = sanitize_input(request.form.get("email"), max_length=150).lower().strip()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = create_reset_token(user)
+            sifre_sifirlama_epostasi_gonder(user, token)
+
+        flash(
+            "E-posta adresiniz kayıtlıysa şifre sıfırlama bağlantısı gönderildi.",
+            "info",
+        )
+        return redirect(url_for("auth.giris"))
+
+    return render_template("sifremi_unuttum.html", title="Şifremi Unuttum")
+
+
+@auth_bp.route("/sifre-sifirla/<token>", methods=["GET", "POST"])
+@limiter.limit(RATE_PASSWORD_RESET, methods=["POST"])
+def sifre_sifirla(token):
+    if request.method == "GET":
+        _, error = peek_token(token, "reset")
+        if error == "expired":
+            flash("Şifre sıfırlama bağlantısının süresi dolmuş.", "warning")
+            return redirect(url_for("auth.sifremi_unuttum"))
+        if error:
+            flash("Geçersiz veya kullanılmış şifre sıfırlama bağlantısı.", "danger")
+            return redirect(url_for("auth.sifremi_unuttum"))
+        return render_template("sifre_sifirla.html", title="Şifre Sıfırla", token=token)
+
+    user, error = verify_reset_token(token)
+    if error == "expired":
+        flash("Şifre sıfırlama bağlantısının süresi dolmuş.", "warning")
+        return redirect(url_for("auth.sifremi_unuttum"))
+    if not user:
+        flash("Geçersiz veya kullanılmış şifre sıfırlama bağlantısı.", "danger")
+        return redirect(url_for("auth.sifremi_unuttum"))
+
+    yeni = request.form.get("yeni_sifre", "")
+    yeni_tekrar = request.form.get("yeni_sifre_tekrar", "")
+    if yeni != yeni_tekrar:
+        flash("Şifreler eşleşmiyor.", "danger")
+        return render_template("sifre_sifirla.html", title="Şifre Sıfırla", token=token)
+    valid, msg = validate_password(yeni)
+    if not valid:
+        flash(msg, "danger")
+        return render_template("sifre_sifirla.html", title="Şifre Sıfırla", token=token)
+
+    user.password = hash_password(yeni)
+    db.session.commit()
+    flash("Şifreniz güncellendi. Giriş yapabilirsiniz.", "success")
+    return redirect(url_for("auth.giris"))

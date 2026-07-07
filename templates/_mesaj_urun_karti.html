@@ -1,0 +1,48 @@
+{% macro mesaj_urun_karti(urun, kaynak_id=0, atik_id=0) %}
+<div class="card shadow-sm mesaj-urun-karti">
+    <div class="card-header fw-semibold small">
+        <i class="bi bi-box-seam me-1"></i>
+        {% if kaynak_id %}Kaynak İlanı{% elif atik_id %}Atık İlanı{% else %}Genel Sohbet{% endif %}
+    </div>
+    <div class="card-body">
+        {% if urun %}
+        {% set kapak = urun|kapak_resim %}
+        <div class="mesaj-urun-img-wrap mb-3">
+            {% if kapak != 'default.jpg' %}
+            <img src="{{ url_for('static', filename='item_pics/' + kapak) }}"
+                 alt="{{ urun.baslik }}" class="img-fluid rounded">
+            {% else %}
+            <div class="mesaj-urun-placeholder rounded d-flex align-items-center justify-content-center">
+                <i class="bi bi-image text-muted fs-2"></i>
+            </div>
+            {% endif %}
+        </div>
+        <h6 class="fw-bold mb-2">{{ urun.baslik }}</h6>
+        <ul class="list-unstyled small text-muted mb-3">
+            {% if urun.kategori is defined and urun.kategori %}
+            <li><strong>Kategori:</strong> {{ urun.kategori }}</li>
+            {% endif %}
+            {% if urun.durum is defined %}
+            <li><strong>Durum:</strong> {{ urun.durum }}</li>
+            {% endif %}
+            <li><strong>İlan:</strong> {{ urun.ilan_durumu or 'Aktif' }}</li>
+            <li><strong>Sahip:</strong> {{ urun.sahip.username }}</li>
+        </ul>
+        <p class="small text-muted clamp-text mb-3">{{ urun.aciklama[:120] }}{% if urun.aciklama|length > 120 %}...{% endif %}</p>
+        {% if kaynak_id %}
+        <a href="{{ url_for('kaynak.kaynak_detay', id=kaynak_id) }}" class="btn btn-outline-primary btn-sm w-100" target="_blank" rel="noopener">
+            İlanı Görüntüle
+        </a>
+        {% elif atik_id %}
+        <a href="{{ url_for('atik.atik_detay', id=atik_id) }}" class="btn btn-outline-success btn-sm w-100" target="_blank" rel="noopener">
+            İlanı Görüntüle
+        </a>
+        {% endif %}
+        {% else %}
+        <p class="text-muted small mb-0">
+            Bu sohbet belirli bir ilana bağlı değil. Mesajlarınız genel görüşme kapsamındadır.
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}

@@ -5,8 +5,9 @@ from flask_login import current_user, login_required
 
 from sqlalchemy import or_
 
-from constants import DURUMLAR_KAYNAK, ILAN_DURUMLARI, KATEGORILER_KAYNAK, MAX_ILAN_FOTOSU
-from extensions import db, limiter
+from constants import DURUMLAR_KAYNAK, ILAN_DURUMLARI, KATEGORILER_KAYNAK, MAX_ILAN_FOTOSU, RATE_COMMENT, RATE_ILAN_CREATE
+from decorators import email_verified_required
+from extensions import db, ai_analiz_limit, limiter, rate_limit_user_or_ip
 from models import Comment, Kaynak
 from services.captcha import captcha_hatasi
 from services.ilan_images import (
@@ -17,7 +18,10 @@ from services.ilan_images import (
     save_ilan_fotograflari,
 )
 from services.notifications import bildirim_olustur
+from services.yorumlar import kok_yorumlari_getir, yorum_cevapla as yorum_cevabi_kaydet
 from services.recommendations import kullanici_onerileri
+from services.query_options import ilan_detay_options, ilan_listesi_options
+from services.content_filter import yorum_uygun_mu
 from utils import ilan_erisilebilir_mi, parse_coordinates, sanitize_input, harita_noktalari
 
 kaynak_bp = Blueprint("kaynak", __name__)
@@ -42,7 +46,9 @@ def kaynak_panel():
     else:
         query = query.order_by(Kaynak.id.desc())
 
-    pagination = query.paginate(page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False)
+    pagination = query.options(*ilan_listesi_options(Kaynak)).paginate(
+        page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False
+    )
     harita_kaynaklar = Kaynak.query.filter(
         or_(Kaynak.ilan_durumu == "Aktif", Kaynak.ilan_durumu.is_(None))
     ).all()
@@ -62,7 +68,9 @@ def kaynak_panel():
 
 @kaynak_bp.route("/yukle_kaynak", methods=["GET", "POST"])
 @login_required
-@limiter.limit("30 per hour")
+@email_verified_required
+@limiter.limit(RATE_ILAN_CREATE, methods=["POST"], key_func=rate_limit_user_or_ip)
+@ai_analiz_limit
 def yukle_kaynak():
     if request.method == "POST":
         captcha_err = captcha_hatasi()
@@ -140,20 +148,32 @@ def yukle_kaynak():
 
 @kaynak_bp.route("/kaynak/<int:id>")
 def kaynak_detay(id):
-    item = Kaynak.query.get_or_404(id)
+    item = Kaynak.query.options(*ilan_detay_options(Kaynak)).filter_by(id=id).first_or_404()
     if not ilan_erisilebilir_mi(item, current_user):
         flash("Bu ilan artık aktif değil.", "warning")
         return redirect(url_for("kaynak.kaynak_panel"))
-    return render_template("kaynak_detay.html", item=item, ilan_durumlari=ILAN_DURUMLARI)
+    return render_template(
+        "kaynak_detay.html",
+        item=item,
+        ilan_durumlari=ILAN_DURUMLARI,
+        kok_yorumlar=kok_yorumlari_getir(kaynak_id=item.id),
+    )
 
 
 @kaynak_bp.route("/yorum_ekle/<int:kaynak_id>", methods=["POST"])
 @login_required
+@email_verified_required
+@limiter.limit(RATE_COMMENT, methods=["POST"], key_func=rate_limit_user_or_ip)
 def yorum_ekle(kaynak_id):
     kaynak = Kaynak.query.get_or_404(kaynak_id)
     content = sanitize_input(request.form.get("yorum"), max_length=1000)
     if not content:
         flash("Yorum boş olamaz!", "danger")
+        return redirect(url_for("kaynak.kaynak_detay", id=kaynak_id))
+
+    uygun, hata = yorum_uygun_mu(content)
+    if not uygun:
+        flash(hata, "danger")
         return redirect(url_for("kaynak.kaynak_detay", id=kaynak_id))
 
     yorum = Comment(content=content, user_id=current_user.id, kaynak_id=kaynak_id)
@@ -171,3 +191,25 @@ def yorum_ekle(kaynak_id):
 
     flash("Yorum başarıyla eklendi!", "success")
     return redirect(url_for("kaynak.kaynak_detay", id=kaynak_id))
+
+
+@kaynak_bp.route("/yorum_cevapla/<int:kaynak_id>/<int:parent_id>", methods=["POST"])
+@login_required
+@email_verified_required
+@limiter.limit(RATE_COMMENT, methods=["POST"], key_func=rate_limit_user_or_ip)
+def yorum_cevapla(kaynak_id, parent_id):
+    Kaynak.query.get_or_404(kaynak_id)
+    content = sanitize_input(request.form.get("yorum"), max_length=1000)
+    if not content:
+        flash("Cevap boş olamaz!", "danger")
+        return redirect(url_for("kaynak.kaynak_detay", id=kaynak_id, _anchor=f"yorum-{parent_id}"))
+
+    try:
+        yorum_cevabi_kaydet(current_user, parent_id, content)
+        flash("Cevabınız eklendi!", "success")
+    except PermissionError:
+        flash("Yalnızca ilan sahibi yorumlara cevap verebilir.", "danger")
+    except ValueError as exc:
+        flash(str(exc), "danger")
+
+    return redirect(url_for("kaynak.kaynak_detay", id=kaynak_id, _anchor=f"yorum-{parent_id}"))

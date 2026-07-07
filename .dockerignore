@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Ortam ve veri
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+backups/
+logs/
+instance/
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Kullanıcı yüklemeleri
+static/item_pics/*
+!static/item_pics/.gitkeep
+static/profile_pics/*
+!static/profile_pics/default.jpg
+
+# Geçici migration dosyaları
+migrations/_*.db

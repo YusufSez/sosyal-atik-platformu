@@ -11,12 +11,12 @@
         {% endfor %}
     </div>
     {% endif %}
-    <div class="carousel-inner rounded overflow-hidden" style="background: var(--bs-secondary-bg);">
+    <div class="carousel-inner rounded overflow-hidden ilan-galeri-inner">
         {% for foto in fotolar %}
         <div class="carousel-item {% if loop.first %}active{% endif %}">
-            <div class="d-flex justify-content-center align-items-center" style="height: 320px;">
+            <div class="d-flex justify-content-center align-items-center ilan-galeri-slide">
                 <img src="{{ url_for('static', filename='item_pics/' + foto) }}"
-                     class="d-block" style="max-height: 100%; max-width: 100%; object-fit: contain;"
+                     class="d-block ilan-galeri-img"
                      alt="{{ item.baslik }} — {{ loop.index }}/{{ fotolar|length }}">
             </div>
         </div>

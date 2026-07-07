@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from constants import DURUMLAR_KAYNAK, ILAN_DURUMLARI, KATEGORILER_ATIK, KATEGORILER_KAYNAK, MAX_ILAN_FOTOSU
-from extensions import db
+from extensions import ai_analiz_limit, db
 from models import Atik, Kaynak, User
 from services.ilan_images import (
     ai_analiz_ilk_foto,
@@ -139,6 +139,7 @@ def ilan_durum_guncelle(tur, id):
 
 @ilan_bp.route("/ilan_duzenle/kaynak/<int:id>", methods=["GET", "POST"])
 @login_required
+@ai_analiz_limit
 def ilan_duzenle_kaynak(id):
     ilan = Kaynak.query.get_or_404(id)
     if ilan.user_id != current_user.id:
@@ -192,6 +193,7 @@ def ilan_duzenle_kaynak(id):
 
 @ilan_bp.route("/ilan_duzenle/atik/<int:id>", methods=["GET", "POST"])
 @login_required
+@ai_analiz_limit
 def ilan_duzenle_atik(id):
     ilan = Atik.query.get_or_404(id)
     if ilan.user_id != current_user.id:

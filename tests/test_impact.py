@@ -159,6 +159,8 @@ def test_ilan_durum_teslim_etki(client, app):
         "username": "other",
         "email": "other@test.com",
         "password": "TestPass1",
+        "password_tekrar": "TestPass1",
+        "kullanim_kosullari": "on",
     }, follow_redirects=True)
     client.post("/profil_tamamla", data={
         "dogum_tarihi": "2000-01-01",

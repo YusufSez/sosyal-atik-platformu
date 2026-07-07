@@ -10,16 +10,17 @@ from extensions import db
 from models import AtikMerkezi
 from services.impact import backfill_mevcut_teslimler, sync_etki_ilan_durumu
 from services.ilan_images import backfill_ilan_resimleri
-from utils import ensure_schema
+from services.db_bootstrap import bootstrap_database
 
 
 def run_migration():
     app = create_app()
     with app.app_context():
         print("Migration başlıyor...")
-        db.create_all()
-        ensure_schema()
+        from flask_migrate import upgrade
 
+        upgrade()
+        bootstrap_database(app)
         if AtikMerkezi.query.count() == 0:
             print("Örnek atık merkezleri ekleniyor...")
             db.session.add_all([

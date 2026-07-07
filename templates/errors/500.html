@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% from "errors/_error_sayfasi.html" import error_sayfasi %}
+{% block content %}
+{{ error_sayfasi(
+    kod='500',
+    baslik='Sunucu Hatası',
+    aciklama='İşleminiz sırasında beklenmeyen bir sorun oluştu. Ekibimiz bilgilendirildi; lütfen bir süre sonra tekrar deneyin.',
+    ikon='bi-tools',
+    variant='primary',
+    ipuclari=[
+        'Sayfayı yenileyerek tekrar deneyebilirsiniz',
+        'Sorun devam ederse farklı bir tarayıcı deneyin',
+        'Verileriniz güvende; işlem tamamlanmamış olabilir'
+    ],
+    birincil_url=url_for('main.anasayfa'),
+    birincil_metin='Anasayfaya Dön',
+    ikincil_url=request.referrer or none,
+    ikincil_metin='Tekrar Dene' if request.referrer else none
+) }}
+{% endblock %}

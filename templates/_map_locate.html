@@ -1,0 +1,9 @@
+{% macro map_with_locate(map_id='map') %}
+<div class="map-locate-wrap">
+    <div id="{{ map_id }}" class="map-container"></div>
+    <button type="button" class="btn btn-light btn-sm map-locate-btn" data-map-locate
+            title="Konumuma git" aria-label="Konumuma git">
+        <i class="bi bi-crosshair"></i>
+    </button>
+</div>
+{% endmacro %}

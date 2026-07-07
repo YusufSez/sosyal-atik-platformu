@@ -4,7 +4,7 @@
 <div class="hero-section fade-in">
     <div class="hero-badge"><i class="bi bi-stars"></i> AI destekli moderasyon</div>
     <h1>Atık & Kaynak Paylaşım Platformu</h1>
-    <p class="text-muted mb-0 mx-auto" style="max-width: 520px;">
+    <p class="text-muted mb-0 mx-auto hero-subtitle">
         Kullanmadığın eşyaları paylaş, atıklarını doğru noktaya ulaştır. Birlikte daha sürdürülebilir bir gelecek.
     </p>
 </div>
@@ -51,10 +51,10 @@
                 <div class="position-relative card-img-wrap">
                     {% set kapak = k|kapak_resim %}
                     {% if kapak != 'default.jpg' %}
-                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ k.baslik }}">
+                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" alt="{{ k.baslik }}">
                     {% else %}
-                    <div class="d-flex align-items-center justify-content-center h-100 text-muted">
-                        <i class="bi bi-image" style="font-size:2rem;"></i>
+                    <div class="card-img-placeholder">
+                        <i class="bi bi-image"></i>
                     </div>
                     {% endif %}
                     <span class="badge bg-success category-badge">{{ k.kategori }}</span>

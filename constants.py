@@ -33,13 +33,49 @@ ILAN_DURUMLARI = ["Aktif", "Rezerve", "Teslim Edildi"]
 DEFAULT_LAT = 41.015137
 DEFAULT_LNG = 28.979530
 
-ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-MAX_SINGLE_IMAGE_BYTES = 5 * 1024 * 1024
-MAX_UPLOAD_BYTES = 16 * 1024 * 1024
+ALLOWED_IMAGE_EXTENSIONS = frozenset({"jpg", "jpeg", "png", "webp"})
+BLOCKED_UPLOAD_EXTENSIONS = frozenset({
+    "exe", "php", "js", "svg", "html", "htm", "sh", "bat", "cmd", "py", "phtml",
+})
+ALLOWED_IMAGE_MIMES = frozenset({"image/jpeg", "image/png", "image/webp"})
+EXTENSION_TO_PIL_FORMAT = {
+    "jpg": "JPEG",
+    "jpeg": "JPEG",
+    "png": "PNG",
+    "webp": "WEBP",
+}
+PIL_FORMAT_TO_EXT = {
+    "JPEG": ".jpg",
+    "PNG": ".png",
+    "WEBP": ".webp",
+}
+PIL_FORMAT_TO_MIME = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+}
 ITEMS_PER_PAGE = 12
 MAX_ILAN_FOTOSU = 10
+MAX_SINGLE_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = MAX_SINGLE_IMAGE_BYTES * MAX_ILAN_FOTOSU
+
+# Rate limiting (Flask-Limiter)
+RATE_LOGIN = "5 per minute"
+RATE_REGISTER = "3 per minute"
+RATE_PASSWORD_RESET = "3 per hour"
+RATE_EMAIL_RESEND = "3 per hour"
+RATE_ILAN_CREATE = "20 per hour"
+RATE_MESSAGE = "30 per minute"
+RATE_COMMENT = "15 per minute"
+RATE_AI_ANALIZ = "10 per minute"
+RATE_PUBLIC_API = "120 per minute"
+
+EMAIL_VERIFY_REQUIRED_MSG = (
+    "Bu işlemi yapabilmek için e-posta adresinizi doğrulamanız gerekiyor."
+)
 
 AI_RISK_BLOCK_THRESHOLD = 70
+MESSAGE_AI_BLOCK_THRESHOLD = 55
 
 HESAPLAMA_VERSIYONU = "1.0"
 

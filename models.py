@@ -18,6 +18,9 @@ class User(UserMixin, db.Model):
     is_completed = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     is_kurum = db.Column(db.Boolean, default=False)
+    terms_accepted_at = db.Column(db.DateTime, nullable=True)
+    email_verified = db.Column(db.Boolean, default=False)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
     guven_puani = db.Column(db.Integer, default=0)
     xp = db.Column(db.Integer, default=0)
     profile_image = db.Column(db.String(60), nullable=True, default="default.jpg")
@@ -86,9 +89,16 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True)
     atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey("comment.id"), nullable=True)
     user = db.relationship("User", backref="comments", lazy=True)
     kaynak = db.relationship("Kaynak", backref="comments", lazy=True)
     atik = db.relationship("Atik", backref="comments", lazy=True)
+    replies = db.relationship(
+        "Comment",
+        backref=db.backref("parent", remote_side=[id]),
+        lazy=True,
+        order_by="Comment.timestamp.asc()",
+    )
 
 
 class Mesaj(db.Model):
@@ -145,12 +155,14 @@ class Sikayet(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True)
     atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True)
+    mesaj_id = db.Column(db.Integer, db.ForeignKey("mesaj.id"), nullable=True)
     sebep = db.Column(db.Text, nullable=False)
     durum = db.Column(db.String(50), nullable=False, default="Beklemede")
     timestamp = db.Column(db.DateTime, default=tr_time)
     user = db.relationship("User", backref="sikayetler", lazy=True)
     kaynak = db.relationship("Kaynak", backref="sikayetler", lazy=True)
     atik = db.relationship("Atik", backref="sikayetler", lazy=True)
+    mesaj = db.relationship("Mesaj", backref="sikayetler", lazy=True)
 
 
 class CevreselEtki(db.Model):
@@ -186,3 +198,25 @@ class KullaniciRozet(db.Model):
     __table_args__ = (
         db.UniqueConstraint("user_id", "rozet_kod", name="uq_kullanici_rozet"),
     )
+
+
+class EmailToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    purpose = db.Column(db.String(20), nullable=False)
+    nonce = db.Column(db.String(64), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time)
+    user = db.relationship("User", backref=db.backref("email_tokens", lazy=True))
+
+
+class AdminAuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    action = db.Column(db.String(80), nullable=False)
+    target = db.Column(db.String(200))
+    detail = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    tarih = db.Column(db.DateTime, default=tr_time)
+    admin = db.relationship("User", backref=db.backref("admin_audit_logs", lazy=True))

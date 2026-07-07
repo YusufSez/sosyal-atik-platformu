@@ -1,0 +1,15 @@
+{% macro turnstile_widget() %}
+{% if config.TURNSTILE_ENABLED and config.TURNSTILE_SITE_KEY %}
+<div class="mb-3 turnstile-widget"
+     data-sitekey="{{ config.TURNSTILE_SITE_KEY }}"
+     data-language="tr"
+     data-theme="auto"></div>
+{% endif %}
+{% endmacro %}
+
+{% macro turnstile_script() %}
+{% if config.TURNSTILE_ENABLED and config.TURNSTILE_SITE_KEY %}
+<script src="{{ url_for('static', filename='js/turnstile-init.js') }}" defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=turnstileWidgetsInit" defer nonce="{{ csp_nonce() }}"></script>
+{% endif %}
+{% endmacro %}

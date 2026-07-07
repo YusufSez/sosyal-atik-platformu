@@ -1,15 +1,28 @@
 import html
+import io
 import os
 import re
-from time import time
+import secrets
 
 import bleach
-from flask import current_app
+from urllib.parse import urlparse
+
+from flask import current_app, request
 from flask_login import current_user
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-from constants import ALLOWED_IMAGE_EXTENSIONS, DEFAULT_LAT, DEFAULT_LNG, MAX_SINGLE_IMAGE_BYTES
+from constants import (
+    ALLOWED_IMAGE_EXTENSIONS,
+    ALLOWED_IMAGE_MIMES,
+    BLOCKED_UPLOAD_EXTENSIONS,
+    DEFAULT_LAT,
+    DEFAULT_LNG,
+    EXTENSION_TO_PIL_FORMAT,
+    MAX_SINGLE_IMAGE_BYTES,
+    PIL_FORMAT_TO_EXT,
+    PIL_FORMAT_TO_MIME,
+)
 from extensions import db
 
 
@@ -37,6 +50,21 @@ def sanitize_input(text, max_length=None):
     return text
 
 
+def safe_redirect_url(target, default_endpoint="main.anasayfa"):
+    """Harici open-redirect riskini önler; yalnızca aynı host veya göreli yollar."""
+    if not target:
+        from flask import url_for
+        return url_for(default_endpoint)
+    parsed = urlparse(target)
+    if parsed.scheme or parsed.netloc:
+        host = (request.host or "").split(":")[0].lower()
+        ref_host = (parsed.netloc or "").split(":")[0].lower()
+        if not ref_host or ref_host != host:
+            from flask import url_for
+            return url_for(default_endpoint)
+    return target
+
+
 def unescape_stored_text(text):
     """Eski kayıtlardaki HTML-escape edilmiş metinleri gösterim için düzeltir."""
     if not text:
@@ -59,58 +87,101 @@ def validate_password(password):
 
 
 def allowed_file(filename):
-    return (
-        "." in filename
-        and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
-    )
+    if not filename or "." not in filename:
+        return False
+    safe_name = secure_filename(filename).lower()
+    if not safe_name:
+        return False
+    for part in safe_name.split(".")[1:]:
+        if part in BLOCKED_UPLOAD_EXTENSIONS:
+            return False
+    ext = safe_name.rsplit(".", 1)[1]
+    return ext in ALLOWED_IMAGE_EXTENSIONS
+
+
+def _normalize_mime(mime_type):
+    if not mime_type:
+        return ""
+    return mime_type.split(";")[0].strip().lower()
 
 
 def _validate_image_bytes(file_storage):
-    """Dosya uzantısı, boyutu ve gerçek görsel içeriğini doğrula."""
+    """Uzantı, MIME, boyut ve Pillow ile gerçek görsel içeriğini doğrula."""
     if not file_storage or not file_storage.filename:
-        return False, "Dosya seçilmedi"
+        return False, "Dosya seçilmedi", None
     if not allowed_file(file_storage.filename):
-        return False, "Sadece PNG, JPG, JPEG veya WEBP yüklenebilir"
+        return False, "Sadece JPG, JPEG, PNG veya WEBP yüklenebilir", None
+
+    safe_name = secure_filename(file_storage.filename).lower()
+    claimed_ext = safe_name.rsplit(".", 1)[1]
+    expected_format = EXTENSION_TO_PIL_FORMAT.get(claimed_ext)
+    if not expected_format:
+        return False, "Geçersiz dosya uzantısı", None
+
     file_storage.seek(0, os.SEEK_END)
     size = file_storage.tell()
     file_storage.seek(0)
+    if size == 0:
+        return False, "Boş dosya yüklenemez", None
     if size > MAX_SINGLE_IMAGE_BYTES:
         max_mb = MAX_SINGLE_IMAGE_BYTES // (1024 * 1024)
-        return False, f"Dosya boyutu {max_mb} MB sınırını aşıyor"
+        return False, f"Dosya boyutu {max_mb} MB sınırını aşıyor", None
+
+    claimed_mime = _normalize_mime(getattr(file_storage, "content_type", None))
+    if claimed_mime and claimed_mime not in ALLOWED_IMAGE_MIMES:
+        return False, "Geçersiz dosya MIME türü", None
+
     try:
-        img = Image.open(file_storage)
-        img.verify()
+        raw = file_storage.read()
         file_storage.seek(0)
-        img = Image.open(file_storage)
-        if img.format and img.format.upper() not in ("JPEG", "PNG", "WEBP"):
-            file_storage.seek(0)
-            return False, "Geçersiz görsel dosyası"
+        with Image.open(io.BytesIO(raw)) as img:
+            img.verify()
+        with Image.open(io.BytesIO(raw)) as img:
+            img.load()
+            detected_format = (img.format or "").upper()
+            if detected_format not in PIL_FORMAT_TO_EXT:
+                return False, "Geçersiz görsel dosyası", None
+            if detected_format != expected_format:
+                return False, "Dosya uzantısı ile içerik uyuşmuyor", None
+            if claimed_mime:
+                expected_mime = PIL_FORMAT_TO_MIME.get(detected_format)
+                if expected_mime and claimed_mime != expected_mime:
+                    return False, "Dosya MIME türü ile içerik uyuşmuyor", None
         file_storage.seek(0)
     except Exception:
         file_storage.seek(0)
-        return False, "Geçersiz görsel dosyası"
-    return True, None
+        return False, "Geçersiz görsel dosyası", None
+
+    return True, None, expected_format
 
 
-def save_picture(form_picture):
-    ok, err = _validate_image_bytes(form_picture)
+def _random_image_filename(pil_format):
+    ext = PIL_FORMAT_TO_EXT.get(pil_format, ".jpg")
+    return secrets.token_hex(16) + ext
+
+
+def _save_image_to_folder(form_picture, folder, thumbnail_size):
+    ok, err, pil_format = _validate_image_bytes(form_picture)
     if not ok:
         raise ValueError(err)
 
-    random_hex = str(time()).replace(".", "")
-    f_ext = os.path.splitext(secure_filename(form_picture.filename))[1].lower()
-    if f_ext == ".jpeg":
-        f_ext = ".jpg"
-    picture_fn = random_hex + f_ext
-    picture_path = os.path.join(current_app.config["UPLOAD_FOLDER"], picture_fn)
+    os.makedirs(folder, exist_ok=True)
+    picture_fn = _random_image_filename(pil_format)
+    picture_path = os.path.join(folder, picture_fn)
 
     img = Image.open(form_picture)
-    img.thumbnail((600, 400))
-    save_format = "JPEG" if f_ext in (".jpg", ".jpeg") else img.format or "PNG"
+    img.thumbnail(thumbnail_size)
+    save_format = pil_format
     if save_format == "JPEG" and img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
     img.save(picture_path, format=save_format, optimize=True, quality=85)
+    form_picture.seek(0)
     return picture_fn
+
+
+def save_picture(form_picture):
+    folder = current_app.config["UPLOAD_FOLDER"]
+    return _save_image_to_folder(form_picture, folder, (600, 400))
 
 
 def delete_picture(filename):
@@ -122,26 +193,8 @@ def delete_picture(filename):
 
 
 def save_profile_picture(form_picture):
-    ok, err = _validate_image_bytes(form_picture)
-    if not ok:
-        raise ValueError(err)
-
     folder = os.path.join(current_app.root_path, "static", "profile_pics")
-    os.makedirs(folder, exist_ok=True)
-    random_hex = str(time()).replace(".", "")
-    f_ext = os.path.splitext(secure_filename(form_picture.filename))[1].lower()
-    if f_ext == ".jpeg":
-        f_ext = ".jpg"
-    picture_fn = random_hex + f_ext
-    picture_path = os.path.join(folder, picture_fn)
-
-    img = Image.open(form_picture)
-    img.thumbnail((300, 300))
-    save_format = "JPEG" if f_ext in (".jpg", ".jpeg") else img.format or "PNG"
-    if save_format == "JPEG" and img.mode in ("RGBA", "P"):
-        img = img.convert("RGB")
-    img.save(picture_path, format=save_format, optimize=True, quality=85)
-    return picture_fn
+    return _save_image_to_folder(form_picture, folder, (300, 300))
 
 
 def delete_profile_picture(filename):
@@ -252,6 +305,8 @@ def ensure_schema():
     """Mevcut SQLite veritabanına yeni sütunları güvenli şekilde ekler."""
     from sqlalchemy import inspect, text
 
+    if db.engine.dialect.name != "sqlite":
+        return
     inspector = inspect(db.engine)
     if "user" in inspector.get_table_names():
         user_cols = {c["name"] for c in inspector.get_columns("user")}
@@ -268,12 +323,21 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE user ADD COLUMN is_kurum BOOLEAN DEFAULT 0"))
             if "xp" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN xp INTEGER DEFAULT 0"))
+            if "terms_accepted_at" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN terms_accepted_at DATETIME"))
+            if "email_verified" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN email_verified BOOLEAN DEFAULT 0"))
+                conn.execute(text("UPDATE user SET email_verified = 1"))
+            if "email_verified_at" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN email_verified_at DATETIME"))
 
     if "comment" in inspector.get_table_names():
         comment_cols = {c["name"] for c in inspector.get_columns("comment")}
         with db.engine.begin() as conn:
             if "atik_id" not in comment_cols:
                 conn.execute(text("ALTER TABLE comment ADD COLUMN atik_id INTEGER"))
+            if "parent_id" not in comment_cols:
+                conn.execute(text("ALTER TABLE comment ADD COLUMN parent_id INTEGER"))
 
     for table in ("kaynak", "atik"):
         if table not in inspector.get_table_names():
@@ -283,3 +347,9 @@ def ensure_schema():
             if "ilan_durumu" not in cols:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN ilan_durumu VARCHAR(50) DEFAULT 'Aktif'"))
             conn.execute(text(f"UPDATE {table} SET ilan_durumu = 'Aktif' WHERE ilan_durumu IS NULL"))
+
+    if "sikayet" in inspector.get_table_names():
+        sikayet_cols = {c["name"] for c in inspector.get_columns("sikayet")}
+        with db.engine.begin() as conn:
+            if "mesaj_id" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN mesaj_id INTEGER"))

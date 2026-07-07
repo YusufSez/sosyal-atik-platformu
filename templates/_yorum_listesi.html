@@ -1,0 +1,54 @@
+{% macro yorum_listesi(kok_yorumlar, ilan_sahip_id, tur, ilan_id) %}
+{% for y in kok_yorumlar %}
+<div class="yorum-kart border rounded p-3 mb-3" id="yorum-{{ y.id }}">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+        <div>
+            <strong>{{ y.user.username }}</strong>
+            {% if y.user_id == ilan_sahip_id %}
+            <span class="badge bg-primary ms-1">İlan Sahibi</span>
+            {% endif %}
+        </div>
+        <small class="text-muted">{{ y.timestamp.strftime('%d.%m.%Y %H:%M') }}</small>
+    </div>
+    <p class="mb-2">{{ y.content|display_text }}</p>
+
+    {% for c in y.replies %}
+    <div class="yorum-cevap border-start border-3 border-primary ps-3 ms-2 mb-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+            <div>
+                <strong>{{ c.user.username }}</strong>
+                <span class="badge bg-secondary ms-1">Cevap</span>
+                {% if c.user_id == ilan_sahip_id %}
+                <span class="badge bg-primary ms-1">İlan Sahibi</span>
+                {% endif %}
+            </div>
+            <small class="text-muted">{{ c.timestamp.strftime('%d.%m.%Y %H:%M') }}</small>
+        </div>
+        <p class="mb-0">{{ c.content|display_text }}</p>
+    </div>
+    {% endfor %}
+
+    {% if current_user.is_authenticated and current_user.id == ilan_sahip_id %}
+    <button type="button"
+            class="btn btn-outline-secondary btn-sm"
+            data-bs-toggle="collapse"
+            data-bs-target="#cevap-form-{{ y.id }}"
+            aria-expanded="false"
+            aria-controls="cevap-form-{{ y.id }}">
+        <i class="bi bi-reply"></i> Cevap Ver
+    </button>
+    <div class="collapse mt-2" id="cevap-form-{{ y.id }}">
+        <form method="POST"
+              action="{% if tur == 'kaynak' %}{{ url_for('kaynak.yorum_cevapla', kaynak_id=ilan_id, parent_id=y.id) }}{% else %}{{ url_for('atik.yorum_cevapla', atik_id=ilan_id, parent_id=y.id) }}{% endif %}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea name="yorum" class="form-control form-control-sm" rows="2"
+                      placeholder="Cevabınızı yazın..." required maxlength="1000"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm mt-2">Cevabı Gönder</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<p class="text-muted">Henüz yorum yok.</p>
+{% endfor %}
+{% endmacro %}

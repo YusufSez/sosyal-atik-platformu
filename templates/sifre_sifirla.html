@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex justify-content-center py-4">
+    <div class="card auth-card w-100">
+        <div class="card-header-custom">
+            <i class="bi bi-shield-lock fs-3 d-block mb-2"></i>
+            <h3>Yeni Şifre Belirle</h3>
+        </div>
+        <div class="card-body p-4">
+            <form method="POST" action="{{ url_for('auth.sifre_sifirla', token=token) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label for="yeni_sifre" class="form-label fw-medium">Yeni Parola</label>
+                    <input type="password" id="yeni_sifre" name="yeni_sifre" class="form-control"
+                           autocomplete="new-password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="yeni_sifre_tekrar" class="form-label fw-medium">Yeni Parola (Tekrar)</label>
+                    <input type="password" id="yeni_sifre_tekrar" name="yeni_sifre_tekrar" class="form-control"
+                           autocomplete="new-password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">Şifreyi Güncelle</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

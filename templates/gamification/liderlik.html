@@ -14,8 +14,8 @@
                 <strong>{{ current_user.username }}</strong>
                 <span class="badge bg-success ms-2">{{ benim_seviye.ad }}</span>
                 <div class="small text-muted mt-1">XP: {{ benim_seviye.xp }} {% if benim_sira %}| Sıra: #{{ benim_sira }}{% endif %}</div>
-                <div class="progress mt-2" style="height:8px; max-width:280px;">
-                    <div class="progress-bar bg-success" style="width:{{ benim_seviye.ilerleme_yuzde }}%"></div>
+                <div class="progress mt-2 progress-compact">
+                    <div class="progress-bar bg-success" data-progress="{{ benim_seviye.ilerleme_yuzde }}"></div>
                 </div>
             </div>
             <a href="{{ url_for('gamification.rozetlerim') }}" class="btn btn-outline-success btn-sm">Rozetlerim</a>

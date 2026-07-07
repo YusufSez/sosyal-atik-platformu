@@ -19,7 +19,15 @@
 
         <ul class="list-group list-group-flush mb-3">
             <li class="list-group-item"><strong>Kullanıcı Adı:</strong> {{ user.username }}</li>
-            <li class="list-group-item"><strong>E-posta:</strong> {{ user.email }}</li>
+            <li class="list-group-item">
+                <strong>E-posta:</strong> {{ user.email }}
+                {% if user.email_verified %}
+                <span class="badge bg-success ms-1">Doğrulandı</span>
+                {% else %}
+                <span class="badge bg-warning text-dark ms-1">Doğrulanmadı</span>
+                <a href="{{ url_for('auth.eposta_dogrula_bekle') }}" class="small ms-1">Doğrula</a>
+                {% endif %}
+            </li>
             <li class="list-group-item"><strong>Güven Puanı:</strong> {{ user.guven_puani or 0 }}</li>
             <li class="list-group-item">
                 <strong>Seviye:</strong> {{ seviye.ad }} ({{ seviye.xp }} XP)

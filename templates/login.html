@@ -19,10 +19,13 @@
                     <input type="password" id="password" name="password" class="form-control"
                            autocomplete="current-password" required>
                 </div>
-                {% from "_recaptcha.html" import recaptcha_widget %}
-                {{ recaptcha_widget() }}
+                {% from "_turnstile.html" import turnstile_widget %}
+                {{ turnstile_widget() }}
                 <button type="submit" class="btn btn-primary w-100 py-2">Giriş Yap</button>
             </form>
+            <div class="mt-3 text-center">
+                <a href="{{ url_for('auth.sifremi_unuttum') }}" class="small text-decoration-none">Şifremi unuttum</a>
+            </div>
             <div class="mt-4 text-center border-top pt-3">
                 <small class="text-muted">
                     Hesabın yok mu? <a href="{{ url_for('auth.kayit') }}" class="fw-semibold text-decoration-none">Kayıt Ol</a>
@@ -35,6 +38,6 @@
 {% endblock %}
 
 {% block scripts %}
-{% from "_recaptcha.html" import recaptcha_script %}
-{{ recaptcha_script() }}
+{% from "_turnstile.html" import turnstile_script %}
+{{ turnstile_script() }}
 {% endblock %}

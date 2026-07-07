@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="container" style="max-width: 700px;">
+<div class="container container-inbox">
     <h3 class="mb-3">💬 Mesajlarım</h3>
 
     {% if sohbetler %}
@@ -22,7 +22,7 @@
                         <span class="badge bg-danger ms-2">Yeni</span>
                     {% endif %}
 
-                    <p class="mb-1 text-truncate" style="max-width: 400px;">
+                    <p class="mb-1 text-truncate text-truncate-md">
                         {% if msg.sender_id == current_user.id %}
                             Sen: {{ msg.content }}
                         {% else %}

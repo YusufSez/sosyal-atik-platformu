@@ -2,7 +2,7 @@
 {% block content %}
 
 <div class="d-flex justify-content-center">
-    <div class="card shadow-sm p-4 w-100" style="max-width: 600px;">
+    <div class="card shadow-sm p-4 w-100 form-card-edit">
         <h3 class="card-title text-center mb-4">{{ '✏️ Kaynak Düzenle' if tur == 'kaynak' else '♻️ Atık Düzenle' }}</h3>
 
         <form method="POST" enctype="multipart/form-data" id="ilanDuzenleForm">
@@ -91,39 +91,6 @@
     </div>
 </div>
 
-<script>
-document.querySelectorAll('.ilan-foto-sil-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var cb = document.getElementById(btn.dataset.checkbox);
-        if (!cb) return;
-        cb.checked = !cb.checked;
-        var kart = btn.closest('.ilan-foto-sil-kart');
-        kart.classList.toggle('silindi-isaretli', cb.checked);
-        btn.setAttribute('aria-pressed', cb.checked ? 'true' : 'false');
-        if (cb.checked) {
-            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Geri Al';
-            btn.classList.remove('btn-danger');
-            btn.classList.add('btn-secondary');
-        } else {
-            btn.innerHTML = '<i class="bi bi-trash"></i> Sil';
-            btn.classList.remove('btn-secondary');
-            btn.classList.add('btn-danger');
-        }
-    });
-});
-
-document.getElementById('konumBtn').addEventListener('click', function() {
-    var durum = document.getElementById('konumDurum');
-    if (!navigator.geolocation) { durum.textContent = 'Konum desteklenmiyor.'; return; }
-    durum.textContent = 'Alınıyor...';
-    navigator.geolocation.getCurrentPosition(function(pos) {
-        document.getElementById('latitude').value = pos.coords.latitude;
-        document.getElementById('longitude').value = pos.coords.longitude;
-        durum.textContent = 'Konum güncellendi.';
-    }, function() { durum.textContent = 'İzin verilmedi.'; });
-});
-</script>
+<script src="{{ url_for('static', filename='js/ilan-duzenle.js') }}"></script>
 
 {% endblock %}

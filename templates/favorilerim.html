@@ -12,14 +12,16 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card hover-card item-card h-100">
             {% if favori.kaynak %}
+                <div class="position-relative card-img-wrap">
                 {% set kapak = favori.kaynak|kapak_resim %}
                 {% if kapak != 'default.jpg' %}
-                <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="{{ favori.kaynak.baslik }}">
+                <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" alt="{{ favori.kaynak.baslik }}">
                 {% else %}
-                <div class="card-img-top d-flex align-items-center justify-content-center bg-secondary text-white" style="height: 180px;">
-                    <i class="bi bi-box-seam" style="font-size: 3rem;"></i>
+                <div class="card-img-placeholder">
+                    <i class="bi bi-box-seam"></i>
                 </div>
                 {% endif %}
+                </div>
                 <div class="card-body">
                     <span class="badge bg-success mb-2">{{ favori.kaynak.kategori }}</span>
                     <h5 class="card-title">{{ favori.kaynak.baslik }}</h5>
@@ -30,21 +32,23 @@
                             <a href="{{ url_for('kaynak.kaynak_detay', id=favori.kaynak.id) }}" class="btn btn-outline-primary">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            <button class="btn btn-outline-danger" onclick="favoriKaldir({{ favori.kaynak.id }}, null)">
+                            <button class="btn btn-outline-danger favori-kaldir-btn" data-kaynak-id="{{ favori.kaynak.id }}">
                                 <i class="bi bi-heart-fill"></i>
                             </button>
                         </div>
                     </div>
                 </div>
             {% elif favori.atik %}
+                <div class="position-relative card-img-wrap">
                 {% set kapak = favori.atik|kapak_resim %}
                 {% if kapak != 'default.jpg' %}
-                <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="card-img-top" style="height: 180px; object-fit: cover;" alt="{{ favori.atik.baslik }}">
+                <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" alt="{{ favori.atik.baslik }}">
                 {% else %}
-                <div class="card-img-top d-flex align-items-center justify-content-center bg-warning text-dark" style="height: 180px;">
-                    <i class="bi bi-recycle" style="font-size: 3rem;"></i>
+                <div class="card-img-placeholder">
+                    <i class="bi bi-recycle"></i>
                 </div>
                 {% endif %}
+                </div>
                 <div class="card-body">
                     <span class="badge bg-warning text-dark">Atik</span>
                     <h5 class="card-title">{{ favori.atik.baslik }}</h5>
@@ -55,7 +59,7 @@
                             <a href="{{ url_for('atik.atik_detay', id=favori.atik.id) }}" class="btn btn-outline-primary">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            <button class="btn btn-outline-danger" onclick="favoriKaldir(null, {{ favori.atik.id }})">
+                            <button class="btn btn-outline-danger favori-kaldir-btn" data-atik-id="{{ favori.atik.id }}">
                                 <i class="bi bi-heart-fill"></i>
                             </button>
                         </div>
@@ -76,25 +80,4 @@
     </a>
 </div>
 {% endif %}
-
-<script>
-function favoriKaldir(kaynakId, atikId) {
-    var data = {};
-    if (kaynakId) data.kaynak_id = kaynakId;
-    if (atikId) data.atik_id = atikId;
-
-    csrfFetch('/api/favori_ekle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(result) {
-        if (result.status === 'removed') {
-            location.reload();
-        }
-    })
-    .catch(function(e) { console.error(e); });
-}
-</script>
 {% endblock %}
