@@ -1,0 +1,11 @@
+{% macro recaptcha_widget() %}
+{% if config.RECAPTCHA_ENABLED and config.RECAPTCHA_SITE_KEY %}
+<div class="g-recaptcha mb-3" data-sitekey="{{ config.RECAPTCHA_SITE_KEY }}"></div>
+{% endif %}
+{% endmacro %}
+
+{% macro recaptcha_script() %}
+{% if config.RECAPTCHA_ENABLED and config.RECAPTCHA_SITE_KEY %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endmacro %}

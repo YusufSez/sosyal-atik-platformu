@@ -1,0 +1,37 @@
+{% macro oneriler_kartlari(oneriler, baslik="Sizin İçin Öneriler") %}
+{% if oneriler %}
+<section class="mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="fw-bold mb-0"><i class="bi bi-stars text-warning me-2"></i>{{ baslik }}</h5>
+        <small class="text-muted">Konum ve ilgi alanınıza göre</small>
+    </div>
+    <div class="row g-3">
+        {% for o in oneriler %}
+        {% set ilan = o.ilan %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card item-card h-100 hover-card border-warning border-opacity-25">
+                <div class="position-relative card-img-wrap">
+                    {% set kapak = ilan|kapak_resim %}
+                    {% if kapak != 'default.jpg' %}
+                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ ilan.baslik }}">
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100 text-muted"><i class="bi bi-image fs-2"></i></div>
+                    {% endif %}
+                    <span class="badge bg-warning text-dark category-badge">{{ o.neden }}</span>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title text-truncate">{{ ilan.baslik }}</h6>
+                    <small class="text-muted d-block mb-2">{{ ilan.kategori }}</small>
+                    {% if o.tur == 'kaynak' %}
+                    <a href="{{ url_for('kaynak.kaynak_detay', id=ilan.id) }}" class="btn btn-sm btn-outline-primary w-100">İncele</a>
+                    {% else %}
+                    <a href="{{ url_for('atik.atik_detay', id=ilan.id) }}" class="btn btn-sm btn-outline-success w-100">İncele</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endmacro %}

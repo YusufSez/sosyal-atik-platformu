@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="page-header mb-4">
+    <h3><i class="bi bi-graph-up-arrow text-success me-2"></i>Çevresel Etki Panelim</h3>
+    <small class="text-muted">Paylaşımlarınızın tahmini çevresel katkısı</small>
+</div>
+
+{% from "_etki_kartlari.html" import etki_kartlari %}
+<div class="mb-4">
+    {{ etki_kartlari(ozet) }}
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="fw-bold mb-3"><i class="bi bi-award text-success me-2"></i>Özet</h5>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Toplam teslim</span>
+                        <strong>{{ ozet.teslim_sayisi }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Döngüsel ekonomi skoru</span>
+                        <strong>{{ ozet.dongusel_skor }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Hesaplama versiyonu</span>
+                        <strong>{{ ozet.hesaplama_versiyonu }}</strong>
+                    </li>
+                </ul>
+                {% if ozet.co2e_kg > 0 %}
+                <p class="text-muted small mt-3 mb-0">
+                    ≈ {{ (ozet.co2e_kg / 0.12)|round(0)|int }} km araba yolculuğu emisyonuna eşdeğer tahmini tasarruf.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="fw-bold mb-3"><i class="bi bi-bar-chart text-primary me-2"></i>Aylık CO₂e (kg)</h5>
+                {% set max_co2 = aylik|map(attribute='co2e_kg')|max if aylik else 1 %}
+                {% if max_co2 == 0 %}{% set max_co2 = 1 %}{% endif %}
+                <div class="d-flex align-items-end gap-2" style="height: 160px;">
+                    {% for ay in aylik %}
+                    <div class="flex-fill text-center">
+                        <div class="bg-success rounded-top mx-auto" style="width: 80%; height: {{ (ay.co2e_kg / max_co2 * 120)|int }}px; min-height: 4px;"></div>
+                        <small class="text-muted d-block mt-1" style="font-size:0.65rem;">{{ ay.etiket }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-body-secondary">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Son Teslimler</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if son_teslimler %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Tür</th>
+                        <th>Kategori</th>
+                        <th>CO₂e</th>
+                        <th>Diğer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in son_teslimler %}
+                    <tr>
+                        <td>{{ e.timestamp.strftime('%d.%m.%Y') if e.timestamp else '-' }}</td>
+                        <td>
+                            {% if e.tur == 'kaynak' %}
+                            <span class="badge bg-primary">Kaynak</span>
+                            {% else %}
+                            <span class="badge bg-success">Atık</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ e.kategori }}</td>
+                        <td>{{ e.co2e_kg|format_etki("kg") }}</td>
+                        <td>
+                            {% if e.tur == 'kaynak' %}
+                            {{ e.su_litre|format_etki("L") }} su
+                            {% else %}
+                            {{ e.atik_kg|format_etki("kg") }} atık
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state text-center m-3">
+            <i class="bi bi-inbox text-muted" style="font-size:2rem;"></i>
+            <p class="text-muted mt-2 mb-0">Henüz teslim edilmiş ilanınız yok. İlk paylaşımınızı yapın!</p>
+            <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+                <a href="{{ url_for('kaynak.yukle_kaynak') }}" class="btn btn-sm btn-primary">Kaynak Ekle</a>
+                <a href="{{ url_for('atik.yukle_atik') }}" class="btn btn-sm btn-success">Atık Ekle</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ url_for('impact.metodoloji') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-info-circle me-1"></i> Hesaplama metodolojisi
+    </a>
+</div>
+
+{% endblock %}

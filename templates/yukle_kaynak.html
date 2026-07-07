@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-center mt-4">
+    <div class="card form-card w-100">
+        <div class="card-header-custom">
+            <h3><i class="bi bi-box-seam me-2"></i>Kaynak Ekle</h3>
+        </div>
+        <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data" id="kaynakForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="latitude" id="latitude">
+            <input type="hidden" name="longitude" id="longitude">
+
+            <div class="mb-3">
+                <label for="baslik" class="form-label">Başlık</label>
+                <input type="text" id="baslik" name="baslik" class="form-control" placeholder="Örn: Kanepe, Masa, Kitap..." required>
+            </div>
+
+            <div class="mb-3">
+                <label for="aciklama" class="form-label">Açıklama</label>
+                <textarea id="aciklama" name="aciklama" class="form-control" rows="4" placeholder="Kaynak hakkında detaylı bilgi..." required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="durum" class="form-label">Durum</label>
+                <select id="durum" name="durum" class="form-control" required>
+                    <option value="">Seçiniz</option>
+                    {% for d in durumlar %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="kategori" class="form-label">Kategori</label>
+                <select id="kategori" name="kategori" class="form-control">
+                    <option value="">Otomatik (AI ile)</option>
+                    {% for kat in kategoriler %}
+                    <option value="{{ kat }}">{{ kat }}</option>
+                    {% endfor %}
+                </select>
+                <small class="text-muted">Boş bırakırsanız AI otomatik kategori atar.</small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Konum</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="konumAlBtn">
+                        <i class="bi bi-geo-alt"></i> Konumumu Kullan
+                    </button>
+                    <small class="text-muted" id="konumDurum">Konum alınmadı (varsayılan: İstanbul)</small>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="resimler" class="form-label">Fotoğraflar <small class="text-muted">(en fazla {{ max_foto }}, isteğe bağlı)</small></label>
+                <input type="file" id="resimler" name="resimler" class="form-control" accept="image/png,image/jpeg,image/webp" multiple>
+                <small class="text-muted">Birden fazla seçmek için Ctrl veya Shift tuşunu kullanın. Maks. 5 MB/dosya.</small>
+            </div>
+
+            {% from "_recaptcha.html" import recaptcha_widget %}
+            {{ recaptcha_widget() }}
+            <button type="submit" class="btn btn-primary w-100 mt-3">Kaynağı Paylaş</button>
+        </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('konumAlBtn').addEventListener('click', function() {
+    if (!navigator.geolocation) {
+        document.getElementById('konumDurum').textContent = 'Tarayıcı konum desteklemiyor.';
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        document.getElementById('latitude').value = pos.coords.latitude;
+        document.getElementById('longitude').value = pos.coords.longitude;
+        document.getElementById('konumDurum').textContent = 'Konum alındı.';
+    }, function() {
+        document.getElementById('konumDurum').textContent = 'Konum izni verilmedi.';
+    });
+});
+</script>
+
+{% endblock %}
+
+{% block scripts %}
+{% from "_recaptcha.html" import recaptcha_script %}
+{{ recaptcha_script() }}
+{% endblock %}

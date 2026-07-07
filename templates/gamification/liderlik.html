@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section fade-in">
+    <div class="page-header mb-4 text-center">
+        <h3 class="fw-bold"><i class="bi bi-trophy me-2 text-warning"></i>Liderlik Tablosu</h3>
+        <p class="text-muted mb-0">XP, teslim ve çevresel etkiye göre en aktif paylaşımcılar</p>
+    </div>
+
+    {% if current_user.is_authenticated and benim_seviye %}
+    <div class="card shadow-sm mb-4 border-success">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <strong>{{ current_user.username }}</strong>
+                <span class="badge bg-success ms-2">{{ benim_seviye.ad }}</span>
+                <div class="small text-muted mt-1">XP: {{ benim_seviye.xp }} {% if benim_sira %}| Sıra: #{{ benim_sira }}{% endif %}</div>
+                <div class="progress mt-2" style="height:8px; max-width:280px;">
+                    <div class="progress-bar bg-success" style="width:{{ benim_seviye.ilerleme_yuzde }}%"></div>
+                </div>
+            </div>
+            <a href="{{ url_for('gamification.rozetlerim') }}" class="btn btn-outline-success btn-sm">Rozetlerim</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Kullanıcı</th>
+                    <th>Seviye</th>
+                    <th>XP</th>
+                    <th>Güven</th>
+                    <th>CO₂e</th>
+                    <th>İl</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in tablo %}
+                <tr {% if current_user.is_authenticated and row.user_id == current_user.id %}class="table-success"{% endif %}>
+                    <td>
+                        {% if row.sira == 1 %}🥇{% elif row.sira == 2 %}🥈{% elif row.sira == 3 %}🥉{% else %}{{ row.sira }}{% endif %}
+                    </td>
+                    <td><strong>{{ row.username }}</strong></td>
+                    <td><span class="badge bg-secondary">{{ row.seviye_ad }}</span></td>
+                    <td>{{ row.xp }}</td>
+                    <td>{{ row.guven_puani }}</td>
+                    <td>{{ row.co2e_kg|format_etki("kg") }}</td>
+                    <td>{{ row.il }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-muted text-center">Henüz sıralama verisi yok.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

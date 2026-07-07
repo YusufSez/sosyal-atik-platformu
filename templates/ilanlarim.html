@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <div class="page-header mb-4">
+        <h3><i class="bi bi-list-ul text-primary me-2"></i>İlanlarım</h3>
+        <small class="text-muted">Paylaştığınız kaynak ve atık ilanları</small>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">📦 Kaynak İlanlarım</h5>
+        </div>
+        <div class="card-body">
+            {% if kaynaklarim %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Resim</th>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>Durum</th>
+                            <th>İlan Durumu</th>
+                            <th>Tarih</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for kaynak in kaynaklarim %}
+                        <tr>
+                            <td>
+                                <img src="{{ url_for('static', filename='item_pics/' + (kaynak|kapak_resim)) }}"
+                                     alt="{{ kaynak.baslik }}"
+                                     class="rounded"
+                                     style="width: 60px; height: 60px; object-fit: cover;">
+                            </td>
+                            <td>
+                                <strong>{{ kaynak.baslik }}</strong>
+                                <br><small class="text-muted">{{ kaynak.aciklama[:50] }}...</small>
+                            </td>
+                            <td><span class="badge bg-info">{{ kaynak.kategori }}</span></td>
+                            <td><span class="badge bg-secondary">{{ kaynak.durum }}</span></td>
+                            <td>
+                                <form method="POST" action="{{ url_for('ilan.ilan_durum_guncelle', tur='kaynak', id=kaynak.id) }}" class="d-flex gap-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <select name="ilan_durumu" class="form-select form-select-sm">
+                                        {% for d in ilan_durumlari %}
+                                        <option value="{{ d }}" {% if (kaynak.ilan_durumu or 'Aktif') == d %}selected{% endif %}>{{ d }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
+                                </form>
+                            </td>
+                            <td><small>{{ kaynak.tarih.strftime('%d.%m.%Y') }}</small></td>
+                            <td>
+                                <a href="{{ url_for('ilan.ilan_duzenle_kaynak', id=kaynak.id) }}" class="btn btn-sm btn-warning">Düzenle</a>
+                                <form method="POST" action="{{ url_for('ilan.ilan_sil', tur='kaynak', id=kaynak.id) }}" class="d-inline"
+                                      onsubmit="return confirm('Bu ilanı silmek istediğinizden emin misiniz?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Sil</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Henüz kaynak ilanı eklemediniz.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">♻️ Atık İlanlarım</h5>
+        </div>
+        <div class="card-body">
+            {% if atiklarim %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Resim</th>
+                            <th>Başlık</th>
+                            <th>Kategori</th>
+                            <th>İlan Durumu</th>
+                            <th>Tarih</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atik in atiklarim %}
+                        <tr>
+                            <td>
+                                <img src="{{ url_for('static', filename='item_pics/' + (atik|kapak_resim)) }}"
+                                     alt="{{ atik.baslik }}"
+                                     class="rounded"
+                                     style="width: 60px; height: 60px; object-fit: cover;">
+                            </td>
+                            <td>
+                                <strong>{{ atik.baslik }}</strong>
+                                <br><small class="text-muted">{{ atik.aciklama[:50] }}...</small>
+                            </td>
+                            <td><span class="badge bg-success">{{ atik.kategori }}</span></td>
+                            <td>
+                                <form method="POST" action="{{ url_for('ilan.ilan_durum_guncelle', tur='atik', id=atik.id) }}" class="d-flex gap-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <select name="ilan_durumu" class="form-select form-select-sm">
+                                        {% for d in ilan_durumlari %}
+                                        <option value="{{ d }}" {% if (atik.ilan_durumu or 'Aktif') == d %}selected{% endif %}>{{ d }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
+                                </form>
+                            </td>
+                            <td><small>{{ atik.tarih.strftime('%d.%m.%Y') }}</small></td>
+                            <td>
+                                <a href="{{ url_for('ilan.ilan_duzenle_atik', id=atik.id) }}" class="btn btn-sm btn-warning">Düzenle</a>
+                                <form method="POST" action="{{ url_for('ilan.ilan_sil', tur='atik', id=atik.id) }}" class="d-inline"
+                                      onsubmit="return confirm('Bu ilanı silmek istediğinizden emin misiniz?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Sil</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Henüz atık ilanı eklemediniz.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

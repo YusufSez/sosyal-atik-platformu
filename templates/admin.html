@@ -1,0 +1,172 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4">
+        <h3><i class="bi bi-shield-lock me-2"></i>Yönetim Paneli</h3>
+        <small class="text-muted">Platform istatistikleri ve moderasyon</small>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ user_count }}</h4><small class="text-muted">Kullanıcı</small></div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ kaynak_count }}</h4><small class="text-muted">Kaynak İlanı</small></div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ atik_count }}</h4><small class="text-muted">Atık İlanı</small></div></div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header fw-bold"><i class="bi bi-globe-americas me-2"></i>Çevresel Etki Özeti</div>
+        <div class="card-body">
+            {% from "_etki_kartlari.html" import etki_kartlari %}
+            {{ etki_kartlari(etki_ozet) }}
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        {% if etki_ozet.teslim_sayisi == 0 %}
+        <div class="col-12">
+            <div class="alert alert-info py-2 mb-0 small">
+                <i class="bi bi-info-circle me-1"></i>
+                Kategori ve il kırılımları yalnızca <strong>Teslim Edildi</strong> durumundaki ilanlardan hesaplanır.
+                Henüz teslim kaydı olmadığı için tablolar boş görünüyor — bu normaldir.
+            </div>
+        </div>
+        {% endif %}
+        <div class="col-lg-6">
+            <h5>Kategori Kırılımı</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>Kategori</th><th>Tür</th><th>Adet</th><th>CO₂e</th></tr></thead>
+                    <tbody>
+                    {% for row in etki_kategoriler %}
+                    <tr>
+                        <td>{{ row.kategori }}</td>
+                        <td>{{ row.tur }}</td>
+                        <td>{{ row.adet }}</td>
+                        <td>{{ row.co2e_kg|format_etki("kg") }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="text-muted">Henüz etki kaydı yok.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <h5>İl Kırılımı</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>İl</th><th>Adet</th><th>CO₂e</th></tr></thead>
+                    <tbody>
+                    {% for row in etki_iller %}
+                    <tr>
+                        <td>{{ row.il }}</td>
+                        <td>{{ row.adet }}</td>
+                        <td>{{ row.co2e_kg|format_etki("kg") }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="text-muted">Henüz etki kaydı yok.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <a href="{{ url_for('admin.ai_test', tur='kaynak') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Kaynak)</a>
+        <a href="{{ url_for('admin.ai_test', tur='atik') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Atık)</a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <h5>Son Kaynaklar</h5>
+            <ul class="list-group">
+                {% for k in son_kaynaklar %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ k.baslik }}</span>
+                    <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                        <span class="badge bg-secondary">{{ k.ilan_durumu or 'Aktif' }}</span>
+                        <a href="{{ url_for('kaynak.kaynak_detay', id=k.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                            <i class="bi bi-eye"></i> İncele
+                        </a>
+                        <form method="POST" action="{{ url_for('admin.admin_ilan_sil', tur='kaynak', id=k.id) }}" class="d-inline"
+                              onsubmit="return confirm('Silmek istediğinize emin misiniz?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-danger">Sil</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-lg-6">
+            <h5>Son Atıklar</h5>
+            <ul class="list-group">
+                {% for a in son_atiklar %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ a.baslik }}</span>
+                    <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                        <span class="badge bg-secondary">{{ a.ilan_durumu or 'Aktif' }}</span>
+                        <a href="{{ url_for('atik.atik_detay', id=a.id) }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                            <i class="bi bi-eye"></i> İncele
+                        </a>
+                        <form method="POST" action="{{ url_for('admin.admin_ilan_sil', tur='atik', id=a.id) }}" class="d-inline"
+                              onsubmit="return confirm('Silmek istediğinize emin misiniz?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-danger">Sil</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <h5 class="mt-4">Kullanıcılar</h5>
+    <div class="table-responsive mb-4">
+        <table class="table table-sm">
+            <thead><tr><th>Kullanıcı</th><th>E-posta</th><th>Admin</th><th>İşlem</th></tr></thead>
+            <tbody>
+            {% for u in kullanicilar %}
+            <tr>
+                <td>{{ u.username }}</td>
+                <td>{{ u.email }}</td>
+                <td>{% if u.is_admin %}<span class="badge bg-warning">Admin</span>{% else %}-{% endif %}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('admin.admin_toggle_admin', user_id=u.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-secondary">Admin Aç/Kapat</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>Şikayetler</h5>
+    <ul class="list-group">
+        {% for s in sikayetler %}
+        <li class="list-group-item">
+            <strong>{{ s.user.username }}</strong> — {{ s.sebep|display_text }}
+            <span class="badge bg-{{ 'success' if s.durum == 'İncelendi' else 'warning' }}">{{ s.durum }}</span>
+            {% if s.durum != 'İncelendi' %}
+            <form method="POST" action="{{ url_for('admin.admin_sikayet_incele', id=s.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-primary">İncelendi</button>
+            </form>
+            {% endif %}
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">Şikayet yok.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

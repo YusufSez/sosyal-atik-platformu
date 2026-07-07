@@ -1,0 +1,45 @@
+# Ortam ve gizli anahtarlar
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Sanal ortamlar
+venv/
+.venv/
+.venv-*/
+
+# Test / IDE
+.pytest_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
+
+# Veritabanı ve yedekler
+*.db
+*.sqlite
+*.sqlite3
+backup.sql
+instance/
+
+# Kullanıcı yüklemeleri (varsayılan görseller hariç)
+static/item_pics/*
+!static/item_pics/.gitkeep
+static/profile_pics/*
+!static/profile_pics/default.jpg
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

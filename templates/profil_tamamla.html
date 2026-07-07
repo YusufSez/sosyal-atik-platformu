@@ -1,0 +1,108 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-center mt-4">
+    <div class="card form-card w-100">
+        <div class="card-header-custom">
+            <h3><i class="bi bi-person-check me-2"></i>Profilini Tamamla</h3>
+        </div>
+        <div class="card-body p-4">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="latitude" id="latitude" value="{{ user.latitude or '' }}">
+            <input type="hidden" name="longitude" id="longitude" value="{{ user.longitude or '' }}">
+
+            <div class="mb-3">
+                <label class="form-label">Doğum Tarihi</label>
+                <input type="date" name="dogum_tarihi" class="form-control" required
+                       value="{{ user.dogum_tarihi or '' }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">İl</label>
+                <select name="il" id="il" class="form-control" required>
+                    <option value="">İl Seçiniz</option>
+                    {% for il in iller %}
+                        <option value="{{ il }}" {% if user.il == il %}selected{% endif %}>{{ il }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">İlçe</label>
+                <select name="ilce" id="ilce" class="form-control" required>
+                    <option value="">İlçe Seçiniz</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Telefon Numarası</label>
+                <input type="text" name="telefon" id="telefon" class="form-control"
+                       placeholder="(5xx) xxx xx xx" required value="{{ user.telefon or '' }}">
+            </div>
+
+            <div class="mb-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="konumBtn">
+                    <i class="bi bi-geo-alt"></i> Konumumu Kullan
+                </button>
+                <small id="konumDurum" class="text-muted ms-2"></small>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Kaydı Tamamla</button>
+        </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+
+<script>
+    const illerData = JSON.parse('{{ iller | tojson | safe }}');
+    const seciliIlce = {{ (user.ilce or '') | tojson }};
+    const ilSelect = document.getElementById('il');
+    const ilceSelect = document.getElementById('ilce');
+
+    function ilceleriDoldur(ilAdi, secili) {
+        ilceSelect.innerHTML = '<option value="">İlçe Seçiniz</option>';
+        if (ilAdi && illerData[ilAdi]) {
+            illerData[ilAdi].forEach(function(ilceName) {
+                const option = document.createElement('option');
+                option.value = ilceName;
+                option.textContent = ilceName;
+                if (secili && secili === ilceName) option.selected = true;
+                ilceSelect.appendChild(option);
+            });
+        }
+    }
+
+    ilSelect.addEventListener('change', function() {
+        ilceleriDoldur(this.value, '');
+    });
+
+    if (ilSelect.value) {
+        ilceleriDoldur(ilSelect.value, seciliIlce);
+    }
+
+    document.getElementById('konumBtn').addEventListener('click', function() {
+        var durum = document.getElementById('konumDurum');
+        if (!navigator.geolocation) {
+            durum.textContent = 'Tarayıcı konum desteklemiyor.';
+            return;
+        }
+        durum.textContent = 'Konum alınıyor...';
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            document.getElementById('latitude').value = pos.coords.latitude;
+            document.getElementById('longitude').value = pos.coords.longitude;
+            durum.textContent = 'Konum kaydedildi.';
+        }, function() {
+            durum.textContent = 'Konum izni verilmedi.';
+        });
+    });
+
+    $(document).ready(function() {
+        $('#telefon').mask('(000) 000 00 00');
+    });
+</script>
+
+{% endblock %}

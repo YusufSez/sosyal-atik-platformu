@@ -1,0 +1,125 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="container" style="max-width: 600px;">
+    <h3 class="mb-3">💬 {{ alici.username }} ile Mesajlaşma</h3>
+
+    <div id="mesajKutusu"
+         class="border rounded p-3 mb-3 mesaj-kutusu"
+         style="height: 400px; overflow-y: auto;"
+         data-alici-id="{{ alici.id }}"
+         data-current-user-id="{{ current_user.id }}"
+         data-kaynak-id="{{ kaynak_id }}"
+         data-atik-id="{{ atik_id }}">
+    </div>
+
+    <form id="mesajForm" data-ajax="true">
+        <div class="input-group">
+            <input type="text" id="mesajInput" class="form-control" placeholder="Mesaj yaz..." required>
+            <button type="submit" class="btn btn-primary">Gönder</button>
+        </div>
+    </form>
+</div>
+
+<script>
+const mesajKutusu = document.getElementById('mesajKutusu');
+
+const alici_id = parseInt(mesajKutusu.dataset.aliciId);
+const current_user_id = parseInt(mesajKutusu.dataset.currentUserId);
+const kaynak_id = parseInt(mesajKutusu.dataset.kaynakId);
+const atik_id = parseInt(mesajKutusu.dataset.atikId);
+
+const mesajForm = document.getElementById('mesajForm');
+const mesajInput = document.getElementById('mesajInput');
+
+function fetchMessages() {
+    fetch(`/mesajlar_getir/${alici_id}/${kaynak_id}/${atik_id}`)
+        .then(response => response.json())
+        .then(data => {
+            mesajKutusu.innerHTML = "";
+
+            data.forEach(msg => {
+                const div = document.createElement("div");
+                div.className = "mb-2 " + (msg.sender_id === current_user_id ? "text-end" : "");
+
+                const badge = document.createElement("span");
+                badge.className = "badge " + (msg.sender_id === current_user_id ? "bg-primary" : "bg-secondary");
+                badge.textContent = msg.sender_username;
+
+                const p = document.createElement("p");
+                p.className = "d-inline-block m-1 p-2 text-white rounded " +
+                    (msg.sender_id === current_user_id ? "bg-primary" : "bg-secondary");
+                p.textContent = msg.content;
+
+                const br = document.createElement("br");
+                const small = document.createElement("small");
+                small.className = "text-muted";
+                small.textContent = msg.timestamp;
+
+                div.appendChild(badge);
+                div.appendChild(document.createTextNode(" "));
+                div.appendChild(p);
+                div.appendChild(br);
+                div.appendChild(small);
+                mesajKutusu.appendChild(div);
+            });
+
+            mesajKutusu.scrollTop = mesajKutusu.scrollHeight;
+        });
+}
+
+setInterval(fetchMessages, 5000);
+fetchMessages();
+
+mesajForm.addEventListener("submit", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const content = mesajInput.value.trim();
+    if (!content) return;
+
+    var submitBtn = mesajForm.querySelector('button[type="submit"]');
+    var originalText = submitBtn ? submitBtn.innerHTML : '';
+    
+    // Loading state baslat
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Gonderiliyor...';
+    }
+
+    fetch("/send_message", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            alici_id: alici_id,
+            content: content,
+            kaynak_id: kaynak_id,
+            atik_id: atik_id
+        })
+    })
+    .then(function(response) {
+        if (!response.ok) throw new Error("Mesaj gonderilemedi");
+        return response.json();
+    })
+    .then(function() {
+        mesajInput.value = "";
+        fetchMessages();
+    })
+    .catch(function(error) {
+        console.error("Hata:", error);
+        alert("Mesaj gonderilemedi. Lutfen tekrar deneyin.");
+    })
+    .finally(function() {
+        // Button'u eski haline getir
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+});
+</script>
+
+{% endblock %}

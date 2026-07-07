@@ -1,0 +1,244 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section fade-in">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <h3><i class="bi bi-box-seam text-success me-2"></i>Kaynak Paylaşımı</h3>
+            <small class="text-muted">{{ pagination.total if pagination else kaynaklar|length }} kaynak bulundu</small>
+        </div>
+        <a href="{{ url_for('kaynak.yukle_kaynak') }}" class="btn btn-success px-3">
+            <i class="bi bi-plus-circle me-1"></i> Yeni Kaynak
+        </a>
+    </div>
+
+    {% from "_oneriler.html" import oneriler_kartlari %}
+    {{ oneriler_kartlari(oneriler) }}
+
+    <form method="GET" class="row g-3 mb-4 filter-panel bg-body-secondary border">
+        <div class="col-12 col-md-4">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" name="ara" class="form-control" 
+                       placeholder="Başlık veya açıklama ara..." 
+                       value="{{ request.args.get('ara','') }}">
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <select name="kategori" class="form-select">
+                <option value="">Kategori (Hepsi)</option>
+                {% for kat in kategoriler %}
+                <option value="{{ kat }}" {% if request.args.get('kategori')==kat %}selected{% endif %}>{{ kat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <select name="sirala" class="form-select">
+                <option value="yeni" {% if request.args.get('sirala')=='yeni' %}selected{% endif %}>En Yeni</option>
+                <option value="eski" {% if request.args.get('sirala')=='eski' %}selected{% endif %}>En Eski</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-funnel"></i> Filtrele
+            </button>
+        </div>
+    </form>
+
+    <div id="map" class="map-container mb-2"></div>
+    {% if konumsuz_sayisi > 0 %}
+    <p class="text-muted small mb-3">
+        <i class="bi bi-info-circle"></i>
+        {{ konumsuz_sayisi }} ilanın konumu belirtilmemiş (varsayılan İstanbul); haritada gösterilmiyor.
+        İlan eklerken <strong>Konumumu Kullan</strong> butonuna tıklayın.
+    </p>
+    {% endif %}
+
+    <!-- KAYNAK KARTLARI -->
+    {% if kaynaklar %}
+    <div class="row g-4">
+        {% for item in kaynaklar %}
+        <div class="col-sm-6 col-lg-4 col-xl-3">
+            <div class="card item-card hover-card h-100 shadow-sm">
+                <!-- RESIM -->
+                <div class="position-relative card-img-wrap" style="height:180px;">
+                    {% set kapak = item|kapak_resim %}
+                    {% if kapak != 'default.jpg' %}
+                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" 
+                         class="w-100 h-100" 
+                         style="object-fit: cover;"
+                         alt="{{ item.baslik }}"
+                         loading="lazy">
+                    {% set foto_say = item|ilan_fotograflari|length %}
+                    {% if foto_say > 1 %}
+                    <span class="badge bg-dark position-absolute bottom-0 end-0 m-2 opacity-75">
+                        <i class="bi bi-images"></i> {{ foto_say }}
+                    </span>
+                    {% endif %}
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100">
+                        <i class="bi bi-box-seam text-secondary" style="font-size: 3rem;"></i>
+                    </div>
+                    {% endif %}
+
+                    <!-- KATEGORI ETIKETI -->
+                    <span class="badge bg-success category-badge">
+                        {{ item.kategori }}
+                    </span>
+
+                    <!-- FAVORI BUTONU -->
+                    <button class="position-absolute top-0 end-0 m-2 btn btn-light btn-sm rounded-circle shadow"
+                            onclick="favoriToggle({{ item.id }}, null, this)"
+                            title="Favorilere Ekle">
+                        <i class="bi bi-heart"></i>
+                    </button>
+                </div>
+
+                <!-- ICERIK -->
+                <div class="card-body d-flex flex-column p-3">
+                    <h6 class="card-title text-truncate fw-bold">{{ item.baslik }}</h6>
+                    <p class="card-text text-muted small flex-grow-1">
+                        {{ item.aciklama[:80] }}{% if item.aciklama|length > 80 %}...{% endif %}
+                    </p>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted">
+                            <i class="bi bi-person"></i> {{ item.sahip.username }}
+                        </small>
+                        <a href="{{ url_for('kaynak.kaynak_detay', id=item.id) }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            Incele <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state text-center py-5">
+        <i class="bi bi-inbox display-4 text-muted d-block mb-3"></i>
+        <h4 class="fw-semibold">Kaynak bulunamadı</h4>
+        <p class="text-muted mb-3">Henüz kaynak paylaşılmamış veya arama kriterlerinize uygun sonuç yok.</p>
+        <a href="{{ url_for('kaynak.yukle_kaynak') }}" class="btn btn-success">
+            <i class="bi bi-plus-circle me-1"></i> İlk Kaynağı Paylaş
+        </a>
+    </div>
+    {% endif %}
+
+    {% include '_pagination.html' %}
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+var isLoggedIn = {{ 'true' if current_user.is_authenticated else 'false' }};
+var haritaNoktalari = {{ harita_nokta | tojson }};
+var detayPrefix = '/kaynak/';
+
+function popupIcerik(nokta) {
+    var html = '';
+    nokta.ilanlar.forEach(function(i) {
+        html += '<div class="mb-1"><b>' + i.baslik + '</b><br><a href="' + detayPrefix + i.id + '">İncele</a></div>';
+    });
+    return html;
+}
+
+function markerKonumlari(noktalar) {
+    var sonuc = [];
+    noktalar.forEach(function(nokta) {
+        if (nokta.ilanlar.length === 1) {
+            sonuc.push({ lat: nokta.lat, lng: nokta.lng, nokta: nokta });
+            return;
+        }
+        var adim = (2 * Math.PI) / nokta.ilanlar.length;
+        var yaricap = 0.0015 * Math.min(nokta.ilanlar.length, 10);
+        nokta.ilanlar.forEach(function(_, idx) {
+            sonuc.push({
+                lat: nokta.lat + yaricap * Math.cos(idx * adim),
+                lng: nokta.lng + yaricap * Math.sin(idx * adim),
+                nokta: nokta,
+            });
+        });
+    });
+    return sonuc;
+}
+
+(function() {
+    var map = L.map('map').setView([41.015, 28.979], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    var bounds = [];
+    markerKonumlari(haritaNoktalari).forEach(function(m) {
+        var marker = L.marker([m.lat, m.lng]).addTo(map).bindPopup(popupIcerik(m.nokta));
+        bounds.push([m.lat, m.lng]);
+    });
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+    }
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            L.marker([pos.coords.latitude, pos.coords.longitude], {
+                icon: L.divIcon({
+                    className: 'user-marker',
+                    html: '<div style="background:#0d6efd;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">📍</div>',
+                    iconSize: [24, 24], iconAnchor: [12, 12],
+                }),
+            }).addTo(map).bindPopup('Sen buradasın');
+        });
+    }
+})();
+
+function favoriToggle(kaynakId, atikId, btn) {
+    if (!isLoggedIn) { window.location.href = '{{ url_for("auth.giris") }}'; return; }
+    var data = {};
+    if (kaynakId) data.kaynak_id = kaynakId;
+    if (atikId) data.atik_id = atikId;
+
+    csrfFetch('/api/favori_ekle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        var icon = btn.querySelector('i');
+        if (result.status === 'added') {
+            icon.className = 'bi bi-heart-fill text-danger';
+            btn.classList.add('btn-outline-danger');
+        } else {
+            icon.className = 'bi bi-heart';
+            btn.classList.remove('btn-outline-danger');
+        }
+    })
+    .catch(function(e) { console.error(e); });
+}
+
+// Sayfa yuklendiginde favori durumlarini kontrol et
+document.addEventListener('DOMContentLoaded', function() {
+    if (!isLoggedIn) return;
+    var cards = document.querySelectorAll('.hover-card');
+    cards.forEach(function(card) {
+        var btn = card.querySelector('button[onclick*="favoriToggle"]');
+        if (btn) {
+            var match = btn.getAttribute('onclick').match(/favoriToggle\((\d+)/);
+            if (match) {
+                fetch('/api/favori_kontrol?kaynak_id=' + match[1])
+                    .then(function(r) { return r.json(); })
+                    .then(function(result) {
+                        if (result.is_favori) {
+                            var icon = btn.querySelector('i');
+                            icon.className = 'bi bi-heart-fill text-danger';
+                            btn.classList.add('btn-outline-danger');
+                        }
+                    });
+            }
+        }
+    });
+});
+</script>
+
+{% endblock %}

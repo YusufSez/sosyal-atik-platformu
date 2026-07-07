@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="container" style="max-width: 700px;">
+    <h3 class="mb-3">💬 Mesajlarım</h3>
+
+    {% if sohbetler %}
+        <ul class="list-group">
+
+        {% for key, sohbet in sohbetler.items() %}
+            {% set msg = sohbet.msg %}
+            {% set urun = sohbet.kaynak if sohbet.kaynak else sohbet.atik %}
+
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                <div>
+                    <strong>
+                        {{ msg.sender.username if msg.sender_id != current_user.id else msg.receiver.username }}
+                    </strong>
+
+                    {% if sohbet.is_new %}
+                        <span class="badge bg-danger ms-2">Yeni</span>
+                    {% endif %}
+
+                    <p class="mb-1 text-truncate" style="max-width: 400px;">
+                        {% if msg.sender_id == current_user.id %}
+                            Sen: {{ msg.content }}
+                        {% else %}
+                            {{ msg.content }}
+                        {% endif %}
+                    </p>
+
+                    <small class="text-muted">{{ msg.timestamp.strftime('%d-%m-%Y %H:%M') }}</small>
+
+                    <div>
+                        <small class="text-muted">📦 {{ urun.baslik if urun else "Ürün bilgisi yok" }}</small>
+                    </div>
+                </div>
+
+                <a href="{{ url_for('messages.mesajlar', 
+                        user_id=sohbet.user_id, 
+                        kaynak_id=sohbet.kaynak_id if sohbet.kaynak_id else 0, 
+                        atik_id=sohbet.atik_id if sohbet.atik_id else 0) }}"
+                    class="btn btn-primary btn-sm">
+                    Mesajları Gör
+                </a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Henüz hiç mesajınız yok.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

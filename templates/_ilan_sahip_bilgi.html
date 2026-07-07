@@ -1,0 +1,24 @@
+{% macro ilan_sahip_bilgi(sahip) %}
+<div class="ilan-sahip-bilgi border rounded p-3 mb-3">
+    <h6 class="mb-2 text-secondary"><i class="bi bi-person-badge me-1"></i>Yükleyen Bilgileri</h6>
+    <ul class="list-unstyled mb-0">
+        <li class="mb-1"><strong>Ad Soyad:</strong> {{ sahip.username }}</li>
+        <li class="mb-1"><strong>İl:</strong> {{ sahip.il or '—' }}</li>
+        <li class="mb-1"><strong>İlçe:</strong> {{ sahip.ilce or '—' }}</li>
+        <li class="mb-1"><strong>Güven Puanı:</strong> {{ sahip.guven_puani or 0 }}</li>
+        <li class="mb-0">
+            <strong>Telefon:</strong>
+            {% if current_user.is_authenticated %}
+                {% if sahip.telefon %}
+                    <a href="tel:{{ sahip.telefon|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">{{ sahip.telefon }}</a>
+                {% else %}
+                    <span class="text-muted">Belirtilmemiş</span>
+                {% endif %}
+            {% else %}
+                <span class="text-muted">Giriş yapınca görünür</span>
+                <a href="{{ url_for('auth.giris') }}" class="ms-1 small">Giriş yap</a>
+            {% endif %}
+        </li>
+    </ul>
+</div>
+{% endmacro %}

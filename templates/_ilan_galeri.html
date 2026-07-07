@@ -1,0 +1,38 @@
+{% macro ilan_galeri(item, carousel_id) %}
+{% set fotolar = item|ilan_fotograflari %}
+{% if fotolar %}
+<div id="{{ carousel_id }}" class="carousel slide mb-3" data-bs-ride="carousel">
+    {% if fotolar|length > 1 %}
+    <div class="carousel-indicators">
+        {% for foto in fotolar %}
+        <button type="button" data-bs-target="#{{ carousel_id }}" data-bs-slide-to="{{ loop.index0 }}"
+                {% if loop.first %}class="active" aria-current="true"{% endif %}
+                aria-label="Fotoğraf {{ loop.index }}"></button>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <div class="carousel-inner rounded overflow-hidden" style="background: var(--bs-secondary-bg);">
+        {% for foto in fotolar %}
+        <div class="carousel-item {% if loop.first %}active{% endif %}">
+            <div class="d-flex justify-content-center align-items-center" style="height: 320px;">
+                <img src="{{ url_for('static', filename='item_pics/' + foto) }}"
+                     class="d-block" style="max-height: 100%; max-width: 100%; object-fit: contain;"
+                     alt="{{ item.baslik }} — {{ loop.index }}/{{ fotolar|length }}">
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% if fotolar|length > 1 %}
+    <button class="carousel-control-prev" type="button" data-bs-target="#{{ carousel_id }}" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon"></span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#{{ carousel_id }}" data-bs-slide="next">
+        <span class="carousel-control-next-icon"></span>
+    </button>
+    <div class="text-center mt-2">
+        <small class="text-muted"><i class="bi bi-images"></i> {{ fotolar|length }} fotoğraf</small>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}

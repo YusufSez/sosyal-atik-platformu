@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      - ./site.db:/app/site.db
+      - ./static/item_pics:/app/static/item_pics
+    restart: unless-stopped

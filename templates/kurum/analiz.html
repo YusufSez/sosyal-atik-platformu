@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section fade-in">
+    <div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h3 class="fw-bold"><i class="bi bi-building me-2"></i>Kurum Analiz Paneli</h3>
+            <small class="text-muted">Belediye ve kurumlar için bölgesel istatistikler ve ısı haritası</small>
+        </div>
+        <form method="GET" class="d-flex gap-2 flex-wrap">
+            <select name="il" class="form-select form-select-sm">
+                <option value="">Tüm Türkiye</option>
+                {% for il in iller %}
+                <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
+                {% endfor %}
+            </select>
+            <select name="tur" class="form-select form-select-sm">
+                <option value="">Tümü</option>
+                <option value="kaynak" {% if secili_tur == 'kaynak' %}selected{% endif %}>Kaynak</option>
+                <option value="atik" {% if secili_tur == 'atik' %}selected{% endif %}>Atık</option>
+            </select>
+            <button class="btn btn-sm btn-success">Filtrele</button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.kullanici }}</h5><small class="text-muted">Kullanıcı</small></div></div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.aktif_kaynak }}</h5><small class="text-muted">Aktif Kaynak</small></div></div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.aktif_atik }}</h5><small class="text-muted">Aktif Atık</small></div></div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.teslim }}</h5><small class="text-muted">Teslim</small></div></div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.co2e_kg|format_etki("kg") }}</h5><small class="text-muted">CO₂e</small></div></div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.atik_kg|format_etki("kg") }}</h5><small class="text-muted">Atık Yönlendirme</small></div></div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold"><i class="bi bi-thermometer-half me-2"></i>Paylaşım Yoğunluk Haritası (Isı Haritası)</div>
+        <div class="card-body p-0">
+            <div id="kurumIsiHaritasi" class="map-container" style="height:420px;"></div>
+        </div>
+        <div class="card-footer small text-muted">
+            Koyu renkler daha yoğun paylaşım ve teslim bölgelerini gösterir.
+            {% if secili_il %}Filtre: <strong>{{ secili_il }}</strong>{% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <h5>İlçe Kırılımı</h5>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead><tr><th>İlçe</th><th>İlan</th></tr></thead>
+                    <tbody>
+                    {% for row in ilceler %}
+                    <tr><td>{{ row.ilce }}</td><td>{{ row.adet }}</td></tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-muted">Veri yok</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <h5>Kaynak Kategorileri</h5>
+            <ul class="list-group list-group-flush">
+                {% for row in kaynak_kategoriler %}
+                <li class="list-group-item d-flex justify-content-between"><span>{{ row.kategori }}</span><span class="badge bg-primary">{{ row.adet }}</span></li>
+                {% else %}
+                <li class="list-group-item text-muted">Veri yok</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-lg-4">
+            <h5>Atık Kategorileri</h5>
+            <ul class="list-group list-group-flush">
+                {% for row in atik_kategoriler %}
+                <li class="list-group-item d-flex justify-content-between"><span>{{ row.kategori }}</span><span class="badge bg-success">{{ row.adet }}</span></li>
+                {% else %}
+                <li class="list-group-item text-muted">Veri yok</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+(function() {
+    var noktalar = {{ isi_noktalari | tojson }};
+    var map = L.map('kurumIsiHaritasi').setView([39.0, 35.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+    if (noktalar.length) {
+        L.heatLayer(noktalar, { radius: 22, blur: 18, maxZoom: 12, gradient: {0.2:'#3b82f6',0.5:'#10b981',0.8:'#f59e0b',1:'#ef4444'} }).addTo(map);
+        var bounds = noktalar.map(function(p) { return [p[0], p[1]]; });
+        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 10 });
+    }
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="kurumsal-sayfa fade-in">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.anasayfa') }}">Anasayfa</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ sayfa.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="page-header mb-4">
+        <h2 class="fw-bold">{{ sayfa.title }}</h2>
+        {% if sayfa.ozet %}
+        <p class="text-muted mb-0">{{ sayfa.ozet }}</p>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        {% for bolum in sayfa.bolumler %}
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm kurumsal-kart">
+                <div class="card-body p-4">
+                    <h5 class="card-title text-success fw-bold">{{ bolum.baslik }}</h5>
+                    <p class="card-text text-muted mb-0" style="white-space: pre-line;">{{ bolum.icerik }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if slug == 'surdurulebilirlik' %}
+    <div class="mt-4 text-center">
+        <a href="{{ url_for('impact.metodoloji') }}" class="btn btn-outline-success">
+            <i class="bi bi-graph-up me-1"></i> Çevresel Etki Metodolojisi
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

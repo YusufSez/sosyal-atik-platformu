@@ -1,0 +1,106 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="card detail-card mb-4">
+        {% from "_ilan_galeri.html" import ilan_galeri %}
+        {{ ilan_galeri(item, 'kaynakGaleri' ~ item.id) }}
+
+        <div class="card-body d-flex flex-column p-4">
+            <h3 class="card-title fw-bold mb-3">{{ item.baslik }}</h3>
+
+            {% from "_ilan_sahip_bilgi.html" import ilan_sahip_bilgi with context %}
+            {{ ilan_sahip_bilgi(item.sahip) }}
+
+            <ul class="list-group list-group-flush mb-3">
+                <li class="list-group-item"><strong>Kategori:</strong> {{ item.kategori }}</li>
+                <li class="list-group-item"><strong>Durum:</strong> {{ item.durum }}</li>
+                <li class="list-group-item"><strong>İlan Durumu:</strong> {{ item.ilan_durumu or 'Aktif' }}</li>
+                <li class="list-group-item"><strong>Tarih:</strong> {{ item.tarih.strftime('%d.%m.%Y %H:%M') if item.tarih else '-' }}</li>
+                <li class="list-group-item">
+                    <strong>Görüntülenme:</strong> <span id="goruntulenmeSayisi">—</span>
+                </li>
+            </ul>
+
+            <div class="d-flex gap-2 mt-auto">
+                {% if current_user.is_authenticated and current_user.id != item.sahip.id %}
+                    <a href="{{ url_for('messages.mesajlar', user_id=item.sahip.id, kaynak_id=item.id, atik_id=0) }}" 
+                        class="btn btn-outline-success btn-sm">
+                        Sahiple İletişime Geç
+                    </a>
+                {% endif %}
+                {% if current_user.is_authenticated and current_user.id != item.sahip.id %}
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="sikayetEt({{ item.id }}, null)">Şikayet Et</button>
+                {% endif %}
+                <a href="{{ url_for('kaynak.kaynak_panel') }}" class="btn btn-primary btn-sm">Geri Dön</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr>
+
+<div class="detail-alt-bolum mb-4">
+    <h4>📝 Ürün Açıklaması</h4>
+    <div class="border rounded p-3 ilan-aciklama-kutu">
+        <p class="mb-0">{{ item.aciklama|display_text }}</p>
+    </div>
+</div>
+
+<h4 class="detail-alt-bolum">💬 Yorumlar</h4>
+
+<div class="detail-alt-bolum">
+{% for y in item.comments %}
+<div class="border p-2 rounded mb-2">
+    <strong>{{ y.user.username }}</strong>
+    <small class="text-muted">{{ y.timestamp.strftime('%d-%m-%Y %H:%M') }}</small>
+    <p>{{ y.content|display_text }}</p>
+</div>
+{% else %}
+<p class="text-muted">Henüz yorum yok.</p>
+{% endfor %}
+</div>
+
+{% if current_user.is_authenticated %}
+<form method="POST" action="{{ url_for('kaynak.yorum_ekle', kaynak_id=item.id) }}" class="detail-alt-bolum">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <textarea name="yorum" class="form-control" rows="3" placeholder="Yorum yaz..." required></textarea>
+    <button class="btn btn-primary btn-sm mt-2">Gönder</button>
+</form>
+{% else %}
+<p class="text-muted text-center">Yorum yapmak için <a href="{{ url_for('auth.giris') }}">giriş yapın</a>.</p>
+{% endif %}
+
+<script>
+function sikayetEt(kaynakId, atikId) {
+    var sebep = prompt('Şikayet sebebinizi yazın:');
+    if (!sebep) return;
+    csrfFetch('/api/sikayet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kaynak_id: kaynakId, atik_id: atikId, sebep: sebep })
+    }).then(function() { alert('Şikayetiniz alındı.'); });
+}
+(function() {
+    var kaynakId = {{ item.id }};
+    function guncelleSayac() {
+        fetch('/api/goruntulenme_sayisi?kaynak_id=' + kaynakId)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var el = document.getElementById('goruntulenmeSayisi');
+                if (el) el.textContent = d.count || 0;
+            });
+    }
+    {% if current_user.is_authenticated %}
+    csrfFetch('/api/goruntulenme_ekle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kaynak_id: kaynakId })
+    }).then(guncelleSayac).catch(guncelleSayac);
+    {% else %}
+    guncelleSayac();
+    {% endif %}
+})();
+</script>
+
+{% endblock %}

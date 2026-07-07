@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-center mt-4">
+    <div class="card profile-card w-100">
+        <div class="card-header-custom">
+            <h3><i class="bi bi-person-circle me-2"></i>Profilim</h3>
+        </div>
+        <div class="card-body p-4">
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='profile_pics/' + (user.profile_image or 'default.jpg')) }}"
+                 class="rounded-circle mb-3 profile-avatar" alt="Profil">
+            <form method="POST" action="{{ url_for('auth.profil_foto') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="profil_resmi" class="form-control form-control-sm mb-2" accept="image/*" required>
+                <button type="submit" class="btn btn-sm btn-outline-primary">Fotoğraf Güncelle</button>
+            </form>
+        </div>
+
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item"><strong>Kullanıcı Adı:</strong> {{ user.username }}</li>
+            <li class="list-group-item"><strong>E-posta:</strong> {{ user.email }}</li>
+            <li class="list-group-item"><strong>Güven Puanı:</strong> {{ user.guven_puani or 0 }}</li>
+            <li class="list-group-item">
+                <strong>Seviye:</strong> {{ seviye.ad }} ({{ seviye.xp }} XP)
+                {% if siralama %}<span class="text-muted">— Liderlik #{{ siralama }}</span>{% endif %}
+            </li>
+            <li class="list-group-item"><strong>Rozetler:</strong> {{ rozet_sayisi }}/{{ rozet_toplam }}</li>
+            <li class="list-group-item"><strong>CO₂e Tasarrufu:</strong> {{ etki_ozet.co2e_kg|format_etki("kg") }}*</li>
+            <li class="list-group-item"><strong>Teslim Sayısı:</strong> {{ etki_ozet.teslim_sayisi }}</li>
+            <li class="list-group-item"><strong>Doğum Tarihi:</strong> {{ user.dogum_tarihi or "-" }}</li>
+            <li class="list-group-item"><strong>İl:</strong> {{ user.il or "-" }}</li>
+            <li class="list-group-item"><strong>İlçe:</strong> {{ user.ilce or "-" }}</li>
+            <li class="list-group-item"><strong>Telefon:</strong> {{ user.telefon or "-" }}</li>
+        </ul>
+
+        <div class="d-flex flex-wrap gap-2 justify-content-between">
+            <a href="{{ url_for('impact.etki_panelim') }}" class="btn btn-success">Çevresel Etkim</a>
+            <a href="{{ url_for('gamification.rozetlerim') }}" class="btn btn-warning">Rozetlerim</a>
+            <a href="{{ url_for('gamification.liderlik') }}" class="btn btn-outline-warning">Liderlik</a>
+            <a href="{{ url_for('auth.profil_tamamla') }}" class="btn btn-primary">Profili Düzenle</a>
+            <a href="{{ url_for('auth.sifre_degistir') }}" class="btn btn-outline-secondary">Şifre Değiştir</a>
+            <a href="{{ url_for('main.anasayfa') }}" class="btn btn-secondary">Anasayfaya Dön</a>
+        </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

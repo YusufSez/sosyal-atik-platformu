@@ -1,0 +1,44 @@
+{% macro etki_kartlari(ozet) %}
+<div class="row g-3 text-center">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-success mb-1"><i class="bi bi-cloud-check" style="font-size:1.5rem;"></i></div>
+                <h4>{{ ozet.co2e_kg|format_etki("kg") }}</h4>
+                <small class="text-muted">CO₂e tasarrufu*</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-primary mb-1"><i class="bi bi-droplet" style="font-size:1.5rem;"></i></div>
+                <h4>{{ ozet.su_litre|format_etki("L") }}</h4>
+                <small class="text-muted">Su tasarrufu*</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-warning mb-1"><i class="bi bi-box-seam" style="font-size:1.5rem;"></i></div>
+                <h4>{{ ozet.yeniden_kullanim }}</h4>
+                <small class="text-muted">Yeniden kullanım</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-success mb-1"><i class="bi bi-recycle" style="font-size:1.5rem;"></i></div>
+                <h4>{{ ozet.atik_kg|format_etki("kg") }}</h4>
+                <small class="text-muted">Yönlendirilen atık*</small>
+            </div>
+        </div>
+    </div>
+</div>
+<p class="text-center text-muted small mt-2 mb-0">
+    * Tahmini değerler —
+    <a href="{{ url_for('impact.metodoloji') }}">Metodoloji</a>
+</p>
+{% endmacro %}

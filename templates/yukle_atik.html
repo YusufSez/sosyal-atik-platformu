@@ -1,0 +1,106 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-center mt-4">
+    <div class="card form-card w-100">
+        <div class="card-header-custom">
+            <h3><i class="bi bi-recycle me-2"></i>Atık Paylaş</h3>
+        </div>
+        <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data" id="atikForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="latitude" id="latitude" value="{{ varsayilan_lat or '' }}">
+            <input type="hidden" name="longitude" id="longitude" value="{{ varsayilan_lng or '' }}">
+
+            <div class="mb-3">
+                <label for="baslik" class="form-label">Atık Türü</label>
+                <input type="text" id="baslik" name="baslik" class="form-control" placeholder="Örn: Plastik, Metal, Ahşap..." required>
+            </div>
+
+            <div class="mb-3">
+                <label for="aciklama" class="form-label">Açıklama</label>
+                <textarea id="aciklama" name="aciklama" class="form-control" rows="4" placeholder="Atık hakkında detaylı bilgi..." required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="kategori" class="form-label">Kategori</label>
+                <select id="kategori" name="kategori" class="form-control">
+                    <option value="">Otomatik (AI ile)</option>
+                    {% for kat in kategoriler %}
+                    <option value="{{ kat }}">{{ kat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Konum</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="konumAlBtn">
+                        <i class="bi bi-geo-alt"></i> Konumumu Kullan
+                    </button>
+                    <small class="text-muted" id="konumDurum">Konum alınmadı (varsayılan: İstanbul)</small>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="resimler" class="form-label">Fotoğraflar <small class="text-muted">(en fazla {{ max_foto }}, isteğe bağlı)</small></label>
+                <input type="file" id="resimler" name="resimler" class="form-control" accept="image/png,image/jpeg,image/webp" multiple>
+                <small class="text-muted">Birden fazla seçmek için Ctrl veya Shift tuşunu kullanın. Maks. 5 MB/dosya.</small>
+            </div>
+
+            {% from "_recaptcha.html" import recaptcha_widget %}
+            {{ recaptcha_widget() }}
+            <button type="submit" class="btn btn-success w-100 mt-3">Atığı Yayınla</button>
+        </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function konumGuncelle(lat, lng, mesaj) {
+    document.getElementById('latitude').value = lat;
+    document.getElementById('longitude').value = lng;
+    document.getElementById('konumDurum').textContent = mesaj;
+}
+
+function konumAl() {
+    if (!navigator.geolocation) {
+        document.getElementById('konumDurum').textContent = 'Tarayıcı konum desteklemiyor.';
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(function(pos) {
+        konumGuncelle(pos.coords.latitude, pos.coords.longitude, 'Konum alındı (GPS).');
+    }, function() {
+        var lat = document.getElementById('latitude').value;
+        var lng = document.getElementById('longitude').value;
+        if (lat && lng) {
+            document.getElementById('konumDurum').textContent = 'Profil konumu kullanılacak.';
+        } else {
+            document.getElementById('konumDurum').textContent = 'Konum izni verilmedi. Haritada görünmeyebilir.';
+        }
+    });
+}
+
+document.getElementById('konumAlBtn').addEventListener('click', konumAl);
+
+if (document.getElementById('latitude').value && document.getElementById('longitude').value) {
+    document.getElementById('konumDurum').textContent = 'Profil konumu yüklendi.';
+} else {
+    konumAl();
+}
+
+document.getElementById('atikForm').addEventListener('submit', function(e) {
+    if (!document.getElementById('latitude').value || !document.getElementById('longitude').value) {
+        e.preventDefault();
+        alert('Haritada görünmesi için lütfen konum izni verin veya "Konumumu Kullan" butonuna tıklayın.');
+        konumAl();
+    }
+});
+</script>
+
+{% endblock %}
+
+{% block scripts %}
+{% from "_recaptcha.html" import recaptcha_script %}
+{{ recaptcha_script() }}
+{% endblock %}

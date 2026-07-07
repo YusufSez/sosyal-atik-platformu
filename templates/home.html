@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="hero-section fade-in">
+    <div class="hero-badge"><i class="bi bi-stars"></i> AI destekli moderasyon</div>
+    <h1>Atık & Kaynak Paylaşım Platformu</h1>
+    <p class="text-muted mb-0 mx-auto" style="max-width: 520px;">
+        Kullanmadığın eşyaları paylaş, atıklarını doğru noktaya ulaştır. Birlikte daha sürdürülebilir bir gelecek.
+    </p>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-6">
+        <div class="card feature-card hover-card h-100">
+            <div class="feature-icon kaynak">📦</div>
+            <h4 class="fw-bold">Kaynak Paylaşımı</h4>
+            <p class="text-muted mb-4">Kullanılabilir eşyalarını ihtiyaç sahipleriyle buluştur.</p>
+            <a href="{{ url_for('kaynak.kaynak_panel') }}" class="btn btn-primary px-4">
+                <i class="bi bi-box-seam me-1"></i> Kaynak Paneli
+            </a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card feature-card hover-card h-100">
+            <div class="feature-icon atik">♻️</div>
+            <h4 class="fw-bold">Atık Paylaşımı</h4>
+            <p class="text-muted mb-4">Atıklarını geri dönüşüm merkezleri ve ihtiyaç sahiplerine ulaştır.</p>
+            <a href="{{ url_for('atik.atik_panel') }}" class="btn btn-success px-4">
+                <i class="bi bi-recycle me-1"></i> Atık Paneli
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if current_user.is_authenticated %}
+{% from "_oneriler.html" import oneriler_kartlari %}
+{{ oneriler_kartlari(oneriler_kaynak, 'Sizin İçin Kaynak Önerileri') }}
+{{ oneriler_kartlari(oneriler_atik, 'Sizin İçin Atık Önerileri') }}
+{% endif %}
+
+{% if kaynaklar %}
+<section class="mb-5">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="fw-bold mb-0"><i class="bi bi-clock-history text-success me-2"></i>Son Eklenen Kaynaklar</h4>
+        <a href="{{ url_for('kaynak.kaynak_panel') }}" class="btn btn-sm btn-outline-primary">Tümünü Gör</a>
+    </div>
+    <div class="row g-3">
+        {% for k in kaynaklar %}
+        <div class="col-md-6 col-lg-3">
+            <div class="card item-card h-100 hover-card">
+                <div class="position-relative card-img-wrap">
+                    {% set kapak = k|kapak_resim %}
+                    {% if kapak != 'default.jpg' %}
+                    <img src="{{ url_for('static', filename='item_pics/' + kapak) }}" class="w-100 h-100" style="object-fit:cover;" alt="{{ k.baslik }}">
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                        <i class="bi bi-image" style="font-size:2rem;"></i>
+                    </div>
+                    {% endif %}
+                    <span class="badge bg-success category-badge">{{ k.kategori }}</span>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title text-truncate fw-semibold">{{ k.baslik }}</h6>
+                    <a href="{{ url_for('kaynak.kaynak_detay', id=k.id) }}" class="btn btn-sm btn-outline-primary w-100">İncele</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="mb-4">
+    <h4 class="text-center fw-bold mb-4">Platform İstatistikleri</h4>
+    <div class="row g-3 text-center">
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card shadow-sm">
+                <h4>{{ stats.kullanici }}</h4>
+                <small class="text-muted">Kayıtlı Kullanıcı</small>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card shadow-sm">
+                <h4>{{ stats.kaynak }}</h4>
+                <small class="text-muted">Kaynak İlanı</small>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card shadow-sm">
+                <h4>{{ stats.atik }}</h4>
+                <small class="text-muted">Atık İlanı</small>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card shadow-sm">
+                <h4>{{ stats.teslim }}</h4>
+                <small class="text-muted">Teslim Edilen</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mb-5">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="fw-bold mb-0"><i class="bi bi-globe-americas text-success me-2"></i>Çevresel Etkimiz</h4>
+        <a href="{{ url_for('impact.metodoloji') }}" class="btn btn-sm btn-outline-success">Metodoloji</a>
+    </div>
+    {% from "_etki_kartlari.html" import etki_kartlari %}
+    {{ etki_kartlari(etki) }}
+    {% if current_user.is_authenticated %}
+    <div class="text-center mt-3">
+        <a href="{{ url_for('impact.etki_panelim') }}" class="btn btn-success btn-sm">
+            <i class="bi bi-graph-up me-1"></i> Etki Panelim
+        </a>
+    </div>
+    {% endif %}
+</section>
+
+{% endblock %}

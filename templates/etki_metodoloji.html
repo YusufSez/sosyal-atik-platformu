@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="page-header mb-4">
+    <h3><i class="bi bi-info-circle text-success me-2"></i>Çevresel Etki Metodolojisi</h3>
+    <small class="text-muted">Versiyon {{ versiyon }} — tüm değerler tahminidir</small>
+</div>
+
+<div class="alert alert-info">
+    <i class="bi bi-exclamation-circle me-2"></i>
+    AtıkPort, teslim edilen ilanlar için <strong>kategori bazlı ortalama katsayılar</strong> kullanarak
+    tahmini çevresel etki hesaplar. Bu değerler bilimsel LCA yerine farkındalık ve karşılaştırma amaçlıdır.
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-bold">Kaynak paylaşımı (yeniden kullanım)</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Kategori</th><th>CO₂e (kg)</th><th>Su (L)</th></tr></thead>
+                    <tbody>
+                    {% for kat, k in kaynak_katsayilari.items() %}
+                    <tr><td>{{ kat }}</td><td>{{ k.co2e_kg }}</td><td>{{ k.su_litre }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header fw-bold">Atık yönlendirme (geri dönüşüm)</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Kategori</th><th>CO₂e (kg)</th><th>Atık (kg)</th></tr></thead>
+                    <tbody>
+                    {% for kat, k in atik_katsayilari.items() %}
+                    <tr><td>{{ kat }}</td><td>{{ k.co2e_kg }}</td><td>{{ k.atik_kg }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="fw-bold">Hesaplama tetikleyicisi</h5>
+        <p class="mb-2">Etki kaydı yalnızca ilan durumu <strong>Teslim Edildi</strong> olarak işaretlendiğinde,
+        ve daha önce bu ilan için kayıt oluşturulmamışsa hesaplanır.</p>
+        <h5 class="fw-bold mt-3">Döngüsel ekonomi skoru</h5>
+        <p class="mb-2">Kaynak: <code>round(CO₂e × 10) + 50</code> — Atık: <code>round(CO₂e × 10) + 30</code></p>
+        <h5 class="fw-bold mt-3">SDG uyumu</h5>
+        <p class="mb-0">Bu modül Birleşmiş Milletler <strong>Sürdürülebilir Kalkınma Hedefi 12</strong>
+        (Sorumlu Tüketim ve Üretim) ile uyumludur.</p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header fw-bold">Platform toplamı (canlı)</div>
+    <div class="card-body">
+        {% from "_etki_kartlari.html" import etki_kartlari %}
+        {{ etki_kartlari(platform_ozet) }}
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ url_for('main.anasayfa') }}" class="btn btn-secondary">Anasayfaya Dön</a>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('impact.etki_panelim') }}" class="btn btn-success">Etki Panelim</a>
+    {% endif %}
+</div>
+
+{% endblock %}
