@@ -142,6 +142,30 @@ def _clear_postgres(engine) -> None:
         conn.execute(text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE"))
 
 
+def _ensure_postgres_schema(app, engine) -> None:
+    """Şema yoksa upgrade; tablolar var ama alembic kaydı yoksa stamp head."""
+    insp = inspect(engine)
+    table_names = insp.get_table_names()
+    with app.app_context():
+        from flask_migrate import stamp, upgrade
+
+        if not table_names:
+            upgrade()
+            return
+
+        version = None
+        if "alembic_version" in table_names:
+            with engine.connect() as conn:
+                version = conn.execute(
+                    text("SELECT version_num FROM alembic_version LIMIT 1")
+                ).scalar()
+
+        if version:
+            upgrade()
+        else:
+            stamp(revision="head")
+
+
 def migrate(sqlite_path: Path, reset: bool) -> None:
     if not sqlite_path.is_file():
         print(f"Hata: SQLite dosyası bulunamadı: {sqlite_path}")
@@ -170,10 +194,7 @@ def migrate(sqlite_path: Path, reset: bool) -> None:
     dest_session = sessionmaker(bind=dest_engine)()
 
     app = create_app()
-    with app.app_context():
-        from flask_migrate import upgrade
-
-        upgrade()
+    _ensure_postgres_schema(app, dest_engine)
 
     if _postgres_has_data(dest_engine):
         if not reset:
@@ -185,9 +206,9 @@ def migrate(sqlite_path: Path, reset: bool) -> None:
         print("Mevcut PostgreSQL tabloları temizleniyor (--reset)...")
         _clear_postgres(dest_engine)
         with app.app_context():
-            from flask_migrate import upgrade
+            from flask_migrate import stamp
 
-            upgrade()
+            stamp(revision="head")
 
     totals: dict[str, int] = {}
     for model in COPY_MODELS:
