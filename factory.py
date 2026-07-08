@@ -12,7 +12,7 @@ from constants import ITEMS_PER_PAGE, MAX_UPLOAD_BYTES
 from extensions import csrf, db, limiter, login_manager, mail, migrate
 from models import User
 import models  # noqa: F401 — Alembic tüm modelleri keşfetsin
-from security import init_security
+from security import apply_force_https_exemptions, init_security
 from services.database_config import is_sqlite_uri, resolve_database_uri
 from utils import env_to_bool
 
@@ -241,6 +241,8 @@ def create_app(config_overrides=None):
     app.register_blueprint(kurum_bp)
     app.register_blueprint(gamification_bp)
     app.register_blueprint(admin_bp)
+
+    apply_force_https_exemptions(app)
 
     with app.app_context():
         from services.db_bootstrap import bootstrap_database

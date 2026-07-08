@@ -60,6 +60,22 @@ _STATIC_CACHE_PATH_PREFIXES = (
     "/favicon.ico",
 )
 
+# Docker healthcheck ve dahili probe'lar — container içinde HTTPS yok
+INTERNAL_HTTP_EXEMPT_PATHS = frozenset({"/health"})
+
+
+def apply_force_https_exemptions(app):
+    """Belirtilen path'lerde Talisman force_https yönlendirmesini kapatır."""
+    for rule in app.url_map.iter_rules():
+        if rule.rule not in INTERNAL_HTTP_EXEMPT_PATHS:
+            continue
+        view = app.view_functions.get(rule.endpoint)
+        if view is None:
+            continue
+        options = dict(getattr(view, "talisman_view_options", {}))
+        options["force_https"] = False
+        view.talisman_view_options = options
+
 
 def init_security(app):
     force_https = app.config.get("FORCE_HTTPS", False)

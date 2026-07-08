@@ -25,6 +25,31 @@ def test_static_cache_headers(client):
     assert "max-age" in cache_control
 
 
+def test_health_allows_http_when_force_https(monkeypatch):
+    """Docker healthcheck container içinde HTTP ile /health çağırır."""
+    from factory import create_app
+
+    monkeypatch.setenv("FORCE_HTTPS", "True")
+    monkeypatch.setenv("DEBUG", "False")
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "WTF_CSRF_ENABLED": False,
+        "TURNSTILE_ENABLED": False,
+    })
+    with app.app_context():
+        from extensions import db
+
+        db.create_all()
+    client = app.test_client()
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.is_json
+    assert response.get_json()["status"] == "ok"
+    assert response.get_json()["database"] == "up"
+    assert response.location is None
+
+
 def test_argon2_password_upgrade_on_login(client, app):
     from auth_utils import hash_password, needs_password_update
     from extensions import db

@@ -49,9 +49,9 @@ def anasayfa():
 def health():
     try:
         db.session.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "up"}, 200
+        return jsonify(status="ok", database="up"), 200
     except Exception:
-        return {"status": "degraded", "database": "down"}, 503
+        return jsonify(status="degraded", database="down"), 503
 
 
 @main_bp.route("/kurumsal/<slug>")
