@@ -36,7 +36,7 @@ def upgrade():
             sa.Column(
                 "is_banned",
                 sa.Boolean(),
-                server_default=sa.text("0"),
+                server_default=sa.text("false"),
                 nullable=False,
             )
         )
@@ -51,34 +51,34 @@ def upgrade():
     if super_email:
         bind.execute(
             text(
-                'UPDATE "user" SET role=:role, is_admin=1 WHERE lower(email)=:email'
+                'UPDATE "user" SET role=:role, is_admin=true WHERE lower(email)=:email'
             ),
             {"role": "superadmin", "email": super_email},
         )
         bind.execute(
             text(
-                'UPDATE "user" SET role=:role, is_admin=1 WHERE is_admin=1 AND lower(email)<>:email'
+                'UPDATE "user" SET role=:role, is_admin=true WHERE is_admin=true AND lower(email)<>:email'
             ),
             {"role": "admin", "email": super_email},
         )
     else:
         # Env tanımlı değilse: geriye uyumluluk için ilk admin'i superadmin yap.
         row = bind.execute(
-            text('SELECT id FROM "user" WHERE is_admin=1 ORDER BY id ASC LIMIT 1')
+            text('SELECT id FROM "user" WHERE is_admin=true ORDER BY id ASC LIMIT 1')
         ).fetchone()
         if row:
             super_id = row[0]
             bind.execute(
-                text('UPDATE "user" SET role=:role, is_admin=1 WHERE id=:id'),
+                text('UPDATE "user" SET role=:role, is_admin=true WHERE id=:id'),
                 {"role": "superadmin", "id": super_id},
             )
             bind.execute(
-                text('UPDATE "user" SET role=:role, is_admin=1 WHERE is_admin=1 AND id<>:id'),
+                text('UPDATE "user" SET role=:role, is_admin=true WHERE is_admin=true AND id<>:id'),
                 {"role": "admin", "id": super_id},
             )
 
     # Garantile: is_admin=False ise role=user
-    bind.execute(text('UPDATE "user" SET role=:role WHERE is_admin=0'), {"role": "user"})
+    bind.execute(text('UPDATE "user" SET role=:role WHERE is_admin=false'), {"role": "user"})
 
 
 def downgrade():
