@@ -88,8 +88,14 @@ def kayit():
             password=hash_password(password),
             terms_accepted_at=datetime.now(),
         )
-        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-        if admin_email and email == admin_email:
+        # Superadmin ataması: sadece SUPERADMIN_EMAIL ile eşleşen kullanıcıya
+        # (SUPERADMIN_EMAIL tanımlı değilse geriye uyumluluk için ADMIN_EMAIL'e fallback).
+        super_email = os.getenv("SUPERADMIN_EMAIL", "").strip().lower()
+        if not super_email:
+            super_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+
+        if super_email and email == super_email:
+            new_user.role = "superadmin"
             new_user.is_admin = True
         db.session.add(new_user)
         db.session.commit()
@@ -174,6 +180,10 @@ def giris():
             return redirect(url_for("auth.giris"))
 
         user = User.query.filter_by(email=email).first()
+        if user and getattr(user, "is_banned", False):
+            flash("Hesabınız banlandı. Giriş yapamazsınız.", "danger")
+            return redirect(url_for("auth.giris"))
+
         if not user or not verify_password(password, user.password):
             flash("Hatalı e-posta veya şifre!", "danger")
             return redirect(url_for("auth.giris"))

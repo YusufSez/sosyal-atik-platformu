@@ -21,7 +21,6 @@ CONTENT_SECURITY_POLICY = {
     "style-src": [
         "'self'",
         "https://challenges.cloudflare.com",
-        "'unsafe-inline'",
     ],
     "font-src": [
         "'self'",

@@ -79,6 +79,9 @@
     </div>
 
     <div class="mb-3">
+        <a href="{{ url_for('admin.admin_users') }}" class="btn btn-sm btn-outline-dark">
+            <i class="bi bi-people"></i> Kullanıcı Yönetimi
+        </a>
         <a href="{{ url_for('admin.ai_test', tur='kaynak') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Kaynak)</a>
         <a href="{{ url_for('admin.ai_test', tur='atik') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Atık)</a>
     </div>
@@ -131,21 +134,32 @@
     <h5 class="mt-4">Kullanıcılar</h5>
     <div class="table-responsive mb-4">
         <table class="table table-sm">
-            <thead><tr><th>Kullanıcı</th><th>E-posta</th><th>Admin</th><th>İşlem</th></tr></thead>
+            <thead><tr><th>Kullanıcı</th><th>E-posta</th><th>Rol</th><th>İşlem</th></tr></thead>
             <tbody>
             {% for u in kullanicilar %}
+            {% set role_name = u.role if u.role else ('admin' if u.is_admin else 'user') %}
             <tr>
                 <td>{{ u.username }}</td>
                 <td>{{ u.email }}</td>
-                <td>{% if u.is_admin %}<span class="badge bg-warning">Admin</span>{% else %}-{% endif %}</td>
                 <td>
-                    {% if super_admin and u.id != current_user.id %}
+                    {% if role_name == 'superadmin' %}
+                        <span class="badge bg-danger">Superadmin</span>
+                    {% elif role_name == 'admin' %}
+                        <span class="badge bg-warning text-dark">Admin</span>
+                    {% else %}
+                        <span class="text-muted">User</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if super_admin and u.id != current_user.id and role_name != 'superadmin' %}
                     <form method="POST" action="{{ url_for('admin.admin_toggle_admin', user_id=u.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-sm btn-outline-secondary">Admin Aç/Kapat</button>
                     </form>
                     {% elif u.id == current_user.id %}
                     <span class="text-muted small">—</span>
+                    {% elif role_name == 'superadmin' %}
+                    <span class="text-muted small">Superadmin</span>
                     {% else %}
                     <span class="text-muted small">Yalnızca süper admin</span>
                     {% endif %}

@@ -15,7 +15,11 @@ def _verification_required() -> bool:
         return False
     if not current_user.is_authenticated:
         return False
-    if getattr(current_user, "is_admin", False):
+    # Admin / superadmin hesapları e-posta doğrulaması zorunluluğundan muaf.
+    if getattr(current_user, "is_admin", False) or getattr(current_user, "role", None) in (
+        "admin",
+        "superadmin",
+    ):
         return False
     return not getattr(current_user, "email_verified", False)
 
@@ -46,7 +50,13 @@ def require_email_verified_response():
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
+        if not current_user.is_authenticated:
+            abort(403)
+        role = getattr(current_user, "role", None)
+        if role in ("admin", "superadmin"):
+            return view(*args, **kwargs)
+        # Geriye uyumluluk: role alanı yoksa is_admin ile devam et.
+        if not getattr(current_user, "is_admin", False):
             abort(403)
         return view(*args, **kwargs)
 
@@ -54,13 +64,25 @@ def admin_required(view):
 
 
 def is_super_admin(user) -> bool:
-    if not user or not user.is_authenticated or not user.is_admin:
+    if not user or not user.is_authenticated:
         return False
 
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    if admin_email:
-        return user.email.lower() == admin_email
+    role = getattr(user, "role", None)
+    if role == "superadmin":
+        return True
 
+    # Yeni akış: SUPERADMIN_EMAIL'i kullan.
+    # Eğer tanımlı değilse geriye dönük uyumluluk için ADMIN_EMAIL'e fallback yapılır.
+    super_email = os.getenv("SUPERADMIN_EMAIL", "").strip().lower()
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    target_email = super_email or admin_email
+    if target_email:
+        # superadmin için is_admin/role eşleşmesi beklenir.
+        if not getattr(user, "is_admin", False):
+            return False
+        return (user.email or "").lower() == target_email
+
+    # Env hiç tanımlı değilse: geriye uyumluluk (ilk admin).
     first_admin = User.query.filter_by(is_admin=True).order_by(User.id.asc()).first()
     return first_admin is not None and first_admin.id == user.id
 
@@ -68,8 +90,6 @@ def is_super_admin(user) -> bool:
 def super_admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
-            abort(403)
         if not is_super_admin(current_user):
             abort(403)
         return view(*args, **kwargs)

@@ -323,6 +323,15 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE user ADD COLUMN is_kurum BOOLEAN DEFAULT 0"))
             if "xp" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN xp INTEGER DEFAULT 0"))
+            # Production role + ban fields (SQLite only) for local compatibility
+            if "role" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR(20) DEFAULT 'user'"))
+            if "is_banned" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN is_banned BOOLEAN DEFAULT 0"))
+            if "banned_at" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN banned_at DATETIME"))
+            if "ban_reason" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN ban_reason TEXT"))
             if "terms_accepted_at" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN terms_accepted_at DATETIME"))
             if "email_verified" not in user_cols:

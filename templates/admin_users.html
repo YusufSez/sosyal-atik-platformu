@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4">
+        <h3><i class="bi bi-people"></i> Kullanıcı Yönetimi</h3>
+        <small class="text-muted">Superadmin için banlama işlemleri</small>
+    </div>
+
+    <div class="mb-3">
+        <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Admin Panel
+        </a>
+    </div>
+
+    <div class="table-responsive mb-4">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Kullanıcı</th>
+                    <th>E-posta</th>
+                    <th>Rol</th>
+                    <th>Kayıt</th>
+                    <th>Durum</th>
+                    <th>İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in users %}
+                {% set role_name = u.role if u.role else ( 'admin' if u.is_admin else 'user' ) %}
+                <tr>
+                    <td>{{ u.username }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        {% if role_name == 'superadmin' %}
+                            <span class="badge bg-danger">Superadmin</span>
+                        {% elif role_name == 'admin' %}
+                            <span class="badge bg-warning text-dark">Admin</span>
+                        {% else %}
+                            <span class="text-muted">User</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.terms_accepted_at %}
+                            {{ u.terms_accepted_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.is_banned %}
+                            <span class="badge bg-danger">Banlı</span>
+                        {% else %}
+                            <span class="badge bg-success">Aktif</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.id == current_user.id %}
+                            <span class="text-muted small">—</span>
+                        {% elif role_name == 'superadmin' %}
+                            <span class="text-muted small">Superadmin</span>
+                        {% else %}
+                            {% if u.is_banned %}
+                                <form method="POST" action="{{ url_for('admin.admin_unban_user', user_id=u.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-success" onclick="return confirm('Ban kaldırmak istiyor musunuz?');">
+                                        Ban Kaldır
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form method="POST" action="{{ url_for('admin.admin_ban_user', user_id=u.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Kullanıcıyı banlamak istiyor musunuz?');">
+                                        Banla
+                                    </button>
+                                </form>
+
+                                <form method="POST" action="{{ url_for('admin.admin_soft_delete_user', user_id=u.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-secondary ms-1" onclick="return confirm('Kullanıcıyı silmek (soft-ban) istiyor musunuz?');">
+                                        Sil (Soft)
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+

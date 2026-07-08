@@ -17,6 +17,13 @@ class User(UserMixin, db.Model):
     longitude = db.Column(db.Float, nullable=True)
     is_completed = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
+    # Authorization role (kept in sync with `is_admin` for backward compatibility).
+    # Values: user, admin, superadmin
+    role = db.Column(db.String(20), nullable=False, default="user", index=True)
+    # Ban state (superadmin can ban/unban users).
+    is_banned = db.Column(db.Boolean, default=False, nullable=False)
+    banned_at = db.Column(db.DateTime, nullable=True)
+    ban_reason = db.Column(db.Text, nullable=True)
     is_kurum = db.Column(db.Boolean, default=False)
     terms_accepted_at = db.Column(db.DateTime, nullable=True)
     email_verified = db.Column(db.Boolean, default=False)

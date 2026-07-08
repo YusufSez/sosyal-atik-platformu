@@ -1,6 +1,7 @@
 import os
+from datetime import datetime
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from decorators import admin_required, is_super_admin, super_admin_required
@@ -10,7 +11,7 @@ from models import AdminAuditLog, Atik, Kaynak, Sikayet, User
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
-from utils import cleanup_ilan_relations
+from utils import cleanup_ilan_relations, sanitize_input
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -34,6 +35,103 @@ def admin_panel():
         audit_kayitlari=AdminAuditLog.query.options(*audit_listesi_options()).order_by(AdminAuditLog.id.desc()).limit(30).all(),
         super_admin=is_super_admin(current_user),
     )
+
+
+@admin_bp.route("/admin/users")
+@login_required
+@super_admin_required
+def admin_users():
+    # Rol/ban işlemleri sadece süper admin tarafında yapılır.
+    users = User.query.order_by(User.id.desc()).all()
+    return render_template("admin_users.html", users=users)
+
+
+@admin_bp.route("/admin/users/ban/<int:user_id>", methods=["POST"])
+@login_required
+@super_admin_required
+def admin_ban_user(user_id: int):
+    target = User.query.get_or_404(user_id)
+
+    if target.id == current_user.id:
+        flash("Kendi hesabınızı banlayamazsınız.", "warning")
+        return redirect(url_for("admin.admin_users"))
+
+    if is_super_admin(target):
+        abort(403)
+
+    reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+
+    target.is_banned = True
+    target.banned_at = datetime.now()
+    target.ban_reason = reason
+    db.session.commit()
+
+    log_admin_action(
+        "user_ban",
+        target=f"user:{target.id}",
+        detail=f"{target.email} reason={reason or ''}",
+    )
+    flash(f"{target.username} banlandı.", "success")
+    return redirect(url_for("admin.admin_users"))
+
+
+@admin_bp.route("/admin/users/unban/<int:user_id>", methods=["POST"])
+@login_required
+@super_admin_required
+def admin_unban_user(user_id: int):
+    target = User.query.get_or_404(user_id)
+
+    if target.id == current_user.id:
+        flash("Kendi hesabınızı unbanlayamazsınız.", "warning")
+        return redirect(url_for("admin.admin_users"))
+
+    if is_super_admin(target):
+        abort(403)
+
+    target.is_banned = False
+    target.banned_at = None
+    target.ban_reason = None
+    db.session.commit()
+
+    log_admin_action(
+        "user_unban",
+        target=f"user:{target.id}",
+        detail=f"{target.email}",
+    )
+    flash(f"{target.username} ban kaldırıldı.", "success")
+    return redirect(url_for("admin.admin_users"))
+
+
+@admin_bp.route("/admin/users/soft-delete/<int:user_id>", methods=["POST"])
+@login_required
+@super_admin_required
+def admin_soft_delete_user(user_id: int):
+    # "Sil" işlemi hard-delete yerine soft-ban olarak uygulanır.
+    target = User.query.get_or_404(user_id)
+
+    if target.id == current_user.id:
+        flash("Kendi hesabınızı silemezsiniz.", "warning")
+        return redirect(url_for("admin.admin_users"))
+
+    if is_super_admin(target):
+        abort(403)
+
+    reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    if not reason:
+        reason = "Silindi"
+
+    target.is_banned = True
+    target.banned_at = datetime.now()
+    target.ban_reason = reason
+    db.session.commit()
+
+    log_admin_action(
+        "user_soft_delete",
+        target=f"user:{target.id}",
+        detail=f"{target.email} reason={reason or ''}",
+    )
+    flash(f"{target.username} silindi (soft-ban).", "success")
+    return redirect(url_for("admin.admin_users"))
 
 
 @admin_bp.route("/admin/ilan_sil/<tur>/<int:id>", methods=["POST"])
@@ -70,7 +168,17 @@ def admin_toggle_admin(user_id):
         flash("Kendi admin durumunuzu değiştiremezsiniz.", "warning")
         return redirect(url_for("admin.admin_panel"))
 
-    user.is_admin = not user.is_admin
+    # Süper admin başka süper admin'i yönetemez.
+    if is_super_admin(user):
+        abort(403)
+
+    # role + is_admin senkronu
+    if user.is_admin:
+        user.is_admin = False
+        user.role = "user"
+    else:
+        user.is_admin = True
+        user.role = "admin"
     db.session.commit()
     log_admin_action(
         "admin_toggle",
