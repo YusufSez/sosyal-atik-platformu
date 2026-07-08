@@ -1,0 +1,23 @@
+# VPS production overlay — atikport.com
+# Kullanım:
+#   cd deploy
+#   docker compose -f docker-compose.prod.yml -f docker-compose.vps-init.yml up -d   # SSL öncesi HTTP
+#   ./scripts/ssl-init.sh
+#   docker compose -f docker-compose.prod.yml -f docker-compose.vps.yml --profile ssl up -d
+
+services:
+  web:
+    environment:
+      SITE_URL: ${SITE_URL:-https://atikport.com}
+      BEHIND_PROXY: "true"
+      FORCE_HTTPS: ${FORCE_HTTPS:-true}
+      ENABLE_HSTS: ${ENABLE_HSTS:-true}
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro

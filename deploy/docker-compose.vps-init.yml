@@ -1,0 +1,18 @@
+# VPS ilk kurulum overlay — yalnızca HTTP (Let's Encrypt doğrulama)
+# Kullanım:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.vps-init.yml up -d
+
+services:
+  web:
+    environment:
+      SITE_URL: ${SITE_URL:-http://atikport.com}
+      BEHIND_PROXY: "true"
+      FORCE_HTTPS: "false"
+      ENABLE_HSTS: "false"
+
+  nginx:
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.http.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_www:/var/www/certbot

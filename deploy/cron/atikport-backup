@@ -1,0 +1,5 @@
+# PostgreSQL günlük yedekleme — /etc/cron.d/atikport-backup olarak kopyalayın
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+0 3 * * * root /opt/atikport/deploy/scripts/backup-db.sh >> /var/log/atikport-backup.log 2>&1

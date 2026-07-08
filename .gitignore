@@ -31,6 +31,8 @@ htmlcov/
 *.sqlite
 *.sqlite3
 backup.sql
+atikport.dump
+*.dump
 backups/
 instance/
 

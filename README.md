@@ -536,6 +536,14 @@ python scripts/test_ai.py
 
 Production stack `deploy/docker-compose.prod.yml` ile yönetilir.
 
+**VPS / atikport.com yayını:** Ayrıntılı adımlar için [`deploy/DEPLOY.md`](deploy/DEPLOY.md) dosyasına bakın.
+
+| Ortam | Komut |
+|-------|-------|
+| Yerel test | `docker compose -f deploy/docker-compose.prod.yml up -d` → `:8080` |
+| VPS (HTTP, SSL öncesi) | `docker compose -f docker-compose.prod.yml -f docker-compose.vps-init.yml up -d` |
+| VPS (HTTPS) | `docker compose -f docker-compose.prod.yml -f docker-compose.vps.yml --profile ssl up -d` |
+
 ```mermaid
 sequenceDiagram
     participant U as Kullanıcı
@@ -568,13 +576,14 @@ sequenceDiagram
 2. `flask db upgrade` — Alembic migration (mevcut şema varsa `stamp head` fallback)
 3. `gunicorn` — Production sunucu başlatılır
 
-### SSL (isteğe bağlı)
+### SSL (atikport.com)
 
 ```bash
-docker compose -f docker-compose.prod.yml --profile ssl up -d certbot
+cd deploy
+bash scripts/ssl-init.sh
 ```
 
-`deploy/nginx.conf` ile TLS yapılandırması kullanılabilir.
+Let's Encrypt sertifikası alınır ve HTTPS nginx'e geçilir. Yenileme: `--profile ssl`.
 
 ### Health check
 
