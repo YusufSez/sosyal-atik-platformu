@@ -9,7 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 load_dotenv()
 
 from constants import ITEMS_PER_PAGE, MAX_UPLOAD_BYTES
-from extensions import csrf, db, limiter, login_manager, mail, migrate
+from extensions import csrf, db, limiter, login_manager, mail, migrate, socketio
 from models import User
 import models  # noqa: F401 — Alembic tüm modelleri keşfetsin
 from security import apply_force_https_exemptions, init_security
@@ -176,6 +176,19 @@ def create_app(config_overrides=None):
     limiter.init_app(app)
     if app.config.get("TESTING"):
         limiter.enabled = False
+
+    socketio_async_mode = (
+        "threading"
+        if app.config.get("TESTING")
+        else os.getenv("SOCKETIO_ASYNC_MODE", "eventlet")
+    )
+    socketio.init_app(
+        app,
+        async_mode=socketio_async_mode,
+        manage_session=False,
+        cors_allowed_origins=os.getenv("SOCKETIO_CORS_ORIGINS") or None,
+    )
+    import socket_events  # noqa: F401 — event handler kaydı
 
     from flask_wtf.csrf import CSRFError
     from flask_limiter.errors import RateLimitExceeded

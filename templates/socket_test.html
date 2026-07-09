@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4">
+        <h3><i class="bi bi-broadcast"></i> SocketIO Test</h3>
+        <small class="text-muted">Flask-SocketIO altyapı bağlantı kontrolü</small>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <p class="mb-2">
+                Durum:
+                <span id="socket-status" class="badge bg-secondary">Bağlanıyor...</span>
+            </p>
+            <p id="socket-message" class="text-muted mb-0">Oturum: {{ current_user.username }}</p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
+<script>
+(function () {
+    const statusEl = document.getElementById("socket-status");
+    const messageEl = document.getElementById("socket-message");
+
+    const socket = io({
+        path: "/socket.io/",
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+    });
+
+    socket.on("connect", function () {
+        statusEl.textContent = "Bağlandı";
+        statusEl.className = "badge bg-success";
+        messageEl.textContent = "SocketIO bağlantısı aktif.";
+    });
+
+    socket.on("disconnect", function () {
+        statusEl.textContent = "Bağlantı koptu";
+        statusEl.className = "badge bg-danger";
+        messageEl.textContent = "SocketIO bağlantısı kesildi.";
+    });
+
+    socket.on("connect_error", function () {
+        statusEl.textContent = "Bağlantı koptu";
+        statusEl.className = "badge bg-danger";
+        messageEl.textContent = "Bağlantı kurulamadı veya oturum geçersiz.";
+    });
+})();
+</script>
+{% endblock %}

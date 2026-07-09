@@ -1,5 +1,5 @@
 from flask import Blueprint, abort, jsonify, redirect, render_template, url_for
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 from sqlalchemy import or_, text
 from sqlalchemy.orm import selectinload
@@ -43,6 +43,12 @@ def anasayfa():
         oneriler_atik=oneriler_atik,
         title="Anasayfa",
     )
+
+
+@main_bp.route("/socket-test")
+@login_required
+def socket_test():
+    return render_template("socket_test.html", title="SocketIO Test")
 
 
 @main_bp.route("/health")

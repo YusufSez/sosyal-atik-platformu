@@ -26,4 +26,11 @@ run_migrate() {
 
 wait_for_postgres
 run_migrate
-exec gunicorn --bind 0.0.0.0:5000 --workers "${GUNICORN_WORKERS:-2}" --timeout "${GUNICORN_TIMEOUT:-120}" app:app
+GUNICORN_WORKER_CLASS="${GUNICORN_WORKER_CLASS:-eventlet}"
+GUNICORN_WORKERS="${GUNICORN_WORKERS:-1}"
+exec gunicorn \
+  --worker-class "$GUNICORN_WORKER_CLASS" \
+  --bind 0.0.0.0:5000 \
+  --workers "$GUNICORN_WORKERS" \
+  --timeout "${GUNICORN_TIMEOUT:-120}" \
+  app:app

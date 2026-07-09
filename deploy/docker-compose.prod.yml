@@ -44,6 +44,9 @@ services:
       AUTO_CREATE_DB: "false"
       RATELIMIT_STORAGE_URI: memory://
       BACKUP_ENABLED: "false"
+      GUNICORN_WORKER_CLASS: eventlet
+      GUNICORN_WORKERS: "1"
+      SOCKETIO_ASYNC_MODE: eventlet
     depends_on:
       postgres:
         condition: service_healthy
