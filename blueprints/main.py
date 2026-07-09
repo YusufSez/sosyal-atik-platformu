@@ -51,6 +51,11 @@ def socket_test():
     return render_template("socket_test.html", title="SocketIO Test")
 
 
+@main_bp.route("/favicon.ico")
+def favicon():
+    return redirect(url_for("static", filename="vendor/leaflet/1.9.4/images/marker-icon.png"), code=302)
+
+
 @main_bp.route("/health")
 def health():
     try:

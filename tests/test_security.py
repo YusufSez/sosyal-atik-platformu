@@ -25,6 +25,34 @@ def test_static_cache_headers(client):
     assert "max-age" in cache_control
 
 
+def test_socket_test_csp_keeps_strict_policy(client, app):
+    from auth_utils import hash_password
+    from extensions import db
+    from models import User
+
+    with app.app_context():
+        user = User(
+            username="csp_socket",
+            email="csp_socket@test.com",
+            password=hash_password("TestPass1"),
+            is_completed=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    client.post(
+        "/giris",
+        data={"email": "csp_socket@test.com", "password": "TestPass1"},
+        follow_redirects=True,
+    )
+    response = client.get("/socket-test")
+    assert response.status_code == 200
+    csp = response.headers.get("Content-Security-Policy", "")
+    assert "unsafe-inline" not in csp
+    assert "unsafe-eval" not in csp
+    assert "cdn.socket.io" not in response.data.decode("utf-8")
+
+
 def test_health_allows_http_when_force_https(monkeypatch):
     """Docker healthcheck container içinde HTTP ile /health çağırır."""
     from factory import create_app
