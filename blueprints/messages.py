@@ -7,9 +7,37 @@ from extensions import db, limiter, rate_limit_user_or_ip
 from models import Atik, Kaynak, Mesaj, User
 from services.content_filter import mesaj_uygun_mu
 from services.notifications import bildirim_olustur
+from socket_events import emit_after_message_created, emit_messages_marked_read, serialize_message
 from utils import format_datetime, sanitize_input
 
 messages_bp = Blueprint("messages", __name__)
+
+
+def _persist_message(sender, receiver_id, content, kaynak_id, atik_id):
+    mesaj = Mesaj(
+        sender_id=sender.id,
+        receiver_id=receiver_id,
+        content=content,
+        kaynak_id=kaynak_id if kaynak_id != 0 else None,
+        atik_id=atik_id if atik_id != 0 else None,
+    )
+    db.session.add(mesaj)
+    db.session.commit()
+    mesaj = db.session.get(Mesaj, mesaj.id)
+    bildirim_olustur(
+        receiver_id,
+        "Yeni mesaj",
+        f"{sender.username} size mesaj gönderdi.",
+        "mesaj",
+        url_for(
+            "messages.mesajlar",
+            user_id=sender.id,
+            kaynak_id=kaynak_id or 0,
+            atik_id=atik_id or 0,
+        ),
+    )
+    emit_after_message_created(mesaj)
+    return mesaj
 
 
 @messages_bp.before_app_request
@@ -40,21 +68,7 @@ def mesajlar(user_id, kaynak_id, atik_id):
             flash(hata, "danger")
             return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
         if icerik:
-            db.session.add(Mesaj(
-                sender_id=current_user.id,
-                receiver_id=alici.id,
-                content=icerik,
-                kaynak_id=kaynak_id if kaynak_id != 0 else None,
-                atik_id=atik_id if atik_id != 0 else None,
-            ))
-            db.session.commit()
-            bildirim_olustur(
-                alici.id,
-                "Yeni mesaj",
-                f"{current_user.username} size mesaj gönderdi.",
-                "mesaj",
-                url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id),
-            )
+            _persist_message(current_user, alici.id, icerik, kaynak_id, atik_id)
         return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
 
     mesajlar_list = Mesaj.query.filter(
@@ -95,6 +109,7 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
         m.is_read = True
     if okunmamis:
         db.session.commit()
+        emit_messages_marked_read(okunmamis, current_user.id)
 
     return jsonify([{
         "id": m.id,
@@ -116,7 +131,7 @@ def mesajlarim():
     sohbetler = {}
     for m in mesajlar_list:
         other_id = m.receiver_id if m.sender_id == current_user.id else m.sender_id
-        key = f"{other_id}-{m.kaynak_id}-{m.atik_id}"
+        key = f"{other_id}-{m.kaynak_id or 0}-{m.atik_id or 0}"
         if key not in sohbetler:
             sohbetler[key] = {
                 "msg": m,
@@ -149,21 +164,9 @@ def send_message():
     if not uygun:
         return jsonify({"error": hata}), 400
 
-    db.session.add(Mesaj(
-        sender_id=current_user.id,
-        receiver_id=alici_id,
-        content=content,
-        kaynak_id=kaynak_id if kaynak_id != 0 else None,
-        atik_id=atik_id if atik_id != 0 else None,
-    ))
-    db.session.commit()
+    mesaj = _persist_message(current_user, alici_id, content, kaynak_id or 0, atik_id or 0)
 
-    bildirim_olustur(
-        alici_id,
-        "Yeni mesaj",
-        f"{current_user.username} size mesaj gönderdi.",
-        "mesaj",
-        url_for("messages.mesajlar", user_id=current_user.id, kaynak_id=kaynak_id or 0, atik_id=atik_id or 0),
-    )
-
-    return jsonify({"success": True})
+    return jsonify({
+        "success": True,
+        "message": serialize_message(mesaj, current_user.id),
+    })

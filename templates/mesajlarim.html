@@ -1,17 +1,21 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="container container-inbox">
+<div class="container container-inbox" id="mesajlarimContainer" data-current-user-id="{{ current_user.id }}">
     <h3 class="mb-3">💬 Mesajlarım</h3>
 
     {% if sohbetler %}
-        <ul class="list-group">
+        <ul class="list-group" id="sohbetListesi">
 
         {% for key, sohbet in sohbetler.items() %}
             {% set msg = sohbet.msg %}
             {% set urun = sohbet.kaynak if sohbet.kaynak else sohbet.atik %}
 
-            <li class="list-group-item d-flex justify-content-between align-items-center">
+            <li class="list-group-item d-flex justify-content-between align-items-center"
+                data-conversation-id="{{ key }}"
+                data-partner-id="{{ sohbet.user_id }}"
+                data-kaynak-id="{{ sohbet.kaynak_id if sohbet.kaynak_id else 0 }}"
+                data-atik-id="{{ sohbet.atik_id if sohbet.atik_id else 0 }}">
 
                 <div>
                     <strong>
@@ -19,10 +23,10 @@
                     </strong>
 
                     {% if sohbet.is_new %}
-                        <span class="badge bg-danger ms-2">Yeni</span>
+                        <span class="badge bg-danger ms-2 conversation-new-badge">Yeni</span>
                     {% endif %}
 
-                    <p class="mb-1 text-truncate text-truncate-md">
+                    <p class="mb-1 text-truncate text-truncate-md conversation-preview">
                         {% if msg.sender_id == current_user.id %}
                             Sen: {{ msg.content }}
                         {% else %}
@@ -30,7 +34,7 @@
                         {% endif %}
                     </p>
 
-                    <small class="text-muted">{{ msg.timestamp|format_dt('%d-%m-%Y %H:%M') }}</small>
+                    <small class="text-muted conversation-time">{{ msg.timestamp|format_dt('%d-%m-%Y %H:%M') }}</small>
 
                     <div>
                         <small class="text-muted">📦 {{ urun.baslik if urun else "Ürün bilgisi yok" }}</small>
@@ -48,8 +52,10 @@
         {% endfor %}
         </ul>
     {% else %}
-        <p class="text-muted">Henüz hiç mesajınız yok.</p>
+        <p class="text-muted" id="bosSohbetMesaji">Henüz hiç mesajınız yok.</p>
     {% endif %}
 </div>
+
+<script src="{{ url_for('static', filename='js/mesajlarim.js') }}"></script>
 
 {% endblock %}

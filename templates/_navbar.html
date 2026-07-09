@@ -92,9 +92,10 @@
                 <li class="nav-item">
                     <a href="{{ url_for('messages.mesajlarim') }}" class="nav-link position-relative">
                         <i class="bi bi-chat-dots"></i><span class="nav-text">Mesajlar</span>
-                        {% if g.get('unread_count', 0) > 0 %}
-                        <span class="badge bg-danger rounded-pill nav-badge nav-badge-inline">{{ g.unread_count }}</span>
-                        {% endif %}
+                        <span id="mesajUnreadBadge"
+                              class="badge bg-danger rounded-pill nav-badge nav-badge-inline{% if g.get('unread_count', 0) == 0 %} d-none{% endif %}">
+                            {{ g.get('unread_count', 0) }}
+                        </span>
                     </a>
                 </li>
                 <li class="nav-item dropdown">

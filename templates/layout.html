@@ -11,7 +11,8 @@
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
 </head>
 <body data-authenticated="{{ '1' if current_user.is_authenticated else '0' }}"
-      data-giris-url="{{ url_for('auth.giris') }}">
+      data-giris-url="{{ url_for('auth.giris') }}"
+      {% if current_user.is_authenticated %}data-current-user-id="{{ current_user.id }}"{% endif %}>
 <div id="loadingOverlay" class="spinner-overlay">
     <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Yukleniyor...</span></div>
 </div>
@@ -56,6 +57,7 @@
 <script src="{{ url_for('static', filename='js/favori-actions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sikayet.js') }}"></script>
 {% if current_user.is_authenticated %}
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
 {% endif %}
 {% block scripts %}{% endblock %}

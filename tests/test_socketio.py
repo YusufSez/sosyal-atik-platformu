@@ -40,10 +40,11 @@ def test_connect_handler_rejects_unauthenticated(app, monkeypatch):
             socket_events.handle_connect()
 
 
-def test_connect_handler_allows_authenticated(app, monkeypatch):
-    with app.test_request_context():
-        monkeypatch.setattr(socket_events, "current_user", MagicMock(is_authenticated=True))
-        assert socket_events.handle_connect() is None
+def test_connect_handler_allows_authenticated(client, app):
+    _register_and_login(client)
+    socket_client = socketio.test_client(app, flask_test_client=client)
+    assert socket_client.is_connected()
+    socket_client.disconnect()
 
 
 def test_authenticated_socket_connection_allowed(client, app):
