@@ -16,7 +16,7 @@ from constants import (
     KATEGORILER_KAYNAK,
     MESSAGE_AI_BLOCK_THRESHOLD,
 )
-from utils import env_to_bool
+from utils import env_to_bool, resolve_item_picture_path_from_ref
 
 FREE_MODEL = "gemini-2.5-flash"
 FREE_MODEL_BACKUP = "gemini-2.0-flash"
@@ -81,7 +81,8 @@ def json_cikar(text):
 # RESİM BYTES
 # ------------------------
 def resmi_bytes_oku(resim_yolu):
-    with open(resim_yolu, "rb") as f:
+    path = resolve_item_picture_path_from_ref(resim_yolu)
+    with open(path, "rb") as f:
         return f.read()
 
 # ------------------------
@@ -89,9 +90,13 @@ def resmi_bytes_oku(resim_yolu):
 # ------------------------
 def resim_kontrol(resim_yolu):
     try:
-        with Image.open(resim_yolu) as img:
+        path = resolve_item_picture_path_from_ref(resim_yolu)
+    except ValueError:
+        return False
+    try:
+        with Image.open(path) as img:
             img.verify()
-        with Image.open(resim_yolu) as img:
+        with Image.open(path) as img:
             return img.format in ("JPEG", "PNG", "WEBP")
     except Exception:
         return False

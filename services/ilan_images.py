@@ -1,11 +1,8 @@
-import os
-
-from flask import current_app
-
 from constants import MAX_ILAN_FOTOSU
 from extensions import db
-from helpers import ai_tam_analiz, moderasyon_kontrol
+from helpers import moderasyon_kontrol
 from models import IlanResim
+from services.moderation_photos import analyze_upload_photos
 from utils import delete_picture, save_picture
 
 
@@ -103,14 +100,12 @@ def _yeniden_sirala(ilan):
 
 
 def ai_analiz_ilk_foto(dosyalar, tur, aciklama, baslik=None, kategori_secim=None):
-    if not dosyalar:
-        return {"kategori": "Diğer", "durum": "Temiz", "risk_skoru": 0, "guvenli": True}
-    path = os.path.join(current_app.config["UPLOAD_FOLDER"], dosyalar[0])
-    return ai_tam_analiz(
-        path,
-        tur=tur,
-        aciklama=aciklama,
-        baslik=baslik,
+    """Tüm ilan fotoğraflarını analiz eder (geriye uyumluluk adı korunur)."""
+    return analyze_upload_photos(
+        dosyalar,
+        tur,
+        baslik,
+        aciklama,
         kategori_secim=kategori_secim,
     )
 

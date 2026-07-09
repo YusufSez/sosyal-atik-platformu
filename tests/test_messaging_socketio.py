@@ -31,9 +31,15 @@ def reset_socket_connection_counts():
 
     socket_events._connection_counts.clear()
     socket_events._rate_buckets.clear()
+    socket_events._sid_users.clear()
+    socket_events._user_sids.clear()
+    socket_events._sid_conversations.clear()
     yield
     socket_events._connection_counts.clear()
     socket_events._rate_buckets.clear()
+    socket_events._sid_users.clear()
+    socket_events._user_sids.clear()
+    socket_events._sid_conversations.clear()
 
 
 def _event_names(events):

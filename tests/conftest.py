@@ -3,6 +3,7 @@ import os
 os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
 
 import pytest
+from sqlalchemy.pool import StaticPool
 
 from factory import create_app
 from extensions import db
@@ -12,7 +13,11 @@ from extensions import db
 def app():
     app = create_app({
         "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "SQLALCHEMY_DATABASE_URI": "sqlite://",
+        "SQLALCHEMY_ENGINE_OPTIONS": {
+            "poolclass": StaticPool,
+            "connect_args": {"check_same_thread": False},
+        },
         "WTF_CSRF_ENABLED": False,
         "TURNSTILE_ENABLED": False,
     })

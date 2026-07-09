@@ -1,22 +1,26 @@
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from sqlalchemy.orm import joinedload
 
-from constants import RATE_MESSAGE
+from constants import RATE_MESSAGE, RATE_MESSAGE_FETCH
 from decorators import email_verified_required
 from extensions import db, limiter, rate_limit_user_or_ip
 from models import Atik, Kaynak, Mesaj, User
 from services.content_filter import mesaj_uygun_mu
+from services.message_unread_cache import get_message_unread_count
+from services.messaging_queries import (
+    fetch_inbox_threads,
+    fetch_message_page,
+    serialize_fetched_message,
+)
 from services.notifications import bildirim_olustur
 from socket_events import (
     canonical_conversation_id,
     emit_after_message_created,
     emit_messages_marked_read,
-    is_user_online,
     presence_payload,
     serialize_message,
 )
-from utils import format_datetime, sanitize_input, utc_now
+from utils import sanitize_input, utc_now
 
 messages_bp = Blueprint("messages", __name__)
 
@@ -48,10 +52,31 @@ def _persist_message(sender, receiver_id, content, kaynak_id, atik_id):
     return mesaj
 
 
+def _mark_conversation_read(alici_id, kaynak_id, atik_id):
+    okunmamis = Mesaj.query.filter_by(
+        sender_id=alici_id,
+        receiver_id=current_user.id,
+        kaynak_id=(kaynak_id if kaynak_id != 0 else None),
+        atik_id=(atik_id if atik_id != 0 else None),
+        is_read=False,
+    ).all()
+    if not okunmamis:
+        return
+    now = utc_now()
+    for mesaj in okunmamis:
+        mesaj.is_read = True
+        mesaj.read_at = now
+    db.session.commit()
+    emit_messages_marked_read(okunmamis, current_user.id)
+
+
 @messages_bp.before_app_request
-def before_request():
+def inject_unread_from_cache():
     if current_user.is_authenticated:
-        g.unread_count = Mesaj.query.filter_by(receiver_id=current_user.id, is_read=False).count()
+        g.unread_count = get_message_unread_count(
+            current_user.id,
+            warm_if_missing=True,
+        )
     else:
         g.unread_count = 0
 
@@ -60,6 +85,7 @@ def before_request():
 @login_required
 @email_verified_required
 @limiter.limit(RATE_MESSAGE, methods=["POST"], key_func=rate_limit_user_or_ip)
+@limiter.limit(RATE_MESSAGE_FETCH, methods=["GET"], key_func=rate_limit_user_or_ip)
 def mesajlar(user_id, kaynak_id, atik_id):
     alici = User.query.get_or_404(user_id)
     urun = None
@@ -79,17 +105,9 @@ def mesajlar(user_id, kaynak_id, atik_id):
             _persist_message(current_user, alici.id, icerik, kaynak_id, atik_id)
         return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
 
-    mesajlar_list = Mesaj.query.filter(
-        ((Mesaj.sender_id == current_user.id) & (Mesaj.receiver_id == alici.id))
-        | ((Mesaj.sender_id == alici.id) & (Mesaj.receiver_id == current_user.id)),
-        Mesaj.kaynak_id == (kaynak_id if kaynak_id != 0 else None),
-        Mesaj.atik_id == (atik_id if atik_id != 0 else None),
-    ).options(joinedload(Mesaj.sender)).order_by(Mesaj.timestamp.asc()).all()
-
     return render_template(
         "mesajlar.html",
         alici=alici,
-        mesajlar=mesajlar_list,
         kaynak_id=kaynak_id,
         atik_id=atik_id,
         urun=urun,
@@ -103,65 +121,31 @@ def mesajlar(user_id, kaynak_id, atik_id):
 
 @messages_bp.route("/mesajlar_getir/<int:alici_id>/<int:kaynak_id>/<int:atik_id>")
 @login_required
+@limiter.limit(RATE_MESSAGE_FETCH, key_func=rate_limit_user_or_ip)
 def mesajlar_getir(alici_id, kaynak_id, atik_id):
-    mesajlar_list = Mesaj.query.filter(
-        ((Mesaj.sender_id == current_user.id) & (Mesaj.receiver_id == alici_id))
-        | ((Mesaj.sender_id == alici_id) & (Mesaj.receiver_id == current_user.id)),
-        Mesaj.kaynak_id == (kaynak_id if kaynak_id != 0 else None),
-        Mesaj.atik_id == (atik_id if atik_id != 0 else None),
-    ).options(joinedload(Mesaj.sender)).order_by(Mesaj.timestamp.asc()).all()
+    before_id = request.args.get("before_id", type=int)
+    mesajlar_list, has_more, oldest_id = fetch_message_page(
+        current_user.id,
+        alici_id,
+        kaynak_id,
+        atik_id,
+        before_id=before_id,
+    )
 
-    okunmamis = Mesaj.query.filter_by(
-        sender_id=alici_id,
-        receiver_id=current_user.id,
-        kaynak_id=(kaynak_id if kaynak_id != 0 else None),
-        atik_id=(atik_id if atik_id != 0 else None),
-        is_read=False,
-    ).all()
-    now = utc_now()
-    for m in okunmamis:
-        m.is_read = True
-        m.read_at = now
-    if okunmamis:
-        db.session.commit()
-        emit_messages_marked_read(okunmamis, current_user.id)
+    if before_id is None:
+        _mark_conversation_read(alici_id, kaynak_id, atik_id)
 
-    return jsonify([{
-        "id": m.id,
-        "content": m.content,
-        "sender_id": m.sender_id,
-        "sender_username": m.sender.username,
-        "is_read": m.is_read,
-        "read_at": m.read_at.isoformat() if m.read_at else None,
-        "read_at_local": format_datetime(m.read_at) if m.read_at else None,
-        "timestamp": format_datetime(m.timestamp, "%d.%m.%Y %H:%M"),
-    } for m in mesajlar_list])
+    return jsonify({
+        "messages": [serialize_fetched_message(m) for m in mesajlar_list],
+        "has_more": has_more,
+        "oldest_id": oldest_id,
+    })
 
 
 @messages_bp.route("/mesajlarim")
 @login_required
 def mesajlarim():
-    mesajlar_list = Mesaj.query.filter(
-        (Mesaj.sender_id == current_user.id) | (Mesaj.receiver_id == current_user.id)
-    ).options(joinedload(Mesaj.sender), joinedload(Mesaj.receiver)).order_by(
-        Mesaj.timestamp.desc()
-    ).all()
-
-    sohbetler = {}
-    for m in mesajlar_list:
-        other_id = m.receiver_id if m.sender_id == current_user.id else m.sender_id
-        key = f"{other_id}-{m.kaynak_id or 0}-{m.atik_id or 0}"
-        if key not in sohbetler:
-            sohbetler[key] = {
-                "msg": m,
-                "user_id": other_id,
-                "kaynak_id": m.kaynak_id,
-                "atik_id": m.atik_id,
-                "kaynak": db.session.get(Kaynak, m.kaynak_id) if m.kaynak_id else None,
-                "atik": db.session.get(Atik, m.atik_id) if m.atik_id else None,
-                "is_new": (not m.is_read) and (m.receiver_id == current_user.id),
-            }
-
+    sohbetler = fetch_inbox_threads(current_user.id)
     return render_template("mesajlarim.html", sohbetler=sohbetler)
 
 

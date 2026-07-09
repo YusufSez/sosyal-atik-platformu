@@ -19,6 +19,7 @@ from constants import (
     DEFAULT_LAT,
     DEFAULT_LNG,
     EXTENSION_TO_PIL_FORMAT,
+    MAX_IMAGE_PIXELS,
     MAX_SINGLE_IMAGE_BYTES,
     PIL_FORMAT_TO_EXT,
     PIL_FORMAT_TO_MIME,
@@ -27,6 +28,8 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from extensions import db
+
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 APP_TIMEZONE = ZoneInfo("Europe/Istanbul")
 UTC = timezone.utc
@@ -143,6 +146,78 @@ def allowed_file(filename):
     return ext in ALLOWED_IMAGE_EXTENSIONS
 
 
+def canonical_upload_basename(filename: str) -> str:
+    """Dosya adını basename + secure_filename ile normalize eder."""
+    if not filename or filename == "default.jpg":
+        raise ValueError("Geçersiz dosya adı")
+    safe = os.path.basename(str(filename).replace("\\", "/"))
+    if not safe or safe in (".", ".."):
+        raise ValueError("Geçersiz dosya adı")
+    safe = secure_filename(safe)
+    if not safe or not allowed_file(safe):
+        raise ValueError("Geçersiz dosya adı")
+    return safe
+
+
+def resolve_safe_path_in_folder(folder: str, filename: str) -> str:
+    """Klasör içinde canonical path; dışına çıkış reddedilir."""
+    safe = canonical_upload_basename(filename)
+    base = os.path.realpath(os.path.abspath(folder))
+    candidate = os.path.realpath(os.path.join(base, safe))
+    if candidate != base and not candidate.startswith(base + os.sep):
+        raise ValueError("Geçersiz dosya yolu")
+    return candidate
+
+
+def resolve_item_picture_path(filename: str) -> str:
+    """UPLOAD_FOLDER altında güvenli ilan fotoğraf yolu."""
+    return resolve_safe_path_in_folder(current_app.config["UPLOAD_FOLDER"], filename)
+
+
+def resolve_profile_picture_path(filename: str) -> str:
+    """profile_pics altında güvenli profil fotoğraf yolu."""
+    folder = os.path.join(current_app.root_path, "static", "profile_pics")
+    return resolve_safe_path_in_folder(folder, filename)
+
+
+def resolve_item_picture_path_from_ref(path_or_name: str) -> str:
+    """Dosya adı veya upload klasörü altındaki tam yol."""
+    folder = current_app.config["UPLOAD_FOLDER"]
+    base = os.path.realpath(os.path.abspath(folder))
+    if os.path.isabs(path_or_name) or "/" in str(path_or_name).replace("\\", "/"):
+        candidate = os.path.realpath(os.path.abspath(path_or_name))
+        if candidate != base and not candidate.startswith(base + os.sep):
+            raise ValueError("Geçersiz dosya yolu")
+        return candidate
+    return resolve_item_picture_path(path_or_name)
+
+
+def _check_image_dimensions(img: Image.Image) -> None:
+    width, height = img.size
+    if width <= 0 or height <= 0:
+        raise ValueError("Geçersiz görsel boyutu")
+    if width * height > MAX_IMAGE_PIXELS:
+        raise ValueError("Görsel çözünürlüğü çok yüksek")
+
+
+def _strip_exif(img: Image.Image) -> Image.Image:
+    """EXIF/GPS/kamera metadata kaldırır."""
+    if img.mode in ("RGBA", "LA"):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[-1])
+        return background
+    if img.mode == "P":
+        img = img.convert("RGBA")
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[-1])
+        return background
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    clean = Image.new("RGB", img.size)
+    clean.paste(img)
+    return clean
+
+
 def _normalize_mime(mime_type):
     if not mime_type:
         return ""
@@ -181,6 +256,7 @@ def _validate_image_bytes(file_storage):
         with Image.open(io.BytesIO(raw)) as img:
             img.verify()
         with Image.open(io.BytesIO(raw)) as img:
+            _check_image_dimensions(img)
             img.load()
             detected_format = (img.format or "").upper()
             if detected_format not in PIL_FORMAT_TO_EXT:
@@ -192,6 +268,9 @@ def _validate_image_bytes(file_storage):
                 if expected_mime and claimed_mime != expected_mime:
                     return False, "Dosya MIME türü ile içerik uyuşmuyor", None
         file_storage.seek(0)
+    except ValueError as exc:
+        file_storage.seek(0)
+        return False, str(exc), None
     except Exception:
         file_storage.seek(0)
         return False, "Geçersiz görsel dosyası", None
@@ -211,13 +290,14 @@ def _save_image_to_folder(form_picture, folder, thumbnail_size):
 
     os.makedirs(folder, exist_ok=True)
     picture_fn = _random_image_filename(pil_format)
-    picture_path = os.path.join(folder, picture_fn)
 
     img = Image.open(form_picture)
+    img.load()
+    _check_image_dimensions(img)
     img.thumbnail(thumbnail_size)
     save_format = pil_format
-    if save_format == "JPEG" and img.mode in ("RGBA", "P"):
-        img = img.convert("RGB")
+    img = _strip_exif(img)
+    picture_path = resolve_safe_path_in_folder(folder, picture_fn)
     img.save(picture_path, format=save_format, optimize=True, quality=85)
     form_picture.seek(0)
     return picture_fn
@@ -231,7 +311,10 @@ def save_picture(form_picture):
 def delete_picture(filename):
     if not filename or filename == "default.jpg":
         return
-    path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+    try:
+        path = resolve_item_picture_path(filename)
+    except ValueError:
+        return
     if os.path.isfile(path):
         os.remove(path)
 
@@ -244,7 +327,10 @@ def save_profile_picture(form_picture):
 def delete_profile_picture(filename):
     if not filename or filename == "default.jpg":
         return
-    path = os.path.join(current_app.root_path, "static", "profile_pics", filename)
+    try:
+        path = resolve_profile_picture_path(filename)
+    except ValueError:
+        return
     if os.path.isfile(path):
         os.remove(path)
 

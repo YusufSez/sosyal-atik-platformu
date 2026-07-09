@@ -99,15 +99,6 @@ def kayit():
             password=hash_password(password),
             terms_accepted_at=utc_now(),
         )
-        # Superadmin ataması: sadece SUPERADMIN_EMAIL ile eşleşen kullanıcıya
-        # (SUPERADMIN_EMAIL tanımlı değilse geriye uyumluluk için ADMIN_EMAIL'e fallback).
-        super_email = os.getenv("SUPERADMIN_EMAIL", "").strip().lower()
-        if not super_email:
-            super_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-
-        if super_email and email == super_email:
-            new_user.role = "superadmin"
-            new_user.is_admin = True
         db.session.add(new_user)
         db.session.commit()
 
@@ -165,6 +156,9 @@ def profil_tamamla():
         db.session.commit()
         session.pop("temp_user_id", None)
         login_user(user)
+        from services.message_unread_cache import refresh_unread_cache
+
+        refresh_unread_cache(user.id)
         flash("Profil başarıyla tamamlandı!", "success")
         return redirect(url_for("main.anasayfa"))
 
@@ -213,6 +207,9 @@ def giris():
             return redirect(url_for("auth.profil_tamamla"))
 
         login_user(user)
+        from services.message_unread_cache import refresh_unread_cache
+
+        refresh_unread_cache(user.id)
         user.last_login_at = utc_now()
         db.session.commit()
         flash("Giriş başarılı! Hoş geldiniz, " + user.username + "!", "success")
@@ -224,7 +221,11 @@ def giris():
 @auth_bp.route("/cikis")
 @login_required
 def cikis():
+    from services.message_unread_cache import clear_unread_cache
+
+    user_id = current_user.id
     logout_user()
+    clear_unread_cache(user_id)
     flash("Çıkış yapıldı.", "success")
     return redirect(url_for("main.anasayfa"))
 

@@ -70,7 +70,8 @@ def create_app(config_overrides=None):
         db_uri = config_overrides["SQLALCHEMY_DATABASE_URI"]
     app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
     if is_sqlite_uri(db_uri):
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
+        if not (config_overrides and "SQLALCHEMY_ENGINE_OPTIONS" in config_overrides):
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {}
     else:
         app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
             "pool_pre_ping": True,
@@ -177,6 +178,8 @@ def create_app(config_overrides=None):
     if app.config.get("TESTING"):
         limiter.enabled = False
 
+    from production_config import resolve_socketio_cors_origins
+
     socketio_async_mode = (
         "threading"
         if app.config.get("TESTING")
@@ -186,7 +189,10 @@ def create_app(config_overrides=None):
         app,
         async_mode=socketio_async_mode,
         manage_session=False,
-        cors_allowed_origins=os.getenv("SOCKETIO_CORS_ORIGINS") or None,
+        cors_allowed_origins=resolve_socketio_cors_origins(
+            is_testing=bool(app.config.get("TESTING")),
+            debug=bool(app.config.get("DEBUG")),
+        ),
     )
     import socket_events  # noqa: F401 — event handler kaydı
 
@@ -241,6 +247,14 @@ def create_app(config_overrides=None):
             expire_temporary_bans()
         except Exception:
             pass
+
+    @app.before_request
+    def _enforce_active_account():
+        if _skip_startup_hooks():
+            return
+        from services.user_moderation import enforce_active_account
+
+        return enforce_active_account()
 
     from blueprints.gamification import gamification_bp
     from blueprints.kurum import kurum_bp

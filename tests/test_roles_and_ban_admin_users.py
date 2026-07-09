@@ -26,7 +26,7 @@ def _create_user(
     )
 
 
-def test_registration_assigns_superadmin_from_env(monkeypatch, client, app):
+def test_registration_does_not_assign_superadmin_from_env(monkeypatch, client, app):
     monkeypatch.setenv("SUPERADMIN_EMAIL", "super@test.com")
 
     client.post(
@@ -44,8 +44,8 @@ def test_registration_assigns_superadmin_from_env(monkeypatch, client, app):
     with app.app_context():
         u = User.query.filter_by(email="super@test.com").first()
         assert u is not None
-        assert u.role == "superadmin"
-        assert u.is_admin is True
+        assert u.role == "user"
+        assert u.is_admin is False
 
 
 def test_banned_user_cannot_login(monkeypatch, client, app):

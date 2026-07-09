@@ -19,6 +19,9 @@
   var stopTypingTimer = null;
   var typingHideTimer = null;
   var lastMessageId = 0;
+  var oldestLoadedId = 0;
+  var hasMoreOlder = false;
+  var loadingOlder = false;
   var pendingNewCount = 0;
   var socket = null;
   var conversationJoined = false;
@@ -230,11 +233,12 @@
     return div;
   }
 
-  function insertMessage(msg, autoScroll) {
+  function insertMessage(msg, autoScroll, prependOnly) {
     var id = msg.message_id || msg.id;
     if (!id || renderedIds[id]) return false;
     renderedIds[id] = true;
     if (id > lastMessageId) lastMessageId = id;
+    if (!oldestLoadedId || id < oldestLoadedId) oldestLoadedId = id;
 
     var node = buildMessageNode(msg);
     var children = mesajKutusu.querySelectorAll("[data-message-id]");
@@ -249,12 +253,52 @@
     }
     if (!inserted) mesajKutusu.appendChild(node);
 
+    if (prependOnly) {
+      return true;
+    }
+
     if (autoScroll !== false && isNearBottom()) {
       scrollToBottom();
     } else if (autoScroll !== false && msg.sender_id !== currentUserId) {
       showNewMessageButton();
     }
     return true;
+  }
+
+  function normalizeFetchPayload(data) {
+    if (Array.isArray(data)) {
+      return {
+        messages: data,
+        has_more: false,
+        oldest_id: data.length ? data[0].id : null,
+      };
+    }
+    return data || { messages: [], has_more: false, oldest_id: null };
+  }
+
+  function mapFetchedMessage(msg) {
+    return {
+      id: msg.id,
+      message_id: msg.id,
+      sender_id: msg.sender_id,
+      sender_username: msg.sender_username,
+      content: msg.content,
+      message: msg.content,
+      timestamp: msg.timestamp,
+      is_read: msg.is_read,
+      read_at_local: msg.read_at_local,
+    };
+  }
+
+  function prependOlderMessages(messages) {
+    if (!messages.length) return;
+    var previousHeight = mesajKutusu.scrollHeight;
+    var previousTop = mesajKutusu.scrollTop;
+    messages.forEach(function (msg) {
+      insertMessage(msg, false, true);
+    });
+    mesajKutusu.scrollTop = mesajKutusu.scrollHeight - previousHeight + previousTop;
+    oldestLoadedId = messages[0].id || messages[0].message_id || oldestLoadedId;
   }
 
   function fetchMessages() {
@@ -265,26 +309,49 @@
         return response.json();
       })
       .then(function (data) {
+        var payload = normalizeFetchPayload(data);
         mesajKutusu.innerHTML = "";
         renderedIds = {};
         lastMessageId = 0;
-        data.forEach(function (msg) {
-          insertMessage(
-            {
-              id: msg.id,
-              message_id: msg.id,
-              sender_id: msg.sender_id,
-              sender_username: msg.sender_username,
-              content: msg.content,
-              message: msg.content,
-              timestamp: msg.timestamp,
-              is_read: msg.is_read,
-              read_at_local: msg.read_at_local,
-            },
-            false
-          );
+        oldestLoadedId = 0;
+        hasMoreOlder = !!payload.has_more;
+        (payload.messages || []).forEach(function (msg) {
+          insertMessage(mapFetchedMessage(msg), false);
         });
+        if (payload.oldest_id) {
+          oldestLoadedId = payload.oldest_id;
+        }
         scrollToBottom();
+      });
+  }
+
+  function loadOlderMessages() {
+    if (!hasMoreOlder || loadingOlder || !oldestLoadedId) return;
+    loadingOlder = true;
+    fetch(
+      "/mesajlar_getir/" +
+        aliciId +
+        "/" +
+        kaynakId +
+        "/" +
+        atikId +
+        "?before_id=" +
+        oldestLoadedId,
+      { headers: { "X-Requested-With": "XMLHttpRequest" } }
+    )
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        var payload = normalizeFetchPayload(data);
+        hasMoreOlder = !!payload.has_more;
+        prependOlderMessages((payload.messages || []).map(mapFetchedMessage));
+        if (payload.oldest_id) {
+          oldestLoadedId = payload.oldest_id;
+        }
+      })
+      .finally(function () {
+        loadingOlder = false;
       });
   }
 
@@ -464,6 +531,9 @@
   }
 
   mesajKutusu.addEventListener("scroll", function () {
+    if (mesajKutusu.scrollTop < 80) {
+      loadOlderMessages();
+    }
     if (isNearBottom()) {
       pendingNewCount = 0;
       if (yeniMesajBtn) yeniMesajBtn.classList.add("d-none");
@@ -473,6 +543,16 @@
   window.addEventListener("atikport:message-socket-ready", initializeMessaging);
   tryInitializeMessaging();
   fetchMessages();
+
+  window.addEventListener("pagehide", function () {
+    if (typeof window.leaveConversation === "function") {
+      window.leaveConversation({
+        partner_id: aliciId,
+        kaynak_id: kaynakId,
+        atik_id: atikId,
+      });
+    }
+  });
 
   if (mesajInput) {
     mesajInput.addEventListener("input", function () {

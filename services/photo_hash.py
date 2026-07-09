@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 
-from flask import current_app
+from utils import resolve_item_picture_path
 
 
 def photo_file_hash(filename: str) -> str | None:
@@ -13,7 +13,7 @@ def photo_file_hash(filename: str) -> str | None:
     if not filename or filename == "default.jpg":
         return None
     try:
-        path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+        path = resolve_item_picture_path(filename)
         if not os.path.isfile(path):
             return None
         h = hashlib.sha256()

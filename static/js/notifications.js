@@ -4,6 +4,38 @@
   var socket = null;
   var lastNotificationUnread = null;
   var joinedConversations = [];
+  var MAX_JOINED_CONVERSATIONS = 5;
+
+  function conversationKey(payload) {
+    return payload.partner_id + "-" + payload.kaynak_id + "-" + payload.atik_id;
+  }
+
+  function leaveConversation(payload) {
+    if (!payload) return;
+    var key = conversationKey(payload);
+    joinedConversations = joinedConversations.filter(function (c) {
+      return conversationKey(c) !== key;
+    });
+    if (socket && socket.connected) {
+      socket.emit("leave_conversation", payload);
+    }
+  }
+
+  function leaveAllConversations() {
+    var pending = joinedConversations.slice();
+    joinedConversations = [];
+    if (!socket || !socket.connected) return;
+    pending.forEach(function (conv) {
+      socket.emit("leave_conversation", conv);
+    });
+  }
+
+  function disconnectMessageSocket() {
+    leaveAllConversations();
+    if (socket) {
+      socket.disconnect();
+    }
+  }
 
   function getSocket() {
     if (!socket && typeof io !== "undefined") {
@@ -50,11 +82,14 @@
       kaynak_id: kaynakId || 0,
       atik_id: atikId || 0,
     };
-    var key = payload.partner_id + "-" + payload.kaynak_id + "-" + payload.atik_id;
+    var key = conversationKey(payload);
     if (joinedConversations.some(function (c) {
-      return c.partner_id + "-" + c.kaynak_id + "-" + c.atik_id === key;
+      return conversationKey(c) === key;
     })) {
       return;
+    }
+    while (joinedConversations.length >= MAX_JOINED_CONVERSATIONS) {
+      leaveConversation(joinedConversations[0]);
     }
     joinedConversations.push(payload);
     if (socket && socket.connected) {
@@ -308,9 +343,20 @@
 
   window.getMessageSocket = getSocket;
   window.registerConversation = registerConversation;
+  window.leaveConversation = leaveConversation;
+  window.leaveAllConversations = leaveAllConversations;
+  window.disconnectMessageSocket = disconnectMessageSocket;
   window.bildirimleriGetir = bildirimleriGetir;
   window.updateMessageBadge = updateMessageBadge;
   window.handleConversationUpdated = handleConversationUpdated;
+
+  window.addEventListener("pagehide", leaveAllConversations);
+  document.addEventListener("click", function (e) {
+    var link = e.target.closest("a[href*='/cikis']");
+    if (link) {
+      disconnectMessageSocket();
+    }
+  });
 
   getSocket();
   window.dispatchEvent(new CustomEvent("atikport:message-socket-ready"));

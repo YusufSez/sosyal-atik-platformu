@@ -25,6 +25,18 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # İsteğe bağlı: docker compose --profile redis -f docker-compose.prod.yml up -d
+  redis:
+    image: redis:7-alpine
+    profiles:
+      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   web:
     build:
       context: ..
@@ -42,7 +54,11 @@ services:
       FORCE_HTTPS: ${FORCE_HTTPS:-false}
       ENABLE_HSTS: ${ENABLE_HSTS:-false}
       AUTO_CREATE_DB: "false"
-      RATELIMIT_STORAGE_URI: memory://
+      RATELIMIT_BACKEND: ${RATELIMIT_BACKEND:-memory}
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-memory://}
+      REDIS_URL: ${REDIS_URL:-}
+      RATELIMIT_STRICT: ${RATELIMIT_STRICT:-false}
+      SOCKETIO_CORS_ORIGINS: ${SOCKETIO_CORS_ORIGINS}
       BACKUP_ENABLED: "false"
       GUNICORN_WORKER_CLASS: eventlet
       GUNICORN_WORKERS: "1"
@@ -98,7 +114,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       AUTO_CREATE_DB: "false"
       SKIP_APP_BOOTSTRAP: "true"
-      RATELIMIT_STORAGE_URI: memory://
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-memory://}
       MAIL_SUPPRESS_SEND: "true"
     depends_on:
       postgres:

@@ -235,6 +235,10 @@ class EmailToken(db.Model):
     created_at = db.Column(db.DateTime, default=tr_time)
     user = db.relationship("User", backref=db.backref("email_tokens", lazy=True))
 
+    __table_args__ = (
+        db.Index("ix_email_token_nonce_purpose", "nonce", "purpose"),
+    )
+
 
 class IlanModerasyonAnaliz(db.Model):
     """Versiyonlu AI moderasyon analiz geçmişi."""

@@ -12,7 +12,7 @@ from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
 from services.user_moderation import apply_ban, clear_ban, parse_ban_duration
-from utils import cleanup_ilan_relations, sanitize_input, utc_now
+from utils import cleanup_ilan_relations, resolve_item_picture_path, sanitize_input, utc_now
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -261,11 +261,17 @@ def ai_test(tur):
     if tur == "kaynak":
         kaynak = Kaynak.query.filter(Kaynak.resim != "default.jpg").first()
         if kaynak:
-            test_resim = os.path.join(current_app.config["UPLOAD_FOLDER"], kaynak.resim)
+            try:
+                test_resim = resolve_item_picture_path(kaynak.resim)
+            except ValueError:
+                test_resim = None
     else:
         atik = Atik.query.filter(Atik.resim.isnot(None), Atik.resim != "default.jpg").first()
         if atik:
-            test_resim = os.path.join(current_app.config["UPLOAD_FOLDER"], atik.resim)
+            try:
+                test_resim = resolve_item_picture_path(atik.resim)
+            except ValueError:
+                test_resim = None
 
     if not test_resim or not os.path.exists(test_resim):
         return jsonify({"hata": "Test için resim bulunamadı."})

@@ -12,7 +12,11 @@ from models import Atik, IlanModerasyonAnaliz, Kaynak
 from services.ai_moderation import enrich_explainability
 from services.ilan_images import fotograf_moderasyonu, ilan_fotograf_listesi
 from services.ilan_moderation import ilan_moderasyon_alanlarini_uygula
-from services.moderation_photos import analyze_listing_photos, merge_photo_analyses
+from services.moderation_photos import (
+    analyze_listing_photos,
+    build_merged_ai_sonuc_from_photos,
+    merge_photo_analyses,
+)
 from services.moderation_timeline import analiz_timeline_olaylari_ekle, timeline_ekle
 from utils import utc_now
 
@@ -234,7 +238,9 @@ def tam_ilan_analizi_yap(
     vision_summary = merge_photo_analyses(photo_analyses)
 
     if photo_analyses:
-        ai_sonuc = dict(photo_analyses[0].get("raw") or {})
+        ai_sonuc = build_merged_ai_sonuc_from_photos(
+            photo_analyses, kategori_secim=kategori_secim
+        )
     else:
         ai_sonuc = {"risk_skoru": 0, "guvenli": True, "moderation_status": "approved"}
 

@@ -2,13 +2,28 @@
 
 from datetime import timedelta
 
-from flask_login import current_user
+from flask import abort, jsonify, request
+from flask_login import current_user, logout_user
 
 from constants import BAN_DURATION_OPTIONS
 from decorators import is_super_admin
 from extensions import db
 from models import Atik, Kaynak, Mesaj, Sikayet, User
 from utils import utc_now
+
+_SUSPENDED_EXEMPT_PATHS = frozenset({
+    "/health",
+    "/giris",
+    "/kayit",
+    "/cikis",
+    "/sifremi-unuttum",
+})
+
+_SUSPENDED_EXEMPT_PREFIXES = (
+    "/static/",
+    "/eposta-dogrula",
+    "/sifre-sifirla/",
+)
 
 
 def normalize_role(user) -> str:
@@ -66,6 +81,46 @@ def is_user_banned(user) -> bool:
         db.session.commit()
         return False
     return True
+
+
+def is_account_suspended(user) -> bool:
+    """Ban veya deaktivasyon nedeniyle hesap askıda mı."""
+    if not user:
+        return False
+    if getattr(user, "is_deactivated", False):
+        return True
+    return is_user_banned(user)
+
+
+def enforce_active_account():
+    """
+    Aktif oturumda ban/deaktivasyon kontrolü.
+    Askıdaki hesap için logout + 403 döner; aksi halde None.
+    """
+    if not current_user.is_authenticated:
+        return None
+
+    path = request.path or ""
+    if path in _SUSPENDED_EXEMPT_PATHS or any(
+        path.startswith(prefix) for prefix in _SUSPENDED_EXEMPT_PREFIXES
+    ):
+        return None
+
+    user = db.session.get(User, int(current_user.get_id()))
+    if not user or not is_account_suspended(user):
+        return None
+
+    user_id = user.id
+    logout_user()
+    try:
+        from socket_events import disconnect_user_sockets
+
+        disconnect_user_sockets(user_id)
+    except Exception:
+        pass
+    if path.startswith("/api/") or request.is_json:
+        return jsonify({"error": "Hesabınız askıya alındı."}), 403
+    abort(403)
 
 
 def parse_ban_duration(duration_key: str | None) -> int | None:

@@ -76,6 +76,19 @@ nano .env   # Tüm <...> değerlerini doldurun
 - `FORCE_HTTPS=True`
 - `TURNSTILE_*` — hostname: `atikport.com`
 - `BREVO_API_KEY` — VPS için önerilir
+- `SOCKETIO_CORS_ORIGINS=https://atikport.com,https://www.atikport.com`
+
+### Bind mount izinleri (upload / log)
+
+`docker-compose.prod.yml` host dizinlerini bağlar: `static/item_pics`, `static/profile_pics`, `logs`.
+
+Container entrypoint bu dizinlerin sahipliğini `atikport` (UID **1000**) kullanıcısına ayarlamaya çalışır. Host'ta dizinler root veya farklı bir kullanıcıya aitse ve `chown` başarısız olursa yükleme/log yazımı `PermissionError` verebilir:
+
+```bash
+sudo chown -R 1000:1000 static/item_pics static/profile_pics logs
+```
+
+Windows bind mount kullanıyorsanız Docker Desktop genelde yazmayı izin verir; sorun yaşarsanız named volume veya WSL2 dosya yolu tercih edin.
 
 ---
 

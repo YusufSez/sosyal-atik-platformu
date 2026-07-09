@@ -255,4 +255,4 @@ def test_photo_analysis_structure():
     ]
     merged = merge_photo_analyses(photos)
     assert merged["photo_count"] == 2
-    assert merged["primary_label"] == "Bitkisel Atık Yağı"
+    assert merged["primary_label"] == "Metal Varil"

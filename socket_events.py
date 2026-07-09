@@ -4,12 +4,17 @@ import logging
 import time
 from collections import defaultdict
 
+from flask import request
 from flask_login import current_user
 from flask_socketio import join_room, leave_room
 from socketio.exceptions import ConnectionRefusedError
 from sqlalchemy import and_, or_, select, union
 
-from constants import RATE_SOCKET_MESSAGE_PER_SEC, RATE_SOCKET_TYPING_PER_SEC
+from constants import (
+    RATE_SOCKET_MESSAGE_PER_SEC,
+    RATE_SOCKET_SYNC_STATE_PER_SEC,
+    RATE_SOCKET_TYPING_PER_SEC,
+)
 from extensions import db, socketio
 from models import Bildirim, Mesaj, User
 from utils import format_datetime, utc_now
@@ -18,6 +23,9 @@ logger = logging.getLogger("atikport.socket")
 
 _connection_counts: defaultdict[int, int] = defaultdict(int)
 _rate_buckets: defaultdict[int, defaultdict[str, list]] = defaultdict(lambda: defaultdict(list))
+_sid_users: dict[str, int] = {}
+_user_sids: defaultdict[int, set] = defaultdict(set)
+_sid_conversations: defaultdict[str, list] = defaultdict(list)
 
 
 def user_room(user_id: int) -> str:
@@ -72,6 +80,69 @@ def _check_rate_limit(user_id: int, event: str, max_per_second: int) -> bool:
         return False
     bucket.append(now)
     return True
+
+
+def _cleanup_user_rate_limit(user_id: int) -> None:
+    if _connection_counts.get(user_id, 0) == 0:
+        _rate_buckets.pop(user_id, None)
+
+
+def _bind_sid(user_id: int) -> None:
+    sid = request.sid
+    _sid_users[sid] = user_id
+    _user_sids[user_id].add(sid)
+
+
+def _release_sid(sid: str) -> int | None:
+    user_id = _sid_users.pop(sid, None)
+    if user_id is not None:
+        _user_sids[user_id].discard(sid)
+        if not _user_sids[user_id]:
+            _user_sids.pop(user_id, None)
+    _sid_conversations.pop(sid, None)
+    return user_id
+
+
+def _track_conversation_join(sid: str, canon: str) -> None:
+    rooms = _sid_conversations[sid]
+    if canon not in rooms:
+        rooms.append(canon)
+
+
+def _untrack_conversation_leave(sid: str, canon: str) -> None:
+    rooms = _sid_conversations.get(sid)
+    if not rooms:
+        return
+    try:
+        rooms.remove(canon)
+    except ValueError:
+        pass
+    if not rooms:
+        _sid_conversations.pop(sid, None)
+
+
+def disconnect_user_sockets(user_id: int) -> None:
+    """Logout/ban sonrası kullanıcının tüm socket bağlantılarını kapatır."""
+    for sid in list(_user_sids.get(user_id, set())):
+        try:
+            socketio.server.disconnect(sid)
+        except Exception:
+            pass
+
+
+def _finalize_disconnect(user_id: int, sid: str, convos: list[str]) -> bool:
+    """Oda ayrılma, presence ve rate-limit temizliği. went_offline döner."""
+    for canon in convos:
+        _leave_room_safe(conversation_room(canon))
+    _release_sid(sid)
+    went_offline = _unregister_connection(user_id)
+    room = user_room(user_id)
+    _leave_room_safe(room)
+    _cleanup_user_rate_limit(user_id)
+    if went_offline:
+        _set_last_seen(user_id)
+        _broadcast_presence(user_id, online=False)
+    return went_offline
 
 
 def _join_room_safe(room: str) -> None:
@@ -193,10 +264,14 @@ def build_conversation_updated(mesaj: Mesaj, for_user_id: int) -> dict:
 
 
 def unread_counts_for(user_id: int) -> dict:
-    return {
+    from services.message_unread_cache import set_unread_counts
+
+    payload = {
         "message_unread": Mesaj.query.filter_by(receiver_id=user_id, is_read=False).count(),
         "notification_unread": Bildirim.query.filter_by(user_id=user_id, okundu=False).count(),
     }
+    set_unread_counts(user_id, payload["message_unread"], payload["notification_unread"])
+    return payload
 
 
 def _set_last_seen(user_id: int) -> None:
@@ -318,7 +393,13 @@ def _unregister_connection(user_id: int) -> bool:
 def handle_connect():
     if not current_user.is_authenticated:
         raise ConnectionRefusedError("Giriş gerekli")
+    from services.user_moderation import is_account_suspended
+
+    user = db.session.get(User, int(current_user.get_id()))
+    if not user or is_account_suspended(user):
+        raise ConnectionRefusedError("Hesap askıya alındı")
     became_online = _register_connection(current_user.id)
+    _bind_sid(current_user.id)
     room = user_room(current_user.id)
     _join_room_safe(room)
     _log_socket("JOIN", user_id=current_user.id, room=room, became_online=became_online)
@@ -328,15 +409,22 @@ def handle_connect():
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    if not current_user.is_authenticated:
+    sid = request.sid
+    convos = list(_sid_conversations.get(sid, []))
+    user_id = _sid_users.get(sid)
+    if user_id is None and current_user.is_authenticated:
+        user_id = current_user.id
+    if user_id is None:
+        _release_sid(sid)
         return
-    went_offline = _unregister_connection(current_user.id)
-    room = user_room(current_user.id)
-    _leave_room_safe(room)
-    _log_socket("LEAVE", user_id=current_user.id, room=room, went_offline=went_offline)
-    if went_offline:
-        _set_last_seen(current_user.id)
-        _broadcast_presence(current_user.id, online=False)
+    went_offline = _finalize_disconnect(user_id, sid, convos)
+    _log_socket(
+        "LEAVE",
+        user_id=user_id,
+        room=user_room(user_id),
+        went_offline=went_offline,
+        sid=sid,
+    )
 
 
 @socketio.on("join")
@@ -347,6 +435,7 @@ def handle_join():
     room = user_room(current_user.id)
     _join_room_safe(room)
     _log_socket("JOIN", user_id=current_user.id, room=room, via="join_event")
+    emit_unread_count_updated(current_user.id)
     return {
         "room": room,
         "user_id": current_user.id,
@@ -377,6 +466,7 @@ def handle_join_conversation(data):
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     room = conversation_room(canon)
     _join_room_safe(room)
+    _track_conversation_join(request.sid, canon)
     _log_socket(
         "JOIN_CONVERSATION",
         user_id=current_user.id,
@@ -405,6 +495,7 @@ def handle_leave_conversation(data):
         canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
         room = conversation_room(canon)
         _leave_room_safe(room)
+        _untrack_conversation_leave(request.sid, canon)
         _log_socket("LEAVE_CONVERSATION", user_id=current_user.id, room=room)
     return {"left": True}
 
@@ -503,6 +594,8 @@ def handle_message_read(data):
 def handle_sync_state(data):
     if not current_user.is_authenticated:
         return {"error": "Giriş gerekli"}
+    if not _check_rate_limit(current_user.id, "sync_state", RATE_SOCKET_SYNC_STATE_PER_SEC):
+        return {"error": "Çok fazla istek"}
     data = data or {}
     partner_id = int(data.get("partner_id") or 0)
     kaynak_id = int(data.get("kaynak_id") or 0)
