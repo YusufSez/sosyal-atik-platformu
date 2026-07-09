@@ -21,8 +21,25 @@ def yorum_agaci_options():
 
 
 def sikayet_listesi_options():
-    return [joinedload(Sikayet.user)]
+    return [
+        joinedload(Sikayet.user),
+        joinedload(Sikayet.reported_user),
+    ]
+
+
+def sikayet_detay_options():
+    return [
+        joinedload(Sikayet.user),
+        joinedload(Sikayet.reported_user),
+        joinedload(Sikayet.reviewer),
+        joinedload(Sikayet.mesaj),
+        joinedload(Sikayet.kaynak),
+        joinedload(Sikayet.atik),
+    ]
 
 
 def audit_listesi_options():
-    return [joinedload(AdminAuditLog.admin)]
+    return [
+        joinedload(AdminAuditLog.admin),
+        joinedload(AdminAuditLog.target_user),
+    ]

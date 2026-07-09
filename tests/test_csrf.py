@@ -83,6 +83,46 @@ def test_get_requests_do_not_require_csrf(csrf_client):
     assert response.status_code == 200
 
 
+def test_admin_report_post_without_csrf_rejected(csrf_client, csrf_app):
+    from auth_utils import hash_password
+    from models import Sikayet, User
+
+    with csrf_app.app_context():
+        admin = User(
+            username="csrfadmin",
+            email="csrfadmin@test.com",
+            password=hash_password("TestPass1"),
+            is_completed=True,
+            is_admin=True,
+            role="admin",
+        )
+        reporter = User(
+            username="csrfrep",
+            email="csrfrep@test.com",
+            password=hash_password("TestPass1"),
+            is_completed=True,
+        )
+        db.session.add_all([admin, reporter])
+        db.session.commit()
+        sikayet = Sikayet(user_id=reporter.id, sebep="test", durum="Bekliyor")
+        db.session.add(sikayet)
+        db.session.commit()
+        report_id = sikayet.id
+
+    csrf_client.post(
+        "/giris",
+        data={
+            "email": "csrfadmin@test.com",
+            "password": "TestPass1",
+            "csrf_token": _get_csrf_token(csrf_client),
+        },
+        follow_redirects=True,
+    )
+
+    response = csrf_client.post(f"/admin/report/{report_id}/mark-reviewed")
+    assert response.status_code == 302
+
+
 def _get_csrf_token(client):
     with client.session_transaction() as sess:
         return sess.get("csrf_token")

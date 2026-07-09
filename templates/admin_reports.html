@@ -1,0 +1,157 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h3><i class="bi bi-flag"></i> Şikayet Yönetimi</h3>
+            <small class="text-muted">Filtreleme, arama ve moderasyon</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Admin Panel
+            </a>
+            <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-outline-dark">
+                <i class="bi bi-journal-text"></i> Yönetim Logları
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" class="card mb-4" id="report-filter-form">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small">Canlı Arama</label>
+                    <input type="search" name="q" id="report-live-search" class="form-control form-control-sm"
+                           value="{{ filters.get('q', '') }}"
+                           placeholder="Kullanıcı, e-posta, mesaj, açıklama...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Durum</label>
+                    <select name="durum" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        {% for d in durumlar %}
+                        <option value="{{ d }}" {% if filters.get('durum') == d %}selected{% endif %}>{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Tür</label>
+                    <select name="tur" class="form-select form-select-sm">
+                        <option value="">Tümü</option>
+                        {% for t in turler %}
+                        <option value="{{ t }}" {% if filters.get('tur') == t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Şikayet Eden</label>
+                    <input type="text" name="username" class="form-control form-control-sm"
+                           value="{{ filters.get('username', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">E-posta</label>
+                    <input type="text" name="email" class="form-control form-control-sm"
+                           value="{{ filters.get('email', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Şikayet Edilen</label>
+                    <input type="text" name="reported_user" class="form-control form-control-sm"
+                           value="{{ filters.get('reported_user', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Başlangıç</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm"
+                           value="{{ filters.get('date_from', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Bitiş</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm"
+                           value="{{ filters.get('date_to', '') }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="sadece_bekleyen" value="1"
+                               id="sadece_bekleyen" {% if filters.get('sadece_bekleyen') %}checked{% endif %}>
+                        <label class="form-check-label small" for="sadece_bekleyen">Sadece bekleyenler</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="banli" value="1"
+                               id="banli_filter" {% if filters.get('banli') %}checked{% endif %}>
+                        <label class="form-check-label small" for="banli_filter">Banlı kullanıcılar</label>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">Filtrele</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" id="reports-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tarih</th>
+                    <th>Şikayet Eden</th>
+                    <th>Şikayet Edilen</th>
+                    <th>Tür</th>
+                    <th>Durum</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for s in reports %}
+                <tr>
+                    <td>#{{ s.id }}</td>
+                    <td><small>{{ s.timestamp|format_dt }}</small></td>
+                    <td>{{ s.user.username if s.user else '-' }}</td>
+                    <td>{{ s.reported_user.username if s.reported_user else '-' }}</td>
+                    <td><span class="badge bg-light text-dark">{{ sikayet_turu_label(s) }}</span></td>
+                    <td>
+                        <span class="badge bg-{{ durum_badge_class(s.durum) }}">
+                            {{ normalize_durum(s.durum) }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin_reports.admin_report_detail', id=s.id) }}"
+                           class="btn btn-sm btn-outline-primary">Detay</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-muted">Şikayet bulunamadı.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Şikayet sayfaları">
+        <ul class="pagination pagination-sm justify-content-center">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_reports.admin_reports_list', page=pagination.prev_num, **filter_args) }}">Önceki</a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('admin_reports.admin_reports_list', page=p, **filter_args) }}">{{ p }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_reports.admin_reports_list', page=pagination.next_num, **filter_args) }}">Sonraki</a>
+            </li>
+        </ul>
+        <p class="text-center text-muted small">Toplam {{ pagination.total }} şikayet</p>
+    </nav>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin-reports.js') }}"></script>
+{% endblock %}

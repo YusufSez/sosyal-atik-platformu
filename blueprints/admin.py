@@ -10,6 +10,7 @@ from models import AdminAuditLog, Atik, Kaynak, Sikayet, User
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
+from services.user_moderation import apply_ban, clear_ban, parse_ban_duration
 from utils import cleanup_ilan_relations, sanitize_input, utc_now
 
 admin_bp = Blueprint("admin", __name__)
@@ -59,16 +60,20 @@ def admin_ban_user(user_id: int):
         abort(403)
 
     reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    duration_days = parse_ban_duration(
+        sanitize_input(request.form.get("ban_duration"), max_length=20) if request.form else None
+    )
 
-    target.is_banned = True
-    target.banned_at = utc_now()
-    target.ban_reason = reason
+    apply_ban(target, reason, duration_days)
     db.session.commit()
 
     log_admin_action(
         "user_ban",
         target=f"user:{target.id}",
+        target_user_id=target.id,
         detail=f"{target.email} reason={reason or ''}",
+        reason=reason,
+        new_value=f"expires={duration_days}",
     )
     flash(f"{target.username} banlandı.", "success")
     return redirect(url_for("admin.admin_users"))
@@ -87,14 +92,13 @@ def admin_unban_user(user_id: int):
     if is_super_admin(target):
         abort(403)
 
-    target.is_banned = False
-    target.banned_at = None
-    target.ban_reason = None
+    clear_ban(target)
     db.session.commit()
 
     log_admin_action(
         "user_unban",
         target=f"user:{target.id}",
+        target_user_id=target.id,
         detail=f"{target.email}",
     )
     flash(f"{target.username} ban kaldırıldı.", "success")
@@ -119,15 +123,15 @@ def admin_soft_delete_user(user_id: int):
     if not reason:
         reason = "Silindi"
 
-    target.is_banned = True
-    target.banned_at = utc_now()
-    target.ban_reason = reason
+    apply_ban(target, reason, None)
     db.session.commit()
 
     log_admin_action(
         "user_soft_delete",
         target=f"user:{target.id}",
+        target_user_id=target.id,
         detail=f"{target.email} reason={reason or ''}",
+        reason=reason,
     )
     flash(f"{target.username} silindi (soft-ban).", "success")
     return redirect(url_for("admin.admin_users"))
@@ -192,10 +196,14 @@ def admin_toggle_admin(user_id):
 @login_required
 @admin_required
 def admin_sikayet_incele(id):
+    """Geriye uyumluluk: eski admin panel butonu."""
     sikayet = Sikayet.query.get_or_404(id)
-    sikayet.durum = "İncelendi"
+    sikayet.reviewer_id = current_user.id
+    sikayet.reviewed_at = utc_now()
+    if sikayet.durum in ("Beklemede", "Bekliyor"):
+        sikayet.durum = "İşlem Yapıldı"
     db.session.commit()
-    log_admin_action("sikayet_incele", target=f"sikayet:{id}", detail=sikayet.sebep)
+    log_admin_action("sikayet_incele", target=f"sikayet:{id}", detail=sikayet.sebep, new_value="reviewed")
     flash("Şikayet incelendi olarak işaretlendi.", "success")
     return redirect(url_for("admin.admin_panel"))
 

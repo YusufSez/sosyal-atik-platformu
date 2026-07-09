@@ -82,6 +82,12 @@
         <a href="{{ url_for('admin.admin_users') }}" class="btn btn-sm btn-outline-dark">
             <i class="bi bi-people"></i> Kullanıcı Yönetimi
         </a>
+        <a href="{{ url_for('admin_reports.admin_reports_list') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-flag"></i> Şikayet Yönetimi
+        </a>
+        <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-journal-text"></i> Yönetim Logları
+        </a>
         <a href="{{ url_for('admin.ai_test', tur='kaynak') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Kaynak)</a>
         <a href="{{ url_for('admin.ai_test', tur='atik') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Atık)</a>
     </div>
@@ -171,22 +177,28 @@
     </div>
 
     <h5>Şikayetler</h5>
-    <ul class="list-group">
+    <ul class="list-group mb-2">
         {% for s in sikayetler %}
-        <li class="list-group-item">
-            <strong>{{ s.user.username }}</strong> — {{ s.sebep|display_text }}
-            <span class="badge bg-{{ 'success' if s.durum == 'İncelendi' else 'warning' }}">{{ s.durum }}</span>
-            {% if s.durum != 'İncelendi' %}
-            <form method="POST" action="{{ url_for('admin.admin_sikayet_incele', id=s.id) }}" class="d-inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button class="btn btn-sm btn-outline-primary">İncelendi</button>
-            </form>
-            {% endif %}
+        <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <strong>{{ s.user.username }}</strong> — {{ s.sebep|display_text|truncate(80) }}
+                <span class="badge bg-{{ 'success' if s.durum in ['İncelendi', 'İşlem Yapıldı'] else 'warning' }}">{{ s.durum }}</span>
+            </div>
+            <div class="d-flex gap-1">
+                <a href="{{ url_for('admin_reports.admin_report_detail', id=s.id) }}" class="btn btn-sm btn-outline-primary">Detay</a>
+                {% if s.durum not in ['İncelendi', 'İşlem Yapıldı', 'Kapatıldı'] %}
+                <form method="POST" action="{{ url_for('admin.admin_sikayet_incele', id=s.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-success">İncelendi</button>
+                </form>
+                {% endif %}
+            </div>
         </li>
         {% else %}
         <li class="list-group-item text-muted">Şikayet yok.</li>
         {% endfor %}
     </ul>
+    <a href="{{ url_for('admin_reports.admin_reports_list') }}" class="btn btn-sm btn-link">Tüm şikayetler →</a>
 
     <h5 class="mt-4">Yönetim Kayıtları</h5>
     <div class="table-responsive">

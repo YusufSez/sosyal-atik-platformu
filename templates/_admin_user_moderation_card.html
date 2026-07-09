@@ -1,0 +1,47 @@
+{% macro user_moderation_card(user, stats, card_id, title, viewer_id=None) %}
+{% if user %}
+<div class="card mb-3" id="{{ card_id }}">
+    <div class="card-header fw-semibold">{{ title }}</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Kullanıcı adı:</strong> {{ user.username }}</p>
+                <p class="mb-1"><strong>İsim:</strong> {{ user.username }}</p>
+                <p class="mb-1"><strong>E-posta:</strong> {{ user.email }}</p>
+                <p class="mb-1"><strong>Kullanıcı ID:</strong> #{{ user.id }}</p>
+                <p class="mb-1">
+                    <strong>Profil:</strong>
+                    {% if viewer_id and user.id == viewer_id %}
+                    <a href="{{ url_for('auth.profil') }}">Profilim</a>
+                    {% else %}
+                    <span class="text-muted">#{{ user.id }}</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                {% set role_name = user.role if user.role else ('admin' if user.is_admin else 'user') %}
+                <p class="mb-1">
+                    <strong>Rol:</strong>
+                    <span class="badge bg-{{ 'danger' if role_name == 'superadmin' else ('primary' if role_name == 'admin' else 'secondary') }}">
+                        {{ role_name }}
+                    </span>
+                    {% if user.is_banned %}
+                    <span class="badge bg-dark">Banlı</span>
+                    {% endif %}
+                    {% if user.is_deactivated %}
+                    <span class="badge bg-secondary">Pasif</span>
+                    {% endif %}
+                </p>
+                <p class="mb-1"><strong>Kayıt:</strong> {{ user.terms_accepted_at|format_dt if user.terms_accepted_at else '-' }}</p>
+                <p class="mb-1"><strong>Son giriş:</strong> {{ user.last_login_at|format_dt if user.last_login_at else '-' }}</p>
+                <p class="mb-1"><strong>Paylaşım:</strong> {{ stats.paylasim|default(0) }}</p>
+                <p class="mb-1"><strong>Mesaj (gönderilen/alınan):</strong> {{ stats.mesaj_gonderilen|default(0) }} / {{ stats.mesaj_alinan|default(0) }}</p>
+                <p class="mb-0"><strong>Şikayet (oluşturulan/alınan):</strong> {{ stats.sikayet_olusturulan|default(0) }} / {{ stats.sikayet_alinan|default(0) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-secondary">Kullanıcı bilgisi yok.</div>
+{% endif %}
+{% endmacro %}

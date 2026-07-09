@@ -55,6 +55,35 @@ PIL_FORMAT_TO_MIME = {
     "WEBP": "image/webp",
 }
 ITEMS_PER_PAGE = 12
+ADMIN_REPORTS_PER_PAGE = 25
+ADMIN_LOGS_PER_PAGE = 50
+
+# Şikayet durumları
+SIKAYET_DURUMLARI = (
+    "Bekliyor",
+    "İnceleniyor",
+    "İşlem Yapıldı",
+    "Reddedildi",
+    "Kapatıldı",
+)
+
+SIKAYET_TURLERI = ("mesaj", "kaynak", "atik")
+
+# Ban süreleri (gün); None = süresiz
+BAN_DURATION_OPTIONS = {
+    "permanent": None,
+    "1": 1,
+    "3": 3,
+    "7": 7,
+    "30": 30,
+    "90": 90,
+}
+
+# Eski durumlar → yeni (migration + runtime)
+SIKAYET_DURUM_LEGACY_MAP = {
+    "Beklemede": "Bekliyor",
+    "İncelendi": "İşlem Yapıldı",
+}
 MAX_ILAN_FOTOSU = 10
 MAX_SINGLE_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_UPLOAD_BYTES = MAX_SINGLE_IMAGE_BYTES * MAX_ILAN_FOTOSU

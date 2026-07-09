@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 from constants import RATE_PUBLIC_API
 from extensions import db, limiter
 from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
+from services.user_moderation import resolve_reported_user_id
 from services.notifications import bildirim_olustur
 from utils import format_datetime, mesafe_hesapla, sanitize_input
 
@@ -294,11 +295,19 @@ def sikayet_olustur():
     if not sebep or (not kaynak_id and not atik_id):
         return jsonify({"error": "Geçersiz istek"}), 400
 
+    tur, reported_user_id = resolve_reported_user_id(
+        reporter_id=current_user.id,
+        kaynak_id=kaynak_id if kaynak_id else None,
+        atik_id=atik_id if atik_id else None,
+    )
     db.session.add(Sikayet(
         user_id=current_user.id,
         kaynak_id=kaynak_id if kaynak_id else None,
         atik_id=atik_id if atik_id else None,
         sebep=sanitize_input(sebep, max_length=500),
+        tur=tur,
+        reported_user_id=reported_user_id,
+        aciklama=sanitize_input(sebep, max_length=500),
     ))
     db.session.commit()
     return jsonify({"success": True})
@@ -328,12 +337,17 @@ def mesaj_sikayet():
     if ek_sebep:
         sebep += f" | Açıklama: {ek_sebep}"
 
+    reported_id = mesaj.sender_id if mesaj.sender_id != current_user.id else mesaj.receiver_id
+
     db.session.add(Sikayet(
         user_id=current_user.id,
         kaynak_id=mesaj.kaynak_id,
         atik_id=mesaj.atik_id,
         mesaj_id=mesaj.id,
         sebep=sebep[:500],
+        tur="mesaj",
+        reported_user_id=reported_id,
+        aciklama=ek_sebep or None,
     ))
     db.session.commit()
     return jsonify({"success": True})

@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h3><i class="bi bi-journal-text"></i> Yönetim Logları</h3>
+            <small class="text-muted">Moderasyon işlem geçmişi</small>
+        </div>
+        <a href="{{ url_for('admin_reports.admin_reports_list') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Şikayetler
+        </a>
+    </div>
+
+    <form method="GET" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <input type="text" name="action" class="form-control form-control-sm"
+                   value="{{ filters.get('action', '') }}" placeholder="İşlem ara (örn. user_ban)">
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-sm btn-primary w-100">Filtrele</button>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Admin</th>
+                    <th>İşlem</th>
+                    <th>Hedef</th>
+                    <th>Kime</th>
+                    <th>IP</th>
+                    <th>Sebep</th>
+                    <th>Eski → Yeni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+                <tr>
+                    <td><small>{{ log.tarih|format_dt }}</small></td>
+                    <td>{{ log.admin.username if log.admin else '-' }}</td>
+                    <td><code>{{ log.action }}</code></td>
+                    <td><small>{{ log.target or '-' }}</small></td>
+                    <td>
+                        {% if log.target_user %}
+                        {{ log.target_user.username }} (#{{ log.target_user_id }})
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td><small>{{ log.ip_address or '-' }}</small></td>
+                    <td><small>{{ log.reason or log.detail or '' }}</small></td>
+                    <td><small class="text-muted">{{ log.old_value or '-' }} → {{ log.new_value or '-' }}</small></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-muted">Kayıt yok.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Log sayfaları">
+        <ul class="pagination pagination-sm justify-content-center">
+            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_reports.admin_logs', page=pagination.prev_num, action=filters.get('action', '')) }}">Önceki</a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('admin_reports.admin_logs', page=p, action=filters.get('action', '')) }}">{{ p }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_reports.admin_logs', page=pagination.next_num, action=filters.get('action', '')) }}">Sonraki</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+{% endblock %}

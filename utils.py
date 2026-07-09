@@ -376,6 +376,12 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE user ADD COLUMN banned_at DATETIME"))
             if "ban_reason" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN ban_reason TEXT"))
+            if "ban_expires_at" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN ban_expires_at DATETIME"))
+            if "is_deactivated" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN is_deactivated BOOLEAN DEFAULT 0"))
+            if "last_login_at" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN last_login_at DATETIME"))
             if "terms_accepted_at" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN terms_accepted_at DATETIME"))
             if "email_verified" not in user_cols:
@@ -406,3 +412,27 @@ def ensure_schema():
         with db.engine.begin() as conn:
             if "mesaj_id" not in sikayet_cols:
                 conn.execute(text("ALTER TABLE sikayet ADD COLUMN mesaj_id INTEGER"))
+            if "reported_user_id" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN reported_user_id INTEGER"))
+            if "tur" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN tur VARCHAR(20)"))
+            if "aciklama" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN aciklama TEXT"))
+            if "reviewer_id" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN reviewer_id INTEGER"))
+            if "reviewed_at" not in sikayet_cols:
+                conn.execute(text("ALTER TABLE sikayet ADD COLUMN reviewed_at DATETIME"))
+
+    if "admin_audit_log" in inspector.get_table_names():
+        audit_cols = {c["name"] for c in inspector.get_columns("admin_audit_log")}
+        with db.engine.begin() as conn:
+            if "target_user_id" not in audit_cols:
+                conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN target_user_id INTEGER"))
+            if "reason" not in audit_cols:
+                conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN reason TEXT"))
+            if "old_value" not in audit_cols:
+                conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN old_value TEXT"))
+            if "new_value" not in audit_cols:
+                conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN new_value TEXT"))
+            if "user_agent" not in audit_cols:
+                conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN user_agent VARCHAR(500)"))

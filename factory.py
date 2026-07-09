@@ -218,9 +218,21 @@ def create_app(config_overrides=None):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
+    @app.before_request
+    def _expire_temporary_bans():
+        if _skip_startup_hooks():
+            return
+        try:
+            from services.user_moderation import expire_temporary_bans
+
+            expire_temporary_bans()
+        except Exception:
+            pass
+
     from blueprints.gamification import gamification_bp
     from blueprints.kurum import kurum_bp
     from blueprints.admin import admin_bp
+    from blueprints.admin_reports import admin_reports_bp
     from blueprints.api import api_bp
     from blueprints.atik import atik_bp
     from blueprints.auth import auth_bp
@@ -241,6 +253,7 @@ def create_app(config_overrides=None):
     app.register_blueprint(kurum_bp)
     app.register_blueprint(gamification_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(admin_reports_bp)
 
     apply_force_https_exemptions(app)
 

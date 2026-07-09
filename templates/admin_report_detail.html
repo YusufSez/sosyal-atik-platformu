@@ -1,0 +1,216 @@
+{% extends "layout.html" %}
+{% from "_admin_user_moderation_card.html" import user_moderation_card %}
+{% block content %}
+
+<div class="content-section">
+    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h3><i class="bi bi-flag-fill"></i> Şikayet Detayı #{{ sikayet.id }}</h3>
+            <small class="text-muted">{{ turu_label }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_reports.admin_reports_list') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Listeye Dön
+            </a>
+            <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-outline-dark">Loglar</a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Şikayet Bilgisi</div>
+        <div class="card-body row g-2">
+            <div class="col-md-4"><strong>ID:</strong> #{{ sikayet.id }}</div>
+            <div class="col-md-4"><strong>Oluşturulma:</strong> {{ sikayet.timestamp|format_dt }}</div>
+            <div class="col-md-4">
+                <strong>Durum:</strong>
+                <span class="badge bg-{{ durum_badge_class(sikayet.durum) }}">{{ normalize_durum(sikayet.durum) }}</span>
+            </div>
+            <div class="col-md-4">
+                <strong>İncelendi mi:</strong>
+                {{ 'Evet' if incelendi_mi else 'Hayır' }}
+            </div>
+            <div class="col-md-4">
+                <strong>İnceleyen:</strong>
+                {{ sikayet.reviewer.username if sikayet.reviewer else '-' }}
+            </div>
+            <div class="col-md-4">
+                <strong>İnceleme tarihi:</strong>
+                {{ sikayet.reviewed_at|format_dt if sikayet.reviewed_at else '-' }}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            {{ user_moderation_card(sikayet.user, reporter_stats, 'reporter-user', 'Şikayet Eden Kullanıcı', current_user.id) }}
+        </div>
+        <div class="col-lg-6">
+            {{ user_moderation_card(sikayet.reported_user, reported_stats, 'reported-user', 'Şikayet Edilen Kullanıcı', current_user.id) }}
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Şikayet Nedeni</div>
+        <div class="card-body">
+            <p class="mb-2"><strong>{{ turu_label }}</strong></p>
+            {% if aciklama %}
+            <p class="mb-0"><strong>Açıklama:</strong> {{ aciklama|display_text }}</p>
+            {% else %}
+            <p class="mb-0 text-muted">Ek açıklama yok.</p>
+            {% endif %}
+            <hr>
+            <p class="mb-0 small text-muted">{{ sikayet.sebep|display_text }}</p>
+        </div>
+    </div>
+
+    {% if sikayet.mesaj %}
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Şikayet Edilen Mesaj</div>
+        <div class="card-body">
+            <p><strong>Mesaj ID:</strong> #{{ sikayet.mesaj.id }}</p>
+            <p><strong>Tarih:</strong> {{ sikayet.mesaj.timestamp|format_dt }}</p>
+            <p><strong>Gönderen:</strong> {{ sikayet.mesaj.sender.username if sikayet.mesaj.sender else '-' }}</p>
+            <p><strong>Alıcı:</strong> {{ sikayet.mesaj.receiver.username if sikayet.mesaj.receiver else '-' }}</p>
+            <div class="border rounded p-3 bg-light">{{ sikayet.mesaj.content|display_text }}</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Mesajın Bulunduğu Konuşma</div>
+        <div class="card-body">
+            {% for m in conversation %}
+            <div class="mb-2 p-2 rounded {% if m.id == highlight_mesaj_id %}bg-danger-subtle border border-danger{% else %}bg-light{% endif %}">
+                <strong>{{ m.sender.username if m.sender else '?' }}:</strong>
+                <span>{{ m.content|display_text }}</span>
+                <small class="text-muted d-block">{{ m.timestamp|format_dt }}</small>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Konuşma bulunamadı.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">Moderasyon Aksiyonları</div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                {% if not incelendi_mi %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_mark_reviewed', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-success">İncelendi olarak işaretle</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_unmark_reviewed', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-secondary">İncelemeyi geri al</button>
+                </form>
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_reports.admin_report_change_status', id=sikayet.id) }}" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="col-md-4">
+                    <label class="form-label small">Durum değiştir</label>
+                    <select name="durum" class="form-select form-select-sm">
+                        {% for d in durumlar %}
+                        <option value="{{ d }}" {% if normalize_durum(sikayet.durum) == d %}selected{% endif %}>{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm btn-primary">Kaydet</button>
+                </div>
+            </form>
+
+            {% if super_admin and sikayet.reported_user %}
+            <hr>
+            <p class="small text-muted mb-2">Superadmin işlemleri (şikayet edilen kullanıcı)</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% if not sikayet.reported_user.is_banned %}
+                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#banModal">
+                    Kullanıcıyı Banla
+                </button>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_unban_user', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-success">Banı Kaldır</button>
+                </form>
+                {% endif %}
+
+                {% set reported_role = sikayet.reported_user.role if sikayet.reported_user.role else ('admin' if sikayet.reported_user.is_admin else 'user') %}
+                {% if reported_role != 'superadmin' and sikayet.reported_user.id != current_user.id %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_toggle_admin', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-primary">
+                        {% if reported_role == 'admin' %}Adminliği Kaldır{% else %}Admin Yap{% endif %}
+                    </button>
+                </form>
+
+                {% if sikayet.reported_user.is_deactivated %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_activate_user', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-info">Aktifleştir</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_deactivate_user', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-warning" onclick="return confirm('Kullanıcı pasifleştirilsin mi?');">
+                        Kullanıcıyı Pasifleştir
+                    </button>
+                </form>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('admin_reports.admin_report_soft_delete_user', id=sikayet.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="ban_reason" value="Silindi">
+                    <button class="btn btn-sm btn-outline-dark" onclick="return confirm('Soft delete uygulansın mı?');">
+                        Kullanıcıyı Soft Delete
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if super_admin and sikayet.reported_user and not sikayet.reported_user.is_banned %}
+<div class="modal fade" id="banModal" tabindex="-1" aria-labelledby="banModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin_reports.admin_report_ban_user', id=sikayet.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="banModalLabel">Kullanıcıyı Banla — {{ sikayet.reported_user.username }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Sebep</label>
+                        <textarea name="ban_reason" class="form-control" rows="3" required maxlength="500"
+                                  placeholder="Ban sebebini yazın..."></textarea>
+                    </div>
+                    <div class="mb-2 fw-medium">Süre</div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="ban_duration" id="ban_perm" value="permanent" checked>
+                        <label class="form-check-label" for="ban_perm">Süresiz</label>
+                    </div>
+                    {% for key, days in ban_durations.items() if days %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="ban_duration" id="ban_{{ key }}" value="{{ key }}">
+                        <label class="form-check-label" for="ban_{{ key }}">{{ days }} gün</label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-danger">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
