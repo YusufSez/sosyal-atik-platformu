@@ -6,28 +6,92 @@
   var currentUserId = parseInt(mesajKutusu.dataset.currentUserId, 10);
   var kaynakId = parseInt(mesajKutusu.dataset.kaynakId, 10);
   var atikId = parseInt(mesajKutusu.dataset.atikId, 10);
-  var conversationId = aliciId + "-" + kaynakId + "-" + atikId;
+  var conversationId =
+    mesajKutusu.dataset.conversationId || aliciId + "-" + kaynakId + "-" + atikId;
+  var canonicalId = mesajKutusu.dataset.canonicalId || "";
   var mesajForm = document.getElementById("mesajForm");
   var mesajInput = document.getElementById("mesajInput");
   var typingIndicator = document.getElementById("typingIndicator");
+  var yeniMesajBtn = document.getElementById("yeniMesajBtn");
+  var partnerPresence = document.getElementById("partnerPresence");
   var renderedIds = {};
   var typingDebounce = null;
   var stopTypingTimer = null;
+  var typingHideTimer = null;
+  var lastMessageId = 0;
+  var pendingNewCount = 0;
   var socket = null;
 
   function getSocket() {
     if (socket) return socket;
     if (typeof window.getMessageSocket === "function") {
       socket = window.getMessageSocket();
-    } else if (typeof io !== "undefined") {
-      socket = io({ withCredentials: true });
-      socket.emit("join");
     }
     return socket;
   }
 
+  function isNearBottom() {
+    return mesajKutusu.scrollHeight - mesajKutusu.scrollTop - mesajKutusu.clientHeight < 80;
+  }
+
+  function scrollToBottom() {
+    mesajKutusu.scrollTop = mesajKutusu.scrollHeight;
+    pendingNewCount = 0;
+    if (yeniMesajBtn) yeniMesajBtn.classList.add("d-none");
+  }
+
+  function showNewMessageButton() {
+    pendingNewCount += 1;
+    if (!yeniMesajBtn) return;
+    yeniMesajBtn.textContent = pendingNewCount > 1 ? "Yeni mesaj (" + pendingNewCount + ")" : "Yeni mesaj";
+    yeniMesajBtn.classList.remove("d-none");
+  }
+
   function matchesConversation(msg) {
+    if (!msg) return false;
+    if (msg.canonical_conversation_id && canonicalId) {
+      return msg.canonical_conversation_id === canonicalId;
+    }
     return msg.conversation_id === conversationId;
+  }
+
+  function joinConversationRoom() {
+    var sock = getSocket();
+    if (!sock) return;
+    sock.emit(
+      "join_conversation",
+      { partner_id: aliciId, kaynak_id: kaynakId, atik_id: atikId },
+      function (res) {
+        if (res && res.canonical_conversation_id) {
+          canonicalId = res.canonical_conversation_id;
+          mesajKutusu.dataset.canonicalId = canonicalId;
+        }
+        if (res && res.partner) {
+          updatePartnerPresence(res.partner);
+        }
+      }
+    );
+  }
+
+  function syncAfterReconnect() {
+    var sock = getSocket();
+    if (!sock || !lastMessageId) return;
+    sock.emit(
+      "sync_state",
+      {
+        partner_id: aliciId,
+        kaynak_id: kaynakId,
+        atik_id: atikId,
+        after_message_id: lastMessageId,
+      },
+      function (res) {
+        if (!res || !res.messages) return;
+        res.messages.forEach(function (msg) {
+          insertMessage(msg, false);
+        });
+        if (isNearBottom()) scrollToBottom();
+      }
+    );
   }
 
   function markMessagesRead(messageIds) {
@@ -62,19 +126,33 @@
       });
   }
 
-  function appendReadReceipt(meta) {
-    if (meta.querySelector(".read-receipt")) return;
-    var receipt = document.createElement("span");
-    receipt.className = "read-receipt text-success ms-2";
-    receipt.textContent = "Görüldü";
-    meta.appendChild(receipt);
+  function receiptMarkup(msg) {
+    if (msg.sender_id !== currentUserId) return "";
+    if (msg.is_read) {
+      return '<span class="read-receipt text-primary ms-2" title="' +
+        (msg.read_at_local || "Okundu") + '">✓✓</span>';
+    }
+    return '<span class="read-receipt text-muted ms-2" title="Gönderildi">✓</span>';
+  }
+
+  function updateReadReceipts(messageIds) {
+    (messageIds || []).forEach(function (id) {
+      var node = mesajKutusu.querySelector('[data-message-id="' + id + '"]');
+      if (!node) return;
+      var meta = node.querySelector(".message-meta");
+      if (!meta) return;
+      var old = meta.querySelector(".read-receipt");
+      if (old) old.remove();
+      meta.insertAdjacentHTML("beforeend", '<span class="read-receipt text-primary ms-2" title="Okundu">✓✓</span>');
+    });
   }
 
   function buildMessageNode(msg) {
+    var id = msg.message_id || msg.id;
     var div = document.createElement("div");
     div.className =
       "mb-3 chat-bubble-wrap " + (msg.sender_id === currentUserId ? "text-end" : "text-start");
-    div.dataset.messageId = msg.message_id || msg.id;
+    div.dataset.messageId = id;
 
     var header = document.createElement("div");
     header.className =
@@ -88,15 +166,12 @@
     p.textContent = msg.message || msg.content;
 
     var meta = document.createElement("div");
-    meta.className = "small text-muted mt-1";
+    meta.className = "small text-muted mt-1 message-meta";
 
     var time = document.createElement("span");
     time.textContent = msg.created_at_local || msg.timestamp;
     meta.appendChild(time);
-
-    if (msg.sender_id === currentUserId && msg.is_read) {
-      appendReadReceipt(meta);
-    }
+    meta.insertAdjacentHTML("beforeend", receiptMarkup(msg));
 
     if (msg.sender_id !== currentUserId) {
       var reportBtn = document.createElement("button");
@@ -104,7 +179,7 @@
       reportBtn.className = "btn btn-link btn-sm text-danger p-0 ms-2 align-baseline";
       reportBtn.textContent = "Şikayet Et";
       reportBtn.addEventListener("click", function () {
-        mesajSikayet(msg.message_id || msg.id);
+        mesajSikayet(id);
       });
       meta.appendChild(reportBtn);
     }
@@ -116,14 +191,31 @@
     return div;
   }
 
-  function appendMessage(msg, scroll) {
+  function insertMessage(msg, autoScroll) {
     var id = msg.message_id || msg.id;
-    if (id && renderedIds[id]) return;
-    if (id) renderedIds[id] = true;
-    mesajKutusu.appendChild(buildMessageNode(msg));
-    if (scroll !== false) {
-      mesajKutusu.scrollTop = mesajKutusu.scrollHeight;
+    if (!id || renderedIds[id]) return false;
+    renderedIds[id] = true;
+    if (id > lastMessageId) lastMessageId = id;
+
+    var node = buildMessageNode(msg);
+    var children = mesajKutusu.querySelectorAll("[data-message-id]");
+    var inserted = false;
+    for (var i = 0; i < children.length; i++) {
+      var existingId = parseInt(children[i].dataset.messageId, 10);
+      if (id < existingId) {
+        mesajKutusu.insertBefore(node, children[i]);
+        inserted = true;
+        break;
+      }
     }
+    if (!inserted) mesajKutusu.appendChild(node);
+
+    if (autoScroll !== false && isNearBottom()) {
+      scrollToBottom();
+    } else if (autoScroll !== false && msg.sender_id !== currentUserId) {
+      showNewMessageButton();
+    }
+    return true;
   }
 
   function fetchMessages() {
@@ -136,8 +228,9 @@
       .then(function (data) {
         mesajKutusu.innerHTML = "";
         renderedIds = {};
+        lastMessageId = 0;
         data.forEach(function (msg) {
-          appendMessage(
+          insertMessage(
             {
               id: msg.id,
               sender_id: msg.sender_id,
@@ -145,89 +238,172 @@
               content: msg.content,
               timestamp: msg.timestamp,
               is_read: msg.is_read,
+              read_at_local: msg.read_at_local,
             },
             false
           );
         });
-        mesajKutusu.scrollTop = mesajKutusu.scrollHeight;
+        scrollToBottom();
       });
   }
 
-  function emitTyping() {
+  function emitTypingStart() {
     var sock = getSocket();
     if (!sock) return;
-    sock.emit("typing", {
-      receiver_id: aliciId,
-      conversation_id: conversationId,
+    sock.emit("typing_start", {
+      partner_id: aliciId,
+      kaynak_id: kaynakId,
+      atik_id: atikId,
     });
   }
 
-  function emitStopTyping() {
+  function emitTypingStop() {
     var sock = getSocket();
     if (!sock) return;
-    sock.emit("stop_typing", {
-      receiver_id: aliciId,
-      conversation_id: conversationId,
+    sock.emit("typing_stop", {
+      partner_id: aliciId,
+      kaynak_id: kaynakId,
+      atik_id: atikId,
     });
+  }
+
+  function hideTypingIndicator() {
+    if (typingIndicator) typingIndicator.classList.add("d-none");
+  }
+
+  function showTypingIndicator(name) {
+    if (!typingIndicator) return;
+    typingIndicator.textContent = (name || "Kullanıcı") + " yazıyor...";
+    typingIndicator.classList.remove("d-none");
+    clearTimeout(typingHideTimer);
+    typingHideTimer = setTimeout(hideTypingIndicator, 2000);
+  }
+
+  function updatePartnerPresence(data) {
+    if (!partnerPresence || !data) return;
+    if (data.is_online) {
+      partnerPresence.innerHTML = '<span class="text-success"><span class="presence-dot"></span> Çevrimiçi</span>';
+      return;
+    }
+    if (data.last_seen_local) {
+      partnerPresence.innerHTML =
+        '<span class="text-muted">Son görülme: ' + data.last_seen_local + "</span>";
+      return;
+    }
+    partnerPresence.innerHTML = '<span class="text-muted">Çevrimdışı</span>';
   }
 
   function setupSocketHandlers() {
     var sock = getSocket();
     if (!sock) return;
 
-    sock.on("new_message", function (msg) {
-      if (!matchesConversation(msg)) return;
-      appendMessage(msg);
-      if (msg.receiver_id === currentUserId) {
-        markMessagesRead([msg.message_id]);
-      }
-    });
-
-    sock.on("message_sent", function (msg) {
-      if (!matchesConversation(msg)) return;
-      appendMessage(msg);
-    });
-
-    sock.on("message_read", function (data) {
-      if (!data || data.conversation_id !== conversationId) return;
-      (data.message_ids || []).forEach(function (id) {
-        var node = mesajKutusu.querySelector('[data-message-id="' + id + '"]');
-        if (!node) return;
-        var meta = node.querySelector(".small.text-muted");
-        if (meta) appendReadReceipt(meta);
+    if (!sock._mesajlarHandlersBound) {
+      sock.on("connect", function () {
+        joinConversationRoom();
+        syncAfterReconnect();
       });
-    });
 
-    sock.on("typing", function (data) {
-      if (!data || data.conversation_id !== conversationId) return;
-      if (data.sender_id !== aliciId) return;
-      if (typingIndicator) {
-        typingIndicator.textContent = (data.sender_name || "Kullanıcı") + " yazıyor...";
-        typingIndicator.classList.remove("d-none");
-      }
-    });
+      sock.on("reconnect", function () {
+        joinConversationRoom();
+        syncAfterReconnect();
+      });
 
-    sock.on("stop_typing", function (data) {
-      if (!data || data.conversation_id !== conversationId) return;
-      if (data.sender_id !== aliciId) return;
-      if (typingIndicator) typingIndicator.classList.add("d-none");
-    });
+      sock.on("new_message", onNewMessage);
+      sock.on("message_sent", onMessageSent);
+      sock.on("message_read", onMessageRead);
+      sock.on("typing_start", onTypingStart);
+      sock.on("typing_stop", onTypingStop);
+      sock.on("friend_online", onFriendOnline);
+      sock.on("friend_offline", onFriendOffline);
+
+      sock._mesajlarHandlersBound = true;
+    }
   }
 
+  function onNewMessage(msg) {
+    if (!matchesConversation(msg)) return;
+    insertMessage(msg);
+    if (msg.receiver_id === currentUserId) {
+      markMessagesRead([msg.message_id]);
+    }
+  }
+
+  function onMessageSent(msg) {
+    if (!matchesConversation(msg)) return;
+    insertMessage(msg);
+  }
+
+  function onMessageRead(data) {
+    if (!data) return;
+    if (
+      data.conversation_id !== conversationId &&
+      data.canonical_conversation_id !== canonicalId
+    ) {
+      return;
+    }
+    updateReadReceipts(data.message_ids);
+  }
+
+  function onTypingStart(data) {
+    if (!data) return;
+    if (
+      data.conversation_id !== conversationId &&
+      data.canonical_conversation_id !== canonicalId
+    ) {
+      return;
+    }
+    if (data.sender_id !== aliciId) return;
+    showTypingIndicator(data.sender_name);
+  }
+
+  function onTypingStop(data) {
+    if (!data) return;
+    if (
+      data.conversation_id !== conversationId &&
+      data.canonical_conversation_id !== canonicalId
+    ) {
+      return;
+    }
+    if (data.sender_id !== aliciId) return;
+    hideTypingIndicator();
+  }
+
+  function onFriendOnline(data) {
+    if (!data || data.user_id !== aliciId) return;
+    updatePartnerPresence(data);
+  }
+
+  function onFriendOffline(data) {
+    if (!data || data.user_id !== aliciId) return;
+    updatePartnerPresence(data);
+  }
+
+  if (yeniMesajBtn) {
+    yeniMesajBtn.addEventListener("click", scrollToBottom);
+  }
+
+  mesajKutusu.addEventListener("scroll", function () {
+    if (isNearBottom()) {
+      pendingNewCount = 0;
+      if (yeniMesajBtn) yeniMesajBtn.classList.add("d-none");
+    }
+  });
+
   fetchMessages();
+  joinConversationRoom();
   setupSocketHandlers();
 
   if (mesajInput) {
     mesajInput.addEventListener("input", function () {
       clearTimeout(typingDebounce);
+      if (!mesajInput.value.trim()) {
+        emitTypingStop();
+        return;
+      }
       typingDebounce = setTimeout(function () {
-        if (mesajInput.value.trim()) {
-          emitTyping();
-          clearTimeout(stopTypingTimer);
-          stopTypingTimer = setTimeout(emitStopTyping, 3000);
-        } else {
-          emitStopTyping();
-        }
+        emitTypingStart();
+        clearTimeout(stopTypingTimer);
+        stopTypingTimer = setTimeout(emitTypingStop, 2000);
       }, 500);
     });
   }
@@ -241,7 +417,7 @@
     var content = mesajInput.value.trim();
     if (!content) return;
 
-    emitStopTyping();
+    emitTypingStop();
 
     var submitBtn = mesajForm.querySelector('button[type="submit"]');
     var originalText = submitBtn ? submitBtn.innerHTML : "";
@@ -272,7 +448,7 @@
         }
         mesajInput.value = "";
         if (result.data.message) {
-          appendMessage(result.data.message);
+          insertMessage(result.data.message);
         }
       })
       .catch(function (error) {

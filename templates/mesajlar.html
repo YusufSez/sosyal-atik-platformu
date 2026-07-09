@@ -5,6 +5,17 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
             <h3 class="mb-1">💬 {{ alici.username }} ile Mesajlaşma</h3>
+            <p class="small mb-0" id="partnerPresence"
+               data-partner-id="{{ alici.id }}"
+               data-canonical-id="{{ canonical_conversation_id }}">
+                {% if partner_presence.is_online %}
+                <span class="text-success"><span class="presence-dot"></span> Çevrimiçi</span>
+                {% elif partner_presence.last_seen_local %}
+                <span class="text-muted">Son görülme: {{ partner_presence.last_seen_local }}</span>
+                {% else %}
+                <span class="text-muted">Çevrimdışı</span>
+                {% endif %}
+            </p>
             {% if urun %}
             <p class="text-muted small mb-0">
                 Konu: <strong>{{ urun.baslik }}</strong>
@@ -25,8 +36,14 @@
                  data-alici-id="{{ alici.id }}"
                  data-current-user-id="{{ current_user.id }}"
                  data-kaynak-id="{{ kaynak_id }}"
-                 data-atik-id="{{ atik_id }}">
+                 data-atik-id="{{ atik_id }}"
+                 data-conversation-id="{{ conversation_id }}"
+                 data-canonical-id="{{ canonical_conversation_id }}">
             </div>
+
+            <button type="button" id="yeniMesajBtn" class="btn btn-sm btn-primary d-none mb-2">
+                Yeni mesaj
+            </button>
 
             <div id="typingIndicator" class="small text-muted mb-2 d-none">Yazıyor...</div>
 

@@ -19,3 +19,11 @@ def bildirim_olustur(user_id, baslik, icerik, tur, link=None):
     user = db.session.get(User, user_id)
     if user and user.email:
         eposta_gonder(user.email, baslik, icerik)
+
+    try:
+        from socket_events import emit_notification_sync, emit_unread_count_updated
+
+        emit_unread_count_updated(user_id)
+        emit_notification_sync(user_id)
+    except Exception:
+        pass

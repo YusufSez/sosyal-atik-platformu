@@ -234,6 +234,7 @@ def cikis():
 def profil():
     from services.gamification import kullanici_rozet_listesi, kullanici_siralama, seviye_hesapla
     from services.impact import kullanici_ozeti
+    from socket_events import is_user_online, presence_payload
 
     rozetler = kullanici_rozet_listesi(current_user)
     kazanilan = sum(1 for r in rozetler if r["kazanildi"])
@@ -245,6 +246,8 @@ def profil():
         siralama=kullanici_siralama(current_user.id),
         rozet_sayisi=kazanilan,
         rozet_toplam=len(rozetler),
+        presence=presence_payload(current_user, current_user.id),
+        is_online=is_user_online(current_user.id),
     )
 
 

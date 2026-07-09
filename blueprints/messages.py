@@ -1,5 +1,6 @@
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from constants import RATE_MESSAGE
 from decorators import email_verified_required
@@ -7,8 +8,15 @@ from extensions import db, limiter, rate_limit_user_or_ip
 from models import Atik, Kaynak, Mesaj, User
 from services.content_filter import mesaj_uygun_mu
 from services.notifications import bildirim_olustur
-from socket_events import emit_after_message_created, emit_messages_marked_read, serialize_message
-from utils import format_datetime, sanitize_input
+from socket_events import (
+    canonical_conversation_id,
+    emit_after_message_created,
+    emit_messages_marked_read,
+    is_user_online,
+    presence_payload,
+    serialize_message,
+)
+from utils import format_datetime, sanitize_input, utc_now
 
 messages_bp = Blueprint("messages", __name__)
 
@@ -76,7 +84,7 @@ def mesajlar(user_id, kaynak_id, atik_id):
         | ((Mesaj.sender_id == alici.id) & (Mesaj.receiver_id == current_user.id)),
         Mesaj.kaynak_id == (kaynak_id if kaynak_id != 0 else None),
         Mesaj.atik_id == (atik_id if atik_id != 0 else None),
-    ).order_by(Mesaj.timestamp.asc()).all()
+    ).options(joinedload(Mesaj.sender)).order_by(Mesaj.timestamp.asc()).all()
 
     return render_template(
         "mesajlar.html",
@@ -85,6 +93,11 @@ def mesajlar(user_id, kaynak_id, atik_id):
         kaynak_id=kaynak_id,
         atik_id=atik_id,
         urun=urun,
+        conversation_id=f"{alici.id}-{kaynak_id}-{atik_id}",
+        canonical_conversation_id=canonical_conversation_id(
+            current_user.id, alici.id, kaynak_id, atik_id
+        ),
+        partner_presence=presence_payload(alici, alici.id),
     )
 
 
@@ -96,7 +109,7 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
         | ((Mesaj.sender_id == alici_id) & (Mesaj.receiver_id == current_user.id)),
         Mesaj.kaynak_id == (kaynak_id if kaynak_id != 0 else None),
         Mesaj.atik_id == (atik_id if atik_id != 0 else None),
-    ).order_by(Mesaj.timestamp.asc()).all()
+    ).options(joinedload(Mesaj.sender)).order_by(Mesaj.timestamp.asc()).all()
 
     okunmamis = Mesaj.query.filter_by(
         sender_id=alici_id,
@@ -105,8 +118,10 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
         atik_id=(atik_id if atik_id != 0 else None),
         is_read=False,
     ).all()
+    now = utc_now()
     for m in okunmamis:
         m.is_read = True
+        m.read_at = now
     if okunmamis:
         db.session.commit()
         emit_messages_marked_read(okunmamis, current_user.id)
@@ -117,6 +132,8 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
         "sender_id": m.sender_id,
         "sender_username": m.sender.username,
         "is_read": m.is_read,
+        "read_at": m.read_at.isoformat() if m.read_at else None,
+        "read_at_local": format_datetime(m.read_at) if m.read_at else None,
         "timestamp": format_datetime(m.timestamp, "%d.%m.%Y %H:%M"),
     } for m in mesajlar_list])
 
@@ -126,7 +143,9 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
 def mesajlarim():
     mesajlar_list = Mesaj.query.filter(
         (Mesaj.sender_id == current_user.id) | (Mesaj.receiver_id == current_user.id)
-    ).order_by(Mesaj.timestamp.desc()).all()
+    ).options(joinedload(Mesaj.sender), joinedload(Mesaj.receiver)).order_by(
+        Mesaj.timestamp.desc()
+    ).all()
 
     sohbetler = {}
     for m in mesajlar_list:

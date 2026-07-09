@@ -3,15 +3,61 @@
 
   var socket = null;
   var lastNotificationUnread = null;
+  var joinedConversations = [];
 
   function getSocket() {
     if (!socket && typeof io !== "undefined") {
-      socket = io({ withCredentials: true });
-      socket.emit("join");
+      socket = io({
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      });
+
+      socket.on("connect", function () {
+        socket.emit("join");
+        rejoinConversations();
+      });
+
+      socket.on("reconnect", function () {
+        socket.emit("join");
+        rejoinConversations();
+        if (typeof window.bildirimleriGetir === "function") {
+          window.bildirimleriGetir();
+        }
+      });
+
       socket.on("unread_count_updated", handleUnreadCountUpdated);
+      socket.on("notification_sync", handleNotificationSync);
       socket.on("conversation_updated", handleConversationUpdated);
     }
     return socket;
+  }
+
+  function rejoinConversations() {
+    if (!socket) return;
+    joinedConversations.forEach(function (conv) {
+      socket.emit("join_conversation", conv);
+    });
+  }
+
+  function registerConversation(partnerId, kaynakId, atikId) {
+    var payload = {
+      partner_id: partnerId,
+      kaynak_id: kaynakId || 0,
+      atik_id: atikId || 0,
+    };
+    var key = payload.partner_id + "-" + payload.kaynak_id + "-" + payload.atik_id;
+    if (joinedConversations.some(function (c) {
+      return c.partner_id + "-" + c.kaynak_id + "-" + c.atik_id === key;
+    })) {
+      return;
+    }
+    joinedConversations.push(payload);
+    if (socket && socket.connected) {
+      socket.emit("join_conversation", payload);
+    }
   }
 
   function updateMessageBadge(count) {
@@ -51,6 +97,15 @@
       lastNotificationUnread = data.notification_unread;
       updateNotificationBadge(data.notification_unread);
     }
+  }
+
+  function handleNotificationSync(data) {
+    if (!data) return;
+    if (typeof data.notification_unread === "number") {
+      lastNotificationUnread = data.notification_unread;
+      updateNotificationBadge(data.notification_unread);
+    }
+    bildirimleriGetir();
   }
 
   function handleConversationUpdated(data) {
@@ -250,6 +305,7 @@
   }
 
   window.getMessageSocket = getSocket;
+  window.registerConversation = registerConversation;
   window.bildirimleriGetir = bildirimleriGetir;
   window.updateMessageBadge = updateMessageBadge;
   window.handleConversationUpdated = handleConversationUpdated;

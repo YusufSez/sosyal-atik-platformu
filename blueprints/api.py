@@ -9,6 +9,7 @@ from extensions import db, limiter
 from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
 from services.user_moderation import resolve_reported_user_id
 from services.notifications import bildirim_olustur
+from socket_events import emit_notification_sync, emit_unread_count_updated
 from utils import format_datetime, mesafe_hesapla, sanitize_input
 
 api_bp = Blueprint("api", __name__)
@@ -221,6 +222,7 @@ def bildirim_okundu_isaretle(id):
     if bildirim:
         bildirim.okundu = True
         db.session.commit()
+        emit_notification_sync(current_user.id)
         return jsonify({"success": True})
     return jsonify({"error": "Bulunamadı"}), 404
 
@@ -230,6 +232,7 @@ def bildirim_okundu_isaretle(id):
 def bildirimleri_okundu_isaretle():
     Bildirim.query.filter_by(user_id=current_user.id, okundu=False).update({"okundu": True})
     db.session.commit()
+    emit_notification_sync(current_user.id)
     return jsonify({"success": True})
 
 

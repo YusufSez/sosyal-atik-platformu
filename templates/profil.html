@@ -40,6 +40,16 @@
             <li class="list-group-item"><strong>İl:</strong> {{ user.il or "-" }}</li>
             <li class="list-group-item"><strong>İlçe:</strong> {{ user.ilce or "-" }}</li>
             <li class="list-group-item"><strong>Telefon:</strong> {{ user.telefon or "-" }}</li>
+            <li class="list-group-item">
+                <strong>Durum:</strong>
+                {% if is_online %}
+                <span class="text-success"><span class="presence-dot"></span> Çevrimiçi</span>
+                {% elif presence.last_seen_local %}
+                <span class="text-muted">Son görülme: {{ presence.last_seen_local }}</span>
+                {% else %}
+                <span class="text-muted">Çevrimdışı</span>
+                {% endif %}
+            </li>
         </ul>
 
         <div class="d-flex flex-wrap gap-2 justify-content-between">

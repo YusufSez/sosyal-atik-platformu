@@ -8,6 +8,8 @@ from auth_utils import hash_password
 from extensions import db, socketio
 from models import Mesaj, User
 from socket_events import (
+    canonical_conversation_id,
+    conversation_room,
     emit_after_message_created,
     emit_messages_marked_read,
     is_user_online,
@@ -28,8 +30,10 @@ def reset_socket_connection_counts():
     import socket_events
 
     socket_events._connection_counts.clear()
+    socket_events._rate_buckets.clear()
     yield
     socket_events._connection_counts.clear()
+    socket_events._rate_buckets.clear()
 
 
 def _event_names(events):
@@ -87,7 +91,7 @@ def _socket_client(app, flask_client):
     return client
 
 
-def test_new_message_only_receiver_gets_event(app):
+def test_new_message_emitted_to_conversation_room(app):
     with app.app_context():
         sender = User(
             username="sock_sender_live",
@@ -107,37 +111,33 @@ def test_new_message_only_receiver_gets_event(app):
         db.session.commit()
         sender_id = sender.id
         receiver_id = receiver.id
+        mesaj = Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="Canlı test")
+        db.session.add(mesaj)
+        db.session.commit()
+        mesaj = db.session.get(Mesaj, mesaj.id)
+        canon = canonical_conversation_id(sender_id, receiver_id, 0, 0)
 
-    receiver_client = app.test_client()
-    _login(receiver_client, "sock_receiver_live@test.com")
-    receiver_socket = _socket_client(app, receiver_client)
+        with patch("socket_events.socketio.emit") as emit_mock:
+            with patch("socket_events.is_user_online", return_value=True):
+                emit_after_message_created(mesaj)
 
-    sender_client = app.test_client()
-    _login(sender_client, "sock_sender_live@test.com")
-
-    response = sender_client.post(
-        "/send_message",
-        json={"alici_id": receiver_id, "content": "Canlı test", "kaynak_id": 0, "atik_id": 0},
-    )
-    assert response.status_code == 200
-
-    receiver_events = receiver_socket.get_received()
-    receiver_names = _event_names(receiver_events)
-
-    assert "new_message" in receiver_names
-
-    new_msg = _event_payload(receiver_events, "new_message")
-    assert new_msg["message"] == "Canlı test"
-    assert "message_id" in new_msg
-    assert "conversation_id" in new_msg
-
-    receiver_socket.disconnect()
+        events = [call.args[0] for call in emit_mock.call_args_list]
+        assert "new_message" in events
+        new_msg_call = next(c for c in emit_mock.call_args_list if c.args[0] == "new_message")
+        assert new_msg_call.args[1]["message"] == "Canlı test"
+        assert new_msg_call.kwargs["room"] == conversation_room(canon)
 
 
 def test_sender_gets_message_sent_confirmation(client, app):
     _, receiver_id, _ = _create_users(app)
     _login(client, "sock_sender@test.com")
     sender_socket = _socket_client(app, client)
+    sender_socket.emit(
+        "join_conversation",
+        {"partner_id": receiver_id, "kaynak_id": 0, "atik_id": 0},
+        callback=True,
+    )
+    sender_socket.get_received()
 
     client.post(
         "/send_message",
@@ -161,17 +161,18 @@ def test_typing_and_stop_typing_unit(app, client):
         with patch("socket_events.socketio.emit") as emit_mock:
             with patch("socket_events.is_user_online", return_value=True):
                 login_user(sender)
-                socket_events.handle_typing(
-                    {"receiver_id": receiver_id, "conversation_id": f"{receiver_id}-0-0"}
+                socket_events.handle_typing_start(
+                    {"partner_id": receiver_id, "kaynak_id": 0, "atik_id": 0}
                 )
-                socket_events.handle_stop_typing(
-                    {"receiver_id": receiver_id, "conversation_id": f"{receiver_id}-0-0"}
+                socket_events.handle_typing_stop(
+                    {"partner_id": receiver_id, "kaynak_id": 0, "atik_id": 0}
                 )
 
         event_names = [call.args[0] for call in emit_mock.call_args_list]
-        assert "typing" in event_names
-        assert "stop_typing" in event_names
-        assert emit_mock.call_args_list[0].kwargs["room"] == user_room(receiver_id)
+        assert "typing_start" in event_names
+        assert "typing_stop" in event_names
+        canon = canonical_conversation_id(sender_id, receiver_id, 0, 0)
+        assert emit_mock.call_args_list[0].kwargs["room"] == conversation_room(canon)
 
 
 def test_read_receipt_unit(app):
@@ -217,6 +218,7 @@ def test_room_isolation_unit(app):
         db.session.add(mesaj)
         db.session.commit()
         mesaj = db.session.get(Mesaj, mesaj.id)
+        canon = canonical_conversation_id(sender_id, receiver_id, 0, 0)
 
         with patch("socket_events.socketio.emit") as emit_mock:
             with patch("socket_events.is_user_online", return_value=True):
@@ -225,11 +227,11 @@ def test_room_isolation_unit(app):
         rooms = [call.kwargs.get("room") for call in emit_mock.call_args_list]
         event_names = [call.args[0] for call in emit_mock.call_args_list]
 
+        assert conversation_room(canon) in rooms
         assert user_room(sender_id) in rooms
         assert user_room(receiver_id) in rooms
         assert "new_message" in event_names
         assert "message_sent" in event_names
-        assert all(room.startswith("user_") for room in rooms if room)
 
 
 def test_unauthorized_room_join_rejected(client, app):

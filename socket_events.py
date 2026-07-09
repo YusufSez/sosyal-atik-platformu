@@ -1,26 +1,127 @@
-"""Flask-SocketIO event handlers — mesajlaşma ve kullanıcı odaları."""
+"""Flask-SocketIO event handlers — mesajlaşma, presence ve conversation odaları."""
 
+import time
 from collections import defaultdict
 
 from flask_login import current_user
 from flask_socketio import join_room, leave_room
 from socketio.exceptions import ConnectionRefusedError
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select, union
 
+from constants import RATE_SOCKET_MESSAGE_PER_SEC, RATE_SOCKET_TYPING_PER_SEC
 from extensions import db, socketio
 from models import Bildirim, Mesaj, User
-from utils import format_datetime
+from utils import format_datetime, utc_now
 
 _connection_counts: defaultdict[int, int] = defaultdict(int)
+_rate_buckets: defaultdict[int, defaultdict[str, list]] = defaultdict(lambda: defaultdict(list))
 
 
 def user_room(user_id: int) -> str:
     return f"user_{user_id}"
 
 
+def canonical_conversation_id(user_a: int, user_b: int, kaynak_id=0, atik_id=0) -> str:
+    low, high = sorted([user_a, user_b])
+    return f"{low}-{high}-{kaynak_id or 0}-{atik_id or 0}"
+
+
+def conversation_room(canonical_id: str) -> str:
+    return f"conversation_{canonical_id}"
+
+
 def conversation_id_for(mesaj: Mesaj, viewer_id: int) -> str:
     other_id = mesaj.receiver_id if mesaj.sender_id == viewer_id else mesaj.sender_id
     return f"{other_id}-{mesaj.kaynak_id or 0}-{mesaj.atik_id or 0}"
+
+
+def parse_conversation_parts(conversation_id: str) -> tuple[int, int, int] | None:
+    parts = str(conversation_id or "").split("-")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[0]), int(parts[1]), int(parts[2])
+    except (TypeError, ValueError):
+        return None
+
+
+def is_user_online(user_id: int) -> bool:
+    return _connection_counts.get(user_id, 0) > 0
+
+
+def get_online_users() -> set[int]:
+    return {uid for uid, count in _connection_counts.items() if count > 0}
+
+
+def _check_rate_limit(user_id: int, event: str, max_per_second: int) -> bool:
+    now = time.time()
+    bucket = _rate_buckets[user_id][event]
+    bucket[:] = [stamp for stamp in bucket if now - stamp < 1]
+    if len(bucket) >= max_per_second:
+        return False
+    bucket.append(now)
+    return True
+
+
+def _join_room_safe(room: str) -> None:
+    try:
+        join_room(room)
+    except (AttributeError, RuntimeError):
+        pass
+
+
+def _leave_room_safe(room: str) -> None:
+    try:
+        leave_room(room)
+    except (AttributeError, RuntimeError):
+        pass
+
+
+def _conversation_filter(user_id: int, partner_id: int, kaynak_id, atik_id):
+    return and_(
+        or_(
+            and_(Mesaj.sender_id == user_id, Mesaj.receiver_id == partner_id),
+            and_(Mesaj.sender_id == partner_id, Mesaj.receiver_id == user_id),
+        ),
+        Mesaj.kaynak_id == kaynak_id,
+        Mesaj.atik_id == atik_id,
+    )
+
+
+def user_can_access_conversation(user_id: int, partner_id: int, kaynak_id: int, atik_id: int) -> bool:
+    if partner_id == user_id:
+        return False
+    if not db.session.get(User, partner_id):
+        return False
+    k_id = kaynak_id if kaynak_id != 0 else None
+    a_id = atik_id if atik_id != 0 else None
+    exists = db.session.query(Mesaj.id).filter(
+        _conversation_filter(user_id, partner_id, k_id, a_id)
+    ).first()
+    return exists is not None
+
+
+def user_can_join_conversation(user_id: int, partner_id: int, kaynak_id: int, atik_id: int) -> bool:
+    if partner_id == user_id:
+        return False
+    return db.session.get(User, partner_id) is not None
+
+
+def get_conversation_partner_ids(user_id: int) -> set[int]:
+    sent = select(Mesaj.receiver_id).where(Mesaj.sender_id == user_id).distinct()
+    recv = select(Mesaj.sender_id).where(Mesaj.receiver_id == user_id).distinct()
+    rows = db.session.execute(union(sent, recv)).fetchall()
+    return {row[0] for row in rows if row[0] != user_id}
+
+
+def presence_payload(user: User | None, user_id: int) -> dict:
+    last_seen = user.last_seen if user else None
+    return {
+        "user_id": user_id,
+        "is_online": is_user_online(user_id),
+        "last_seen": last_seen.isoformat() if last_seen else None,
+        "last_seen_local": format_datetime(last_seen, "%d.%m.%Y %H:%M") if last_seen else None,
+    }
 
 
 def serialize_message(mesaj: Mesaj, for_user_id: int) -> dict:
@@ -34,7 +135,15 @@ def serialize_message(mesaj: Mesaj, for_user_id: int) -> dict:
         "created_at": mesaj.timestamp.isoformat() if mesaj.timestamp else None,
         "created_at_local": format_datetime(mesaj.timestamp),
         "conversation_id": conversation_id_for(mesaj, for_user_id),
+        "canonical_conversation_id": canonical_conversation_id(
+            mesaj.sender_id,
+            mesaj.receiver_id,
+            mesaj.kaynak_id or 0,
+            mesaj.atik_id or 0,
+        ),
         "is_read": bool(mesaj.is_read),
+        "read_at": mesaj.read_at.isoformat() if mesaj.read_at else None,
+        "read_at_local": format_datetime(mesaj.read_at) if mesaj.read_at else None,
     }
 
 
@@ -54,6 +163,12 @@ def build_conversation_updated(mesaj: Mesaj, for_user_id: int) -> dict:
     other = db.session.get(User, other_id)
     return {
         "conversation_id": conversation_id_for(mesaj, for_user_id),
+        "canonical_conversation_id": canonical_conversation_id(
+            mesaj.sender_id,
+            mesaj.receiver_id,
+            mesaj.kaynak_id or 0,
+            mesaj.atik_id or 0,
+        ),
         "partner_id": other_id,
         "partner_name": other.username if other else "",
         "last_message": mesaj.content,
@@ -73,15 +188,21 @@ def unread_counts_for(user_id: int) -> dict:
     }
 
 
-def is_user_online(user_id: int) -> bool:
-    return _connection_counts.get(user_id, 0) > 0
+def _set_last_seen(user_id: int) -> None:
+    user = db.session.get(User, user_id)
+    if not user:
+        return
+    user.last_seen = utc_now()
+    db.session.commit()
 
 
-def _join_user_room(user_id: int) -> None:
-    try:
-        join_room(user_room(user_id))
-    except (AttributeError, RuntimeError):
-        pass
+def _broadcast_presence(user_id: int, online: bool) -> None:
+    user = db.session.get(User, user_id)
+    payload = presence_payload(user, user_id)
+    event = "friend_online" if online else "friend_offline"
+    for partner_id in get_conversation_partner_ids(user_id):
+        if is_user_online(partner_id):
+            socketio.emit(event, payload, room=user_room(partner_id))
 
 
 def emit_unread_count_updated(user_id: int) -> None:
@@ -90,15 +211,24 @@ def emit_unread_count_updated(user_id: int) -> None:
     socketio.emit("unread_count_updated", unread_counts_for(user_id), room=user_room(user_id))
 
 
+def emit_notification_sync(user_id: int) -> None:
+    if not is_user_online(user_id):
+        return
+    socketio.emit("notification_sync", unread_counts_for(user_id), room=user_room(user_id))
+
+
 def emit_after_message_created(mesaj: Mesaj) -> None:
     sender_id = mesaj.sender_id
     receiver_id = mesaj.receiver_id
-
-    socketio.emit(
-        "message_sent",
-        serialize_message(mesaj, sender_id),
-        room=user_room(sender_id),
+    canon = canonical_conversation_id(
+        sender_id,
+        receiver_id,
+        mesaj.kaynak_id or 0,
+        mesaj.atik_id or 0,
     )
+    conv = conversation_room(canon)
+
+    socketio.emit("message_sent", serialize_message(mesaj, sender_id), room=conv)
     socketio.emit(
         "conversation_updated",
         build_conversation_updated(mesaj, sender_id),
@@ -106,11 +236,7 @@ def emit_after_message_created(mesaj: Mesaj) -> None:
     )
 
     if is_user_online(receiver_id):
-        socketio.emit(
-            "new_message",
-            serialize_message(mesaj, receiver_id),
-            room=user_room(receiver_id),
-        )
+        socketio.emit("new_message", serialize_message(mesaj, receiver_id), room=conv)
         socketio.emit(
             "conversation_updated",
             build_conversation_updated(mesaj, receiver_id),
@@ -123,11 +249,15 @@ def emit_messages_marked_read(messages: list, reader_id: int) -> None:
     if not messages:
         return
 
-    by_sender: dict[int, list[int]] = {}
+    by_sender: dict[int, list[dict]] = defaultdict(list)
     for mesaj in messages:
-        by_sender.setdefault(mesaj.sender_id, []).append(mesaj.id)
+        by_sender[mesaj.sender_id].append({
+            "message_id": mesaj.id,
+            "read_at": mesaj.read_at.isoformat() if mesaj.read_at else None,
+            "read_at_local": format_datetime(mesaj.read_at) if mesaj.read_at else None,
+        })
 
-    for sender_id, message_ids in by_sender.items():
+    for sender_id, items in by_sender.items():
         if not is_user_online(sender_id):
             continue
         sample = next(m for m in messages if m.sender_id == sender_id)
@@ -135,8 +265,15 @@ def emit_messages_marked_read(messages: list, reader_id: int) -> None:
             "message_read",
             {
                 "reader_id": reader_id,
-                "message_ids": message_ids,
+                "message_ids": [item["message_id"] for item in items],
+                "messages": items,
                 "conversation_id": conversation_id_for(sample, sender_id),
+                "canonical_conversation_id": canonical_conversation_id(
+                    sample.sender_id,
+                    sample.receiver_id,
+                    sample.kaynak_id or 0,
+                    sample.atik_id or 0,
+                ),
             },
             room=user_room(sender_id),
         )
@@ -144,36 +281,38 @@ def emit_messages_marked_read(messages: list, reader_id: int) -> None:
     emit_unread_count_updated(reader_id)
 
 
-def _conversation_filter(sender_id: int, receiver_id: int, kaynak_id, atik_id):
-    return and_(
-        or_(
-            and_(Mesaj.sender_id == sender_id, Mesaj.receiver_id == receiver_id),
-            and_(Mesaj.sender_id == receiver_id, Mesaj.receiver_id == sender_id),
-        ),
-        Mesaj.kaynak_id == kaynak_id,
-        Mesaj.atik_id == atik_id,
-    )
+def _register_connection(user_id: int) -> bool:
+    _connection_counts[user_id] += 1
+    return _connection_counts[user_id] == 1
+
+
+def _unregister_connection(user_id: int) -> bool:
+    _connection_counts[user_id] = max(0, _connection_counts[user_id] - 1)
+    if _connection_counts[user_id] == 0:
+        _connection_counts.pop(user_id, None)
+        return True
+    return False
 
 
 @socketio.on("connect")
 def handle_connect():
-    """Yalnızca Flask-Login oturumu olan kullanıcılar bağlanabilir."""
     if not current_user.is_authenticated:
         raise ConnectionRefusedError("Giriş gerekli")
-    _connection_counts[current_user.id] += 1
-    _join_user_room(current_user.id)
+    became_online = _register_connection(current_user.id)
+    _join_room_safe(user_room(current_user.id))
+    if became_online:
+        _broadcast_presence(current_user.id, online=True)
 
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    if current_user.is_authenticated:
-        _connection_counts[current_user.id] = max(0, _connection_counts[current_user.id] - 1)
-        if _connection_counts[current_user.id] == 0:
-            _connection_counts.pop(current_user.id, None)
-        try:
-            leave_room(user_room(current_user.id))
-        except (AttributeError, RuntimeError):
-            pass
+    if not current_user.is_authenticated:
+        return
+    went_offline = _unregister_connection(current_user.id)
+    _leave_room_safe(user_room(current_user.id))
+    if went_offline:
+        _set_last_seen(current_user.id)
+        _broadcast_presence(current_user.id, online=False)
 
 
 @socketio.on("join")
@@ -182,8 +321,12 @@ def handle_join():
         return {"error": "Giriş gerekli"}
     _connection_counts[current_user.id] = max(1, _connection_counts.get(current_user.id, 0))
     room = user_room(current_user.id)
-    _join_user_room(current_user.id)
-    return {"room": room}
+    _join_room_safe(room)
+    return {
+        "room": room,
+        "user_id": current_user.id,
+        "presence": presence_payload(current_user, current_user.id),
+    }
 
 
 @socketio.on("leave")
@@ -191,66 +334,115 @@ def handle_leave():
     if not current_user.is_authenticated:
         return {"error": "Giriş gerekli"}
     room = user_room(current_user.id)
-    try:
-        leave_room(room)
-    except (AttributeError, RuntimeError):
-        pass
+    _leave_room_safe(room)
     return {"left": room}
 
 
-@socketio.on("typing")
-def handle_typing(data):
+@socketio.on("join_conversation")
+def handle_join_conversation(data):
+    if not current_user.is_authenticated:
+        return {"error": "Giriş gerekli"}
+    data = data or {}
+    partner_id = int(data.get("partner_id") or 0)
+    kaynak_id = int(data.get("kaynak_id") or 0)
+    atik_id = int(data.get("atik_id") or 0)
+    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+        return {"error": "Yetkisiz"}
+    canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
+    room = conversation_room(canon)
+    _join_room_safe(room)
+    partner = db.session.get(User, partner_id)
+    return {
+        "room": room,
+        "canonical_conversation_id": canon,
+        "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
+        "partner": presence_payload(partner, partner_id),
+    }
+
+
+@socketio.on("leave_conversation")
+def handle_leave_conversation(data):
+    if not current_user.is_authenticated:
+        return {"error": "Giriş gerekli"}
+    data = data or {}
+    partner_id = int(data.get("partner_id") or 0)
+    kaynak_id = int(data.get("kaynak_id") or 0)
+    atik_id = int(data.get("atik_id") or 0)
+    if partner_id:
+        canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
+        _leave_room_safe(conversation_room(canon))
+    return {"left": True}
+
+
+@socketio.on("typing_start")
+def handle_typing_start(data):
     if not current_user.is_authenticated:
         return
+    if not _check_rate_limit(current_user.id, "typing", RATE_SOCKET_TYPING_PER_SEC):
+        return
     data = data or {}
-    receiver_id = data.get("receiver_id")
-    conversation_id = data.get("conversation_id")
-    if not receiver_id:
+    partner_id = int(data.get("partner_id") or data.get("receiver_id") or 0)
+    kaynak_id = int(data.get("kaynak_id") or 0)
+    atik_id = int(data.get("atik_id") or 0)
+    if not partner_id or partner_id == current_user.id:
         return
-    receiver_id = int(receiver_id)
-    if receiver_id == current_user.id:
+    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
-    if not is_user_online(receiver_id):
-        return
+    canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     socketio.emit(
-        "typing",
+        "typing_start",
         {
             "sender_id": current_user.id,
             "sender_name": current_user.username,
-            "conversation_id": conversation_id,
+            "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
+            "canonical_conversation_id": canon,
         },
-        room=user_room(receiver_id),
+        room=conversation_room(canon),
+        include_self=False,
     )
 
 
-@socketio.on("stop_typing")
-def handle_stop_typing(data):
+@socketio.on("typing_stop")
+def handle_typing_stop(data):
     if not current_user.is_authenticated:
         return
     data = data or {}
-    receiver_id = data.get("receiver_id")
-    conversation_id = data.get("conversation_id")
-    if not receiver_id:
+    partner_id = int(data.get("partner_id") or data.get("receiver_id") or 0)
+    kaynak_id = int(data.get("kaynak_id") or 0)
+    atik_id = int(data.get("atik_id") or 0)
+    if not partner_id or partner_id == current_user.id:
         return
-    receiver_id = int(receiver_id)
-    if receiver_id == current_user.id:
+    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
-    if not is_user_online(receiver_id):
-        return
+    canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     socketio.emit(
-        "stop_typing",
+        "typing_stop",
         {
             "sender_id": current_user.id,
-            "conversation_id": conversation_id,
+            "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
+            "canonical_conversation_id": canon,
         },
-        room=user_room(receiver_id),
+        room=conversation_room(canon),
+        include_self=False,
     )
+
+
+@socketio.on("typing")
+def handle_typing_legacy(data):
+    handle_typing_start(data)
+
+
+@socketio.on("stop_typing")
+def handle_stop_typing_legacy(data):
+    handle_typing_stop(data)
 
 
 @socketio.on("message_read")
 def handle_message_read(data):
     if not current_user.is_authenticated:
         return {"error": "Giriş gerekli"}
+    if not _check_rate_limit(current_user.id, "message_read", RATE_SOCKET_MESSAGE_PER_SEC):
+        return {"error": "Çok fazla istek"}
     data = data or {}
     message_ids = data.get("message_ids") or []
     if not message_ids:
@@ -266,8 +458,37 @@ def handle_message_read(data):
     if not messages:
         return {"updated": 0}
 
+    now = utc_now()
     for mesaj in messages:
         mesaj.is_read = True
+        mesaj.read_at = now
     db.session.commit()
     emit_messages_marked_read(messages, current_user.id)
     return {"updated": len(messages)}
+
+
+@socketio.on("sync_state")
+def handle_sync_state(data):
+    if not current_user.is_authenticated:
+        return {"error": "Giriş gerekli"}
+    data = data or {}
+    partner_id = int(data.get("partner_id") or 0)
+    kaynak_id = int(data.get("kaynak_id") or 0)
+    atik_id = int(data.get("atik_id") or 0)
+    after_id = int(data.get("after_message_id") or 0)
+    if not partner_id:
+        return {"error": "Eksik veri"}
+    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+        return {"error": "Yetkisiz"}
+    k_id = kaynak_id if kaynak_id != 0 else None
+    a_id = atik_id if atik_id != 0 else None
+    query = Mesaj.query.filter(
+        _conversation_filter(current_user.id, partner_id, k_id, a_id),
+    )
+    if after_id:
+        query = query.filter(Mesaj.id > after_id)
+    rows = query.order_by(Mesaj.id.asc()).limit(100).all()
+    return {
+        "messages": [serialize_message(m, current_user.id) for m in rows],
+        "unread": unread_counts_for(current_user.id),
+    }

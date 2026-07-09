@@ -382,6 +382,8 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE user ADD COLUMN is_deactivated BOOLEAN DEFAULT 0"))
             if "last_login_at" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN last_login_at DATETIME"))
+            if "last_seen" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN last_seen DATETIME"))
             if "terms_accepted_at" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN terms_accepted_at DATETIME"))
             if "email_verified" not in user_cols:
