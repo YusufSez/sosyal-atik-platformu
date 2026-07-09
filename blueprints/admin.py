@@ -3,6 +3,7 @@ import os
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED
 from decorators import admin_required, is_super_admin, super_admin_required
 from extensions import db, limiter
 from helpers import ai_tam_analiz
@@ -30,6 +31,10 @@ def admin_panel():
         etki_iller=il_kirilimi(),
         son_kaynaklar=Kaynak.query.order_by(Kaynak.id.desc()).limit(10).all(),
         son_atiklar=Atik.query.order_by(Atik.id.desc()).limit(10).all(),
+        inceleme_kaynaklar=Kaynak.query.filter_by(moderation_status=MODERATION_STATUS_PENDING_REVIEW)
+        .order_by(Kaynak.id.desc()).limit(20).all(),
+        inceleme_atiklar=Atik.query.filter_by(moderation_status=MODERATION_STATUS_PENDING_REVIEW)
+        .order_by(Atik.id.desc()).limit(20).all(),
         kullanicilar=User.query.order_by(User.id.desc()).limit(20).all(),
         sikayetler=Sikayet.query.options(*sikayet_listesi_options()).order_by(Sikayet.id.desc()).limit(20).all(),
         audit_kayitlari=AdminAuditLog.query.options(*audit_listesi_options()).order_by(AdminAuditLog.id.desc()).limit(30).all(),
@@ -159,6 +164,42 @@ def admin_ilan_sil(tur, id):
         flash("Atık ilanı admin tarafından silindi.", "success")
     else:
         abort(400)
+    return redirect(url_for("admin.admin_panel"))
+
+
+@admin_bp.route("/admin/moderasyon_onayla/<tur>/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def admin_moderasyon_onayla(tur, id):
+    if tur == "kaynak":
+        ilan = Kaynak.query.get_or_404(id)
+    elif tur == "atik":
+        ilan = Atik.query.get_or_404(id)
+    else:
+        abort(400)
+
+    ilan.moderation_status = MODERATION_STATUS_APPROVED
+    db.session.commit()
+    log_admin_action("moderasyon_onay", target=f"{tur}:{id}", detail=ilan.baslik)
+    flash("İlan moderasyonu onaylandı.", "success")
+    return redirect(url_for("admin.admin_panel"))
+
+
+@admin_bp.route("/admin/moderasyon_reddet/<tur>/<int:id>", methods=["POST"])
+@login_required
+@admin_required
+def admin_moderasyon_reddet(tur, id):
+    if tur == "kaynak":
+        ilan = Kaynak.query.get_or_404(id)
+    elif tur == "atik":
+        ilan = Atik.query.get_or_404(id)
+    else:
+        abort(400)
+
+    ilan.moderation_status = MODERATION_STATUS_REJECTED
+    db.session.commit()
+    log_admin_action("moderasyon_red", target=f"{tur}:{id}", detail=ilan.baslik)
+    flash("İlan moderasyonu reddedildi ve yayından kaldırıldı.", "warning")
     return redirect(url_for("admin.admin_panel"))
 
 

@@ -1,0 +1,173 @@
+{% extends "layout.html" %}
+{% from "_moderation_macros.html" import risk_badge, moderation_status_badge, ai_health_card %}
+{% block content %}
+<div class="content-section">
+    <div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h3><i class="bi bi-shield-check me-2"></i>AI Moderasyon Dashboard</h3>
+            <small class="text-muted">Analiz istatistikleri ve trendler</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_moderation.ilan_listesi', status='pending_review') }}" class="btn btn-sm btn-warning">
+                İnceleme Bekleyenler ({{ stats.pending_review }})
+            </a>
+            <a href="{{ url_for('admin_moderation.ilan_listesi') }}" class="btn btn-sm btn-outline-primary">Tüm İlanlar</a>
+            <a href="{{ url_for('admin_moderation.activity_log') }}" class="btn btn-sm btn-outline-dark">Activity Log</a>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">Export</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% for scope, label in [('records','Kayıtlar'),('timeline','Timeline'),('dashboard','Dashboard'),('decisions','Kararlar')] %}
+                    <li class="dropdown-header">{{ label }}</li>
+                    <li><a class="dropdown-item small" href="{{ url_for('admin_moderation.export_veri', scope=scope, fmt='csv') }}">CSV</a></li>
+                    <li><a class="dropdown-item small" href="{{ url_for('admin_moderation.export_veri', scope=scope, fmt='xlsx') }}">Excel</a></li>
+                    <li><a class="dropdown-item small" href="{{ url_for('admin_moderation.export_veri', scope=scope, fmt='pdf') }}">PDF</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-sm btn-outline-secondary">Admin Panel</a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ stats.toplam_analiz }}</h4><small class="text-muted">Toplam Analiz</small></div></div></div>
+        <div class="col-md-3"><div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ stats.bugun_analiz }}</h4><small class="text-muted">Bugünkü Analiz</small></div></div></div>
+        <div class="col-md-2"><div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ stats.approved }}</h4><small class="text-muted">Approved</small></div></div></div>
+        <div class="col-md-2"><div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ stats.pending_review }}</h4><small class="text-muted">Pending Review</small></div></div></div>
+        <div class="col-md-2"><div class="card stat-card shadow-sm"><div class="card-body"><h4>{{ stats.rejected }}</h4><small class="text-muted">Rejected</small></div></div></div>
+    </div>
+
+    {{ ai_health_card(stats.ai_health) }}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card shadow-sm border-info"><div class="card-body"><h5>{{ stats.ai_accuracy }}%</h5><small class="text-muted">AI Accuracy</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-warning"><div class="card-body"><h5>{{ stats.override_rate }}%</h5><small class="text-muted">Override Rate</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.false_positive }}</h5><small class="text-muted">False Positive</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.false_negative }}</h5><small class="text-muted">False Negative</small></div></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.pending_to_approved }}</h5><small class="text-muted">Pending → Approved</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.pending_to_rejected }}</h5><small class="text-muted">Pending → Rejected</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.whitelist_kullanilan }}</h5><small class="text-muted">Whitelist Kullanılan</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.ortalama_risk }}</h5><small class="text-muted">Ortalama Risk</small></div></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.yanlis_pozitif }}</h5><small class="text-muted">Yanlış Pozitif (whitelist düzeltilen)</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.admin_override }}</h5><small class="text-muted">Timeline Override</small></div></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card shadow-sm border-danger"><div class="card-body"><h5>{{ stats.spam_dagilimi['61-100'] }}</h5><small class="text-muted">Yüksek Spam (61-100)</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.spam_dagilimi['31-60'] }}</h5><small class="text-muted">Orta Spam (31-60)</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><h5>{{ stats.spam_dagilimi['0-30'] }}</h5><small class="text-muted">Düşük Spam (0-30)</small></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-warning"><div class="card-body"><h5>{{ stats.duplicate_orani }}%</h5><small class="text-muted">Duplicate Oranı</small></div></div></div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Spam Kullanıcılar</div>
+                <ul class="list-group list-group-flush">
+                    {% for user, score in stats.en_spam_kullanicilar %}
+                    <li class="list-group-item d-flex justify-content-between"><span>{{ user }}</span><span class="badge bg-danger">{{ score }}</span></li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Çok Tekrar Eden İlanlar</div>
+                <ul class="list-group list-group-flush">
+                    {% for baslik, score, tur, ilan_id in stats.en_tekrar_ilanlar %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_moderation.ilan_detay', tur=tur, ilan_id=ilan_id) }}" class="text-truncate me-2">{{ baslik }}</a>
+                        <span class="badge bg-warning text-dark">{{ score }}</span>
+                    </li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Çok Override Edilen Kategori</div>
+                <ul class="list-group list-group-flush">
+                    {% for kat, adet in stats.en_cok_override_kategori %}
+                    <li class="list-group-item d-flex justify-content-between"><span>{{ kat }}</span><span class="badge bg-warning text-dark">{{ adet }}</span></li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Çok Override Edilen Purpose</div>
+                <ul class="list-group list-group-flush">
+                    {% for p, adet in stats.en_cok_override_purpose %}
+                    <li class="list-group-item d-flex justify-content-between"><span>{{ p }}</span><span class="badge bg-warning text-dark">{{ adet }}</span></li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Çok Kategori</div>
+                <ul class="list-group list-group-flush">
+                    {% for kat, adet in stats.en_cok_kategori %}
+                    <li class="list-group-item d-flex justify-content-between"><span>{{ kat }}</span><span class="badge bg-secondary">{{ adet }}</span></li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">En Çok Purpose</div>
+                <ul class="list-group list-group-flush">
+                    {% for p, adet in stats.en_cok_purpose %}
+                    <li class="list-group-item d-flex justify-content-between"><span>{{ p }}</span><span class="badge bg-secondary">{{ adet }}</span></li>
+                    {% else %}<li class="list-group-item text-muted">Veri yok</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">Son 7 Günlük Analiz</div>
+                <div class="card-body">
+                    <canvas id="chart7" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">Son 30 Günlük Analiz</div>
+                <div class="card-body">
+                    <canvas id="chart30" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const data7 = {{ stats.grafik_7_gun|tojson }};
+    const data30 = {{ stats.grafik_30_gun|tojson }};
+    function makeChart(id, data) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(data),
+                datasets: [{ label: 'Analiz', data: Object.values(data), backgroundColor: 'rgba(25,135,84,0.6)' }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+    makeChart('chart7', data7);
+    makeChart('chart30', data30);
+})();
+</script>
+{% endblock %}

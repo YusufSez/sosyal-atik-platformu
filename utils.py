@@ -299,6 +299,12 @@ def harita_noktalari(ilanlar):
 
 
 def ilan_erisilebilir_mi(ilan, user=None):
+    mod_status = getattr(ilan, "moderation_status", None) or "approved"
+    if mod_status == "rejected":
+        if user and getattr(user, "is_authenticated", False):
+            if ilan.user_id == user.id or getattr(user, "is_admin", False):
+                return True
+        return False
     durum = getattr(ilan, "ilan_durumu", None) or "Aktif"
     if durum == "Aktif":
         return True
@@ -408,6 +414,17 @@ def ensure_schema():
             if "ilan_durumu" not in cols:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN ilan_durumu VARCHAR(50) DEFAULT 'Aktif'"))
             conn.execute(text(f"UPDATE {table} SET ilan_durumu = 'Aktif' WHERE ilan_durumu IS NULL"))
+            if "moderation_status" not in cols:
+                conn.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN moderation_status VARCHAR(30) DEFAULT 'approved'")
+                )
+            if "moderation_reason" not in cols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN moderation_reason TEXT"))
+            if "ai_risk_score" not in cols:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN ai_risk_score INTEGER"))
+            conn.execute(
+                text(f"UPDATE {table} SET moderation_status = 'approved' WHERE moderation_status IS NULL")
+            )
 
     if "sikayet" in inspector.get_table_names():
         sikayet_cols = {c["name"] for c in inspector.get_columns("sikayet")}

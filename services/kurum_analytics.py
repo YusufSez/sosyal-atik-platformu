@@ -1,6 +1,8 @@
 """Belediye ve kurumlar için analiz ve ısı haritası verileri."""
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
+
+from services.ilan_moderation import public_ilan_base_filter
 
 from extensions import db
 from models import Atik, CevreselEtki, Kaynak, User
@@ -8,14 +10,14 @@ from utils import is_varsayilan_konum
 
 
 def _aktif_kaynak_query(il_filtre=None):
-    q = Kaynak.query.filter(or_(Kaynak.ilan_durumu == "Aktif", Kaynak.ilan_durumu.is_(None)))
+    q = public_ilan_base_filter(Kaynak.query, Kaynak)
     if il_filtre:
         q = q.join(User, Kaynak.user_id == User.id).filter(User.il == il_filtre)
     return q
 
 
 def _aktif_atik_query(il_filtre=None):
-    q = Atik.query.filter(or_(Atik.ilan_durumu == "Aktif", Atik.ilan_durumu.is_(None)))
+    q = public_ilan_base_filter(Atik.query, Atik)
     if il_filtre:
         q = q.join(User, Atik.user_id == User.id).filter(User.il == il_filtre)
     return q

@@ -68,6 +68,9 @@ class Kaynak(db.Model):
     latitude = db.Column(db.Float, nullable=False)
     longitude = db.Column(db.Float, nullable=False)
     ilan_durumu = db.Column(db.String(50), nullable=False, default="Aktif")
+    moderation_status = db.Column(db.String(30), nullable=False, default="approved")
+    moderation_reason = db.Column(db.Text, nullable=True)
+    ai_risk_score = db.Column(db.Integer, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     tarih = db.Column(db.DateTime, default=tr_time)
 
@@ -81,6 +84,9 @@ class Atik(db.Model):
     longitude = db.Column(db.Float, default=28.979)
     kategori = db.Column(db.String(50), nullable=True)
     ilan_durumu = db.Column(db.String(50), nullable=False, default="Aktif")
+    moderation_status = db.Column(db.String(30), nullable=False, default="approved")
+    moderation_reason = db.Column(db.Text, nullable=True)
+    ai_risk_score = db.Column(db.Integer, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     tarih = db.Column(db.DateTime, default=tr_time)
 
@@ -228,6 +234,145 @@ class EmailToken(db.Model):
     used_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=tr_time)
     user = db.relationship("User", backref=db.backref("email_tokens", lazy=True))
+
+
+class IlanModerasyonAnaliz(db.Model):
+    """Versiyonlu AI moderasyon analiz geçmişi."""
+
+    __tablename__ = "ilan_moderasyon_analiz"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tur = db.Column(db.String(10), nullable=False, index=True)
+    kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True, index=True)
+    atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True, index=True)
+    analysis_version = db.Column(db.Integer, nullable=False, default=1)
+    is_current = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    model_name = db.Column(db.String(80), nullable=False, default="gemini-2.5-flash")
+    prompt_version = db.Column(db.String(20), nullable=False, default="2.1")
+    initial_risk = db.Column(db.Integer, nullable=True)
+    final_risk = db.Column(db.Integer, nullable=True)
+    risk_adjustment = db.Column(db.Integer, nullable=False, default=0)
+    category = db.Column(db.String(80), nullable=True)
+    purpose = db.Column(db.String(40), nullable=True)
+    confidence = db.Column(db.Float, nullable=True)
+    is_recyclable = db.Column(db.Boolean, nullable=False, default=False)
+    matched_rules_json = db.Column(db.Text, nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    moderation_status = db.Column(db.String(30), nullable=False, default="approved")
+    whitelist_applied = db.Column(db.Boolean, nullable=False, default=False)
+    risk_adjustment_reason = db.Column(db.Text, nullable=True)
+    text_analysis_json = db.Column(db.Text, nullable=True)
+    vision_analysis_json = db.Column(db.Text, nullable=True)
+    photo_analyses_json = db.Column(db.Text, nullable=True)
+    raw_json = db.Column(db.Text, nullable=True)
+    spam_score = db.Column(db.Integer, nullable=True, index=True)
+    duplicate_score = db.Column(db.Integer, nullable=True, index=True)
+    spam_reasons_json = db.Column(db.Text, nullable=True)
+    duplicate_reasons_json = db.Column(db.Text, nullable=True)
+    duplicate_matches_json = db.Column(db.Text, nullable=True)
+    upload_ip = db.Column(db.String(45), nullable=True)
+    upload_user_agent = db.Column(db.String(500), nullable=True)
+    device_fingerprint = db.Column(db.String(64), nullable=True, index=True)
+    photo_hashes_json = db.Column(db.Text, nullable=True)
+    triggered_by = db.Column(db.String(30), nullable=False, default="upload")
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    kaynak = db.relationship("Kaynak", backref=db.backref("moderasyon_analizleri", lazy=True))
+    atik = db.relationship("Atik", backref=db.backref("moderasyon_analizleri", lazy=True))
+    admin = db.relationship("User", foreign_keys=[admin_user_id])
+
+
+class IlanModerasyonTimeline(db.Model):
+    """Moderasyon olay akışı."""
+
+    __tablename__ = "ilan_moderasyon_timeline"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tur = db.Column(db.String(10), nullable=False, index=True)
+    kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True, index=True)
+    atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True, index=True)
+    analiz_id = db.Column(db.Integer, db.ForeignKey("ilan_moderasyon_analiz.id"), nullable=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    detail_json = db.Column(db.Text, nullable=True)
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    analiz = db.relationship("IlanModerasyonAnaliz", backref=db.backref("timeline_events", lazy=True))
+    admin = db.relationship("User", foreign_keys=[admin_user_id])
+
+
+class IlanModerasyonNot(db.Model):
+    """Admin moderasyon notları."""
+
+    __tablename__ = "ilan_moderasyon_not"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tur = db.Column(db.String(10), nullable=False, index=True)
+    kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True, index=True)
+    atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True, index=True)
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    note = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    admin = db.relationship("User", backref=db.backref("moderasyon_notlari", lazy=True))
+
+
+class IlanModerasyonKarar(db.Model):
+    """AI vs Admin karar karşılaştırması (Phase 1 analitik)."""
+
+    __tablename__ = "ilan_moderasyon_karar"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tur = db.Column(db.String(10), nullable=False, index=True)
+    kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True, index=True)
+    atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True, index=True)
+    analiz_id = db.Column(db.Integer, db.ForeignKey("ilan_moderasyon_analiz.id"), nullable=True)
+    action_type = db.Column(db.String(30), nullable=False, index=True)
+    ai_decision = db.Column(db.String(30), nullable=False)
+    admin_decision = db.Column(db.String(30), nullable=False)
+    decision_match = db.Column(db.Boolean, nullable=False, default=False)
+    override = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    decision_version = db.Column(db.Integer, nullable=True)
+    decision_reason = db.Column(db.Text, nullable=True)
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    decision_time = db.Column(db.DateTime, default=tr_time, index=True)
+    category = db.Column(db.String(80), nullable=True)
+    purpose = db.Column(db.String(40), nullable=True)
+    analiz = db.relationship("IlanModerasyonAnaliz", backref=db.backref("kararlar", lazy=True))
+    admin = db.relationship("User", foreign_keys=[admin_user_id])
+
+
+class IlanModerasyonActivityLog(db.Model):
+    """Moderasyon paneli admin activity log."""
+
+    __tablename__ = "ilan_moderasyon_activity_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tur = db.Column(db.String(10), nullable=True, index=True)
+    kaynak_id = db.Column(db.Integer, db.ForeignKey("kaynak.id"), nullable=True, index=True)
+    atik_id = db.Column(db.Integer, db.ForeignKey("atik.id"), nullable=True, index=True)
+    admin_user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    note = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    admin = db.relationship("User", backref=db.backref("moderasyon_activity_logs", lazy=True))
+
+
+class AiModerasyonHealthLog(db.Model):
+    """AI istek sağlık metrikleri (production monitoring)."""
+
+    __tablename__ = "ai_moderasyon_health_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_name = db.Column(db.String(80), nullable=False, index=True)
+    prompt_version = db.Column(db.String(20), nullable=False)
+    request_type = db.Column(db.String(30), nullable=False, default="vision")
+    success = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    response_time_ms = db.Column(db.Integer, nullable=True)
+    error_type = db.Column(db.String(30), nullable=True, index=True)
+    retry_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
 
 
 class AdminAuditLog(db.Model):

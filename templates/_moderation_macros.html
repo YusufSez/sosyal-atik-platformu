@@ -1,0 +1,377 @@
+{% macro moderation_status_badge(status) %}
+{% if status == 'pending_review' %}
+<span class="badge bg-warning text-dark">İnceleme</span>
+{% elif status == 'rejected' %}
+<span class="badge bg-danger">Reddedildi</span>
+{% else %}
+<span class="badge bg-success">Onaylı</span>
+{% endif %}
+{% endmacro %}
+
+{% macro risk_badge(risk) %}
+{% if risk is none %}
+<span class="badge bg-secondary">—</span>
+{% elif risk >= 90 %}
+<span class="badge bg-danger">{{ risk }}/100</span>
+{% elif risk >= 70 %}
+<span class="badge bg-warning text-dark">{{ risk }}/100</span>
+{% else %}
+<span class="badge bg-success">{{ risk }}/100</span>
+{% endif %}
+{% endmacro %}
+
+{% macro confidence_badge(confidence) %}
+{% if confidence is none %}
+<span class="text-muted">—</span>
+{% elif confidence >= 0.85 %}
+<span class="badge bg-success">{{ (confidence * 100)|round(0) }}%</span>
+{% elif confidence >= 0.6 %}
+<span class="badge bg-warning text-dark">{{ (confidence * 100)|round(0) }}%</span>
+{% else %}
+<span class="badge bg-danger">{{ (confidence * 100)|round(0) }}%</span>
+{% endif %}
+{% endmacro %}
+
+{% macro signal_badge(signal, positive=true) %}
+<span class="badge {% if positive %}bg-success{% else %}bg-danger{% endif %} me-1 mb-1">{{ signal }}</span>
+{% endmacro %}
+
+{% macro rule_badge(rule) %}
+<span class="badge bg-primary me-1 mb-1">{{ rule }}</span>
+{% endmacro %}
+
+{% macro ilan_tipi_badge(tur) %}
+{% if tur == 'atik' %}
+<span class="badge bg-success">Atık</span>
+{% else %}
+<span class="badge bg-primary">Kaynak</span>
+{% endif %}
+{% endmacro %}
+
+{% macro timeline_list(events) %}
+<div class="moderation-timeline">
+    {% for event in events %}
+    <div class="timeline-item mb-3 ps-3 border-start border-2 {% if loop.last %}border-primary{% else %}border-secondary{% endif %}">
+        <div class="small text-muted">{{ event.created_at|format_dt('%H:%M') if event.created_at else '' }}
+            · {{ event.created_at|format_dt('%d.%m.%Y') if event.created_at else '' }}</div>
+        <div class="fw-semibold">{{ event.title }}</div>
+        {% if event.detail %}
+        <div class="small text-muted">
+            {% for key, val in event.detail.items() %}
+            <span class="me-2">{{ key }}: {{ val }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">Timeline kaydı yok.</p>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro ai_report_card(analiz, show_sensitive=true) %}
+{% if analiz %}
+<div class="card mb-3">
+    <div class="card-header fw-bold"><i class="bi bi-robot me-2"></i>AI Analiz Raporu
+        {% if analiz.analysis_version %}<span class="badge bg-secondary ms-2">v{{ analiz.analysis_version }}</span>{% endif %}
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="small text-muted">Risk Skoru (Final)</div>
+                {{ risk_badge(analiz.final_risk) }}
+            </div>
+            {% if show_sensitive %}
+            <div class="col-md-4">
+                <div class="small text-muted">İlk AI Riski</div>
+                {{ risk_badge(analiz.initial_risk) }}
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Risk Adjustment</div>
+                <strong>{{ analiz.risk_adjustment or 0 }}</strong>
+            </div>
+            {% endif %}
+            <div class="col-md-4">
+                <div class="small text-muted">Moderation Status</div>
+                {{ moderation_status_badge(analiz.moderation_status) }}
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Category</div>
+                <strong>{{ analiz.category or '—' }}</strong>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Purpose</div>
+                <strong>{{ analiz.purpose or '—' }}</strong>
+            </div>
+            {% if show_sensitive %}
+            <div class="col-md-4">
+                <div class="small text-muted">Confidence</div>
+                {{ confidence_badge(analiz.confidence) }}
+            </div>
+            {% endif %}
+            {% if show_sensitive and analiz.reason %}
+            <div class="col-12">
+                <div class="small text-muted">Reason</div>
+                <span class="badge bg-info text-dark">{{ analiz.reason }}</span>
+            </div>
+            {% endif %}
+            {% if show_sensitive and analiz.matched_rules %}
+            <div class="col-12">
+                <div class="small text-muted">Matched Rules</div>
+                {% for rule in analiz.matched_rules %}
+                {{ rule_badge(rule) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if show_sensitive and analiz.positive_signals %}
+            <div class="col-12">
+                <div class="small text-muted">Positive Signals</div>
+                {% for s in analiz.positive_signals %}
+                {{ signal_badge(s, true) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if show_sensitive and analiz.negative_signals %}
+            <div class="col-12">
+                <div class="small text-muted">Negative Signals</div>
+                {% for s in analiz.negative_signals %}
+                {{ signal_badge(s, false) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if show_sensitive %}
+            <div class="col-md-6">
+                <div class="small text-muted">Whitelist Uygulandı mı</div>
+                <strong>{{ 'Evet' if analiz.whitelist_applied else 'Hayır' }}</strong>
+            </div>
+            {% if analiz.risk_adjustment_reason %}
+            <div class="col-md-6">
+                <div class="small text-muted">Risk Adjustment Sebebi</div>
+                <p class="mb-0 small">{{ analiz.risk_adjustment_reason }}</p>
+            </div>
+            {% endif %}
+            {% endif %}
+            <div class="col-md-4">
+                <div class="small text-muted">Model</div>
+                <span class="small">{{ analiz.model_name }} · prompt {{ analiz.prompt_version }}</span>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">AI Timestamp</div>
+                <span class="small">{{ analiz.created_at|format_dt if analiz.created_at else '—' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro spam_badge(score) %}
+{% if score is none %}
+<span class="badge bg-secondary">—</span>
+{% elif score >= 61 %}
+<span class="badge bg-danger">{{ score }}</span>
+{% elif score >= 31 %}
+<span class="badge bg-warning text-dark">{{ score }}</span>
+{% else %}
+<span class="badge bg-success">{{ score }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro duplicate_badge(score) %}
+{% if score is none %}
+<span class="badge bg-secondary">—</span>
+{% elif score >= 70 %}
+<span class="badge bg-danger">{{ score }}</span>
+{% elif score >= 40 %}
+<span class="badge bg-warning text-dark">{{ score }}</span>
+{% else %}
+<span class="badge bg-success">{{ score }}</span>
+{% endif %}
+{% endmacro %}
+
+{% macro spam_duplicate_card(analiz) %}
+{% if analiz %}
+<div class="card mb-3 border-warning">
+    <div class="card-header fw-bold"><i class="bi bi-exclamation-triangle me-2"></i>Spam & Duplicate Analizi</div>
+    <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="small text-muted">Spam Score</div>
+                {{ spam_badge(analiz.spam_score) }}
+            </div>
+            <div class="col-md-6">
+                <div class="small text-muted">Duplicate Score</div>
+                {{ duplicate_badge(analiz.duplicate_score) }}
+            </div>
+        </div>
+        {% if analiz.spam_reasons %}
+        <div class="mb-3">
+            <div class="small text-muted fw-semibold">Spam Nedenleri</div>
+            <ul class="small mb-0">
+                {% for r in analiz.spam_reasons %}
+                <li>{{ r.label }} (+{{ r.points }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if analiz.duplicate_reasons %}
+        <div class="mb-3">
+            <div class="small text-muted fw-semibold">Duplicate Nedenleri</div>
+            <ul class="small mb-0">
+                {% for r in analiz.duplicate_reasons %}
+                <li>{{ r }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if analiz.duplicate_matches %}
+        <div>
+            <div class="small text-muted fw-semibold">Benzer İlanlar</div>
+            <ul class="list-group list-group-flush">
+                {% for m in analiz.duplicate_matches %}
+                <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('admin_moderation.ilan_detay', tur=m.tur, ilan_id=m.ilan_id) }}">{{ m.baslik }}</a>
+                    <span class="badge bg-warning text-dark">{{ m.score }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro karar_karsilastirma_card(ozet) %}
+<div class="card mb-3 border-secondary">
+    <div class="card-header fw-bold"><i class="bi bi-diagram-3 me-2"></i>Karar Karşılaştırması</div>
+    <div class="card-body text-center">
+        <div class="mb-2">
+            <div class="small text-muted">AI Kararı</div>
+            {{ moderation_status_badge(ozet.ai_decision) }}
+            {% if ozet.decision_version %}<div class="small text-muted mt-1">v{{ ozet.decision_version }}</div>{% endif %}
+        </div>
+        <div class="my-2 text-muted">↓</div>
+        <div class="mb-2">
+            <div class="small text-muted">Admin Kararı</div>
+            {{ moderation_status_badge(ozet.admin_decision) }}
+            {% if ozet.decision_time %}<div class="small text-muted mt-1">{{ ozet.decision_time|format_dt }}</div>{% endif %}
+        </div>
+        <div class="my-2 text-muted">↓</div>
+        <div>
+            <div class="small text-muted">Sonuç</div>
+            {% if ozet.override %}
+            <span class="badge bg-warning text-dark">{{ ozet.sonuc }}</span>
+            {% elif ozet.decision_match %}
+            <span class="badge bg-success">{{ ozet.sonuc }}</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ ozet.sonuc }}</span>
+            {% endif %}
+            {% if ozet.decision_reason %}
+            <p class="small text-muted mt-2 mb-0">{{ ozet.decision_reason }}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro prompt_compare_card(comparison) %}
+{% if comparison and comparison.has_changes %}
+<div class="card mb-3 border-info">
+    <div class="card-header fw-bold"><i class="bi bi-arrow-left-right me-2"></i>Prompt Karşılaştırması
+        <span class="badge bg-secondary ms-2">v{{ comparison.old_version }} → v{{ comparison.new_version }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Alan</th>
+                        <th>Eski Analiz</th>
+                        <th></th>
+                        <th>Yeni Analiz</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in comparison.rows %}
+                    <tr class="{% if row.changed %}table-warning{% endif %}">
+                        <td class="fw-semibold small">{{ row.label }}</td>
+                        <td class="small">{% if row.old is iterable and row.old is not string %}{{ row.old|join(', ') }}{% else %}{{ row.old or '—' }}{% endif %}</td>
+                        <td class="text-center text-muted">→</td>
+                        <td class="small">{% if row.new is iterable and row.new is not string %}{{ row.new|join(', ') }}{% else %}{{ row.new or '—' }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro moderation_flow_card(steps) %}
+<div class="card mb-3">
+    <div class="card-header fw-bold"><i class="bi bi-diagram-2 me-2"></i>AI Moderation Flow</div>
+    <div class="card-body">
+        {% for step in steps %}
+        <div class="text-center mb-1">
+            <div class="d-inline-block border rounded px-3 py-2 {% if step.status == 'done' %}border-success bg-success-subtle{% elif step.status == 'active' %}border-primary bg-primary-subtle{% elif step.status == 'skip' %}border-secondary text-muted{% else %}border-light{% endif %}">
+                <div class="fw-semibold small">{{ step.title }}</div>
+                <div class="text-muted" style="font-size:0.75rem;">{{ step.detail }}</div>
+            </div>
+        </div>
+        {% if not loop.last %}<div class="text-muted my-1">↓</div>{% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro ai_health_card(health) %}
+<div class="card mb-3 border-{% if health.healthy %}success{% else %}danger{% endif %}">
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-heart-pulse me-2"></i>AI Health</span>
+        <span class="badge {% if health.healthy %}bg-success{% else %}bg-danger{% endif %}">
+            {% if health.healthy %}Healthy{% else %}Degraded{% endif %}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row g-2 small">
+            <div class="col-md-4"><span class="text-muted">Model:</span> <strong>{{ health.model_name }}</strong></div>
+            <div class="col-md-4"><span class="text-muted">Prompt:</span> <strong>{{ health.prompt_version }}</strong></div>
+            <div class="col-md-4"><span class="text-muted">Avg Response:</span> <strong>{{ health.avg_response_time_ms }} ms</strong></div>
+            <div class="col-md-3"><span class="text-muted">Timeout:</span> {{ health.timeout_ms }} ms ({{ health.timeout_count }})</div>
+            <div class="col-md-3"><span class="text-muted">Retry:</span> {{ health.retry_count }}</div>
+            <div class="col-md-3"><span class="text-muted">Bugün:</span> {{ health.today_requests }}</div>
+            <div class="col-md-3"><span class="text-muted">Başarılı:</span> <span class="text-success">{{ health.successful }}</span></div>
+            <div class="col-md-3"><span class="text-muted">Başarısız:</span> <span class="text-danger">{{ health.failed }}</span></div>
+            <div class="col-md-3"><span class="text-muted">Rate Limit:</span> {{ health.rate_limit_count }}</div>
+            <div class="col-md-3"><span class="text-muted">Success Rate:</span> {{ health.success_rate }}%</div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro photo_analysis_list(photos, show_sensitive=true) %}
+{% if photos %}
+<div class="card mb-3">
+    <div class="card-header fw-bold"><i class="bi bi-images me-2"></i>Fotoğraf Analizi</div>
+    <div class="card-body">
+        {% for photo in photos %}
+        <div class="border rounded p-2 mb-2">
+            <div class="fw-semibold">Fotoğraf {{ photo.index }} — {{ photo.label }}</div>
+            {% if show_sensitive %}{{ confidence_badge(photo.confidence) }}{% endif %}
+            {% if photo.detected and show_sensitive %}
+            <div class="small mt-1">
+                {% if photo.detected.hazard_symbol %}<span class="badge bg-danger me-1">Tehlike işareti</span>{% endif %}
+                {% if photo.detected.human %}<span class="badge bg-secondary me-1">İnsan</span>{% endif %}
+                {% if photo.detected.vehicle %}<span class="badge bg-secondary me-1">Araç</span>{% endif %}
+                {% if photo.detected.logo %}<span class="badge bg-secondary me-1">Logo</span>{% endif %}
+                {% if photo.detected.label_text %}<span class="badge bg-light text-dark border">Etiket</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

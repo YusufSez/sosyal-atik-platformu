@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+{% from "_ilan_galeri.html" import ilan_galeri %}
+{% from "_moderation_macros.html" import moderation_status_badge, risk_badge, ilan_tipi_badge, timeline_list, ai_report_card, photo_analysis_list, karar_karsilastirma_card, spam_duplicate_card, prompt_compare_card, moderation_flow_card %}
+{% block content %}
+<div class="content-section">
+    <div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h3><i class="bi bi-search me-2"></i>{{ ilan.baslik }}</h3>
+            <small class="text-muted">{{ ilan_tipi_badge(tur) }} · {{ moderation_status_badge(ilan.moderation_status) }}</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('admin_moderation.ilan_listesi') }}" class="btn btn-sm btn-outline-secondary">Liste</a>
+            <a href="{{ url_for('admin_moderation.dashboard') }}" class="btn btn-sm btn-outline-primary">Dashboard</a>
+            {% if tur == 'kaynak' %}
+            <a href="{{ url_for('kaynak.kaynak_detay', id=ilan.id) }}" class="btn btn-sm btn-outline-info" target="_blank">Public Görünüm</a>
+            {% else %}
+            <a href="{{ url_for('atik.atik_detay', id=ilan.id) }}" class="btn btn-sm btn-outline-info" target="_blank">Public Görünüm</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card mb-3">
+                <div class="card-header fw-bold">İlan Bilgileri</div>
+                <div class="card-body">
+                    <p><strong>Başlık:</strong> {{ ilan.baslik }}</p>
+                    <p><strong>Açıklama:</strong><br>{{ ilan.aciklama|display_text }}</p>
+                    <p><strong>Kategori:</strong> {{ ilan.kategori or '—' }}
+                    {% if tur == 'kaynak' %} · <strong>Alt kategori (durum):</strong> {{ ilan.durum }}{% endif %}
+                    </p>
+                    <p><strong>Kullanıcı:</strong> {{ sahip.username if sahip else '—' }}</p>
+                    <p><strong>E-posta:</strong> {{ sahip.email if sahip else '—' }}</p>
+                    <p><strong>Telefon:</strong> {{ sahip.telefon if sahip and sahip.telefon else '—' }}</p>
+                    <p><strong>Tarih:</strong> {{ ilan.tarih|format_dt if ilan.tarih else '—' }}</p>
+                    <p><strong>Konum:</strong> {{ ilan.latitude }}, {{ ilan.longitude }}</p>
+                </div>
+            </div>
+
+            {{ ilan_galeri(ilan, 'admin_mod_galeri') }}
+
+            {% if ilan.latitude and ilan.longitude %}
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Harita</div>
+                <div class="card-body p-0">
+                    <div id="mod-map" style="height:280px;"></div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card mb-3 border-primary">
+                <div class="card-header fw-bold">Admin Aksiyonları</div>
+                <div class="card-body d-flex flex-wrap gap-2">
+                    <form method="POST" action="{{ url_for('admin_moderation.onayla', tur=tur, ilan_id=ilan.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-success btn-sm">✓ Onayla</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin_moderation.reddet', tur=tur, ilan_id=ilan.id) }}" onsubmit="return confirm('Reddetmek istediğinize emin misiniz?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger btn-sm">✗ Reddet</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin_moderation.yeniden_analiz', tur=tur, ilan_id=ilan.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-warning btn-sm">↻ Yeniden AI Analizi</button>
+                    </form>
+                    <a href="{{ url_for('admin_moderation.ham_json', tur=tur, ilan_id=ilan.id) }}" class="btn btn-outline-dark btn-sm" target="_blank">📄 AI Ham JSON</a>
+                </div>
+                <div class="card-body border-top">
+                    <form method="POST" action="{{ url_for('admin_moderation.risk_duzenle', tur=tur, ilan_id=ilan.id) }}" class="row g-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="col-4">
+                            <label class="form-label small">✎ Risk (0-100)</label>
+                            <input type="number" name="risk_skoru" class="form-control form-control-sm" min="0" max="100" value="{{ ilan.ai_risk_score or 0 }}">
+                        </div>
+                        <div class="col-8">
+                            <label class="form-label small">Gerekçe</label>
+                            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Manuel düzenleme gerekçesi">
+                        </div>
+                        <div class="col-12"><button class="btn btn-sm btn-outline-secondary">Riski Kaydet</button></div>
+                    </form>
+                </div>
+                <div class="card-body border-top">
+                    <form method="POST" action="{{ url_for('admin_moderation.not_ekle', tur=tur, ilan_id=ilan.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <label class="form-label small">📝 Admin Notu</label>
+                        <textarea name="note" class="form-control form-control-sm mb-2" rows="2" required></textarea>
+                        <button class="btn btn-sm btn-outline-primary">Not Ekle</button>
+                    </form>
+                </div>
+            </div>
+
+            {{ karar_karsilastirma_card(karar_ozeti) }}
+
+            {{ prompt_compare_card(prompt_karsilastirma) }}
+
+            {{ moderation_flow_card(moderation_flow) }}
+
+            {{ spam_duplicate_card(guncel_analiz) }}
+
+            {{ ai_report_card(guncel_analiz, show_sensitive=true) }}
+            {{ photo_analysis_list(guncel_analiz.get('photo_analyses', []) if guncel_analiz else [], show_sensitive=true) }}
+
+            <div class="card mb-3">
+                <div class="card-header fw-bold"><i class="bi bi-clock-history me-2"></i>AI Timeline</div>
+                <div class="card-body">{{ timeline_list(timeline) }}</div>
+            </div>
+
+            {% if analiz_gecmisi|length > 1 %}
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Analiz Geçmişi (Karşılaştırma)</div>
+                <div class="card-body">
+                    {% for a in analiz_gecmisi %}
+                    <div class="border rounded p-2 mb-2 {% if a.is_current %}border-primary{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>v{{ a.analysis_version }} · {{ a.model_name }}</span>
+                            {{ risk_badge(a.final_risk) }}
+                        </div>
+                        <div class="small text-muted">
+                            İlk: {{ a.initial_risk }} → Final: {{ a.final_risk }}
+                            · {{ a.created_at|format_dt if a.created_at else '' }}
+                        </div>
+                        <a href="{{ url_for('admin_moderation.ham_json', tur=tur, ilan_id=ilan.id, version=a.analysis_version) }}" class="small" target="_blank">JSON</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if notlar %}
+            <div class="card mb-3">
+                <div class="card-header fw-bold">Admin Notları</div>
+                <ul class="list-group list-group-flush">
+                    {% for n in notlar %}
+                    <li class="list-group-item">
+                        <div class="small text-muted">{{ n.created_at|format_dt }} · {{ n.admin.username if n.admin else 'Admin' }}</div>
+                        {{ n.note }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if ilan.latitude and ilan.longitude %}
+{% include "_leaflet_assets.html" %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const map = L.map('mod-map').setView([{{ ilan.latitude }}, {{ ilan.longitude }}], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    L.marker([{{ ilan.latitude }}, {{ ilan.longitude }}]).addTo(map);
+});
+</script>
+{% endif %}
+{% endblock %}

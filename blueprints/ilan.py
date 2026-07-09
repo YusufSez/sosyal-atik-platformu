@@ -6,6 +6,11 @@ from flask_login import current_user, login_required
 from constants import DURUMLAR_KAYNAK, ILAN_DURUMLARI, KATEGORILER_ATIK, KATEGORILER_KAYNAK, MAX_ILAN_FOTOSU
 from extensions import ai_analiz_limit, db
 from models import Atik, Kaynak, User
+from services.ilan_moderation import (
+    admin_moderasyon_bildir,
+    ilan_metin_moderasyonu,
+    ilan_moderasyon_alanlarini_uygula,
+)
 from services.ilan_images import (
     ai_analiz_ilk_foto,
     ensure_ilan_fotograflari,
@@ -55,6 +60,16 @@ def _etki_durum_mesajlari(ilan, tur, sonuc):
         flash("İlan durumu güncellendi. Çevresel etki kaydı geri alındı.", "info")
 
 
+def _ilan_metin_moderasyonu_uygula(ilan, tur):
+    """Başlık/açıklama değişikliklerinde metin moderasyonu."""
+    ai_sonuc = ilan_metin_moderasyonu(ilan.baslik, ilan.aciklama, tur=tur)
+    if moderasyon_reddedildi(ai_sonuc, []):
+        return ai_sonuc, None
+    karar = ilan_moderasyon_alanlarini_uygula(ilan, ai_sonuc)
+    admin_moderasyon_bildir(ilan, tur, ai_sonuc, karar, current_user)
+    return ai_sonuc, karar
+
+
 def _ilan_foto_guncelle(ilan, tur):
     ensure_ilan_fotograflari(ilan, tur)
     silinecek = [int(x) for x in request.form.getlist("silinecek_resim") if str(x).isdigit()]
@@ -72,7 +87,7 @@ def _ilan_foto_guncelle(ilan, tur):
             baslik=ilan.baslik,
             kategori_secim=ilan.kategori if tur == "atik" else None,
         )
-        ai_sonuc = fotograf_moderasyonu(ai_sonuc, ilan.baslik, ilan.aciklama, yeni_dosyalar)
+        ai_sonuc = fotograf_moderasyonu(ai_sonuc, ilan.baslik, ilan.aciklama, yeni_dosyalar, tur=tur)
         if moderasyon_reddedildi(ai_sonuc, yeni_dosyalar):
             return "Yeni görseller moderasyon kontrolünden geçemedi."
         ilan_fotograflari_ekle(ilan, tur, yeni_dosyalar)
@@ -167,6 +182,16 @@ def ilan_duzenle_kaynak(id):
             flash(foto_hata, "danger")
             return redirect(url_for("ilan.ilan_duzenle_kaynak", id=id))
 
+        ai_sonuc, karar = _ilan_metin_moderasyonu_uygula(ilan, "kaynak")
+        if karar is None:
+            flash(
+                f"Metin moderasyonu: İçerik yayınlanamadı (Skor: {ai_sonuc.get('risk_skoru', 0)}/100). "
+                f"{ai_sonuc.get('reason') or 'Admin onayı gerekiyor.'}",
+                "danger",
+            )
+            db.session.rollback()
+            return redirect(url_for("ilan.ilan_duzenle_kaynak", id=id))
+
         sonuc = ilan_durum_etki_sync(ilan, "kaynak", eski_durum, ilan.ilan_durumu)
         db.session.commit()
         if sonuc and sonuc[0] == "eklendi":
@@ -218,6 +243,16 @@ def ilan_duzenle_atik(id):
         foto_hata = _ilan_foto_guncelle(ilan, "atik")
         if foto_hata:
             flash(foto_hata, "danger")
+            return redirect(url_for("ilan.ilan_duzenle_atik", id=id))
+
+        ai_sonuc, karar = _ilan_metin_moderasyonu_uygula(ilan, "atik")
+        if karar is None:
+            flash(
+                f"Metin moderasyonu: İçerik yayınlanamadı (Skor: {ai_sonuc.get('risk_skoru', 0)}/100). "
+                f"{ai_sonuc.get('reason') or 'Admin onayı gerekiyor.'}",
+                "danger",
+            )
+            db.session.rollback()
             return redirect(url_for("ilan.ilan_duzenle_atik", id=id))
 
         sonuc = ilan_durum_etki_sync(ilan, "atik", eski_durum, ilan.ilan_durumu)

@@ -1,6 +1,6 @@
 """Kullanıcıya özel akıllı ilan önerileri."""
 
-from sqlalchemy import or_
+from services.ilan_moderation import public_ilan_base_filter
 
 from models import Atik, Favori, Goruntulenme, Kaynak, User
 from utils import is_varsayilan_konum, mesafe_hesapla
@@ -65,20 +65,16 @@ def kullanici_onerileri(user, tur="kaynak", limit=6):
 
     if tur == "atik":
         ilanlar = (
-            Atik.query.filter(
-                Atik.user_id != user.id,
-                or_(Atik.ilan_durumu == "Aktif", Atik.ilan_durumu.is_(None)),
-            )
+            public_ilan_base_filter(Atik.query, Atik)
+            .filter(Atik.user_id != user.id)
             .order_by(Atik.id.desc())
             .limit(80)
             .all()
         )
     else:
         ilanlar = (
-            Kaynak.query.filter(
-                Kaynak.user_id != user.id,
-                or_(Kaynak.ilan_durumu == "Aktif", Kaynak.ilan_durumu.is_(None)),
-            )
+            public_ilan_base_filter(Kaynak.query, Kaynak)
+            .filter(Kaynak.user_id != user.id)
             .order_by(Kaynak.id.desc())
             .limit(80)
             .all()

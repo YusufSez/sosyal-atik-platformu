@@ -88,8 +88,76 @@
         <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-journal-text"></i> Yönetim Logları
         </a>
+        <a href="{{ url_for('admin_moderation.dashboard') }}" class="btn btn-sm btn-warning">
+            <i class="bi bi-shield-check"></i> AI Moderasyon Paneli
+        </a>
         <a href="{{ url_for('admin.ai_test', tur='kaynak') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Kaynak)</a>
         <a href="{{ url_for('admin.ai_test', tur='atik') }}" class="btn btn-sm btn-outline-info" target="_blank">AI Test (Atık)</a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <h5><i class="bi bi-shield-exclamation text-warning"></i> İnceleme Bekleyen İlanlar</h5>
+            {% if inceleme_kaynaklar or inceleme_atiklar %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Tür</th>
+                            <th>Başlık</th>
+                            <th>Risk</th>
+                            <th>Gerekçe</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for k in inceleme_kaynaklar %}
+                        <tr>
+                            <td><span class="badge bg-info">Kaynak</span></td>
+                            <td>{{ k.baslik }}</td>
+                            <td><span class="badge bg-warning text-dark">{{ k.ai_risk_score or '?' }}/100</span></td>
+                            <td class="small text-muted">{{ k.moderation_reason or '-' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin_moderation.ilan_detay', tur='kaynak', ilan_id=k.id) }}" class="btn btn-sm btn-outline-primary">Detay</a>
+                                <form method="POST" action="{{ url_for('admin.admin_moderasyon_onayla', tur='kaynak', id=k.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-success">Onayla</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('admin.admin_moderasyon_reddet', tur='kaynak', id=k.id) }}" class="d-inline"
+                                      onsubmit="return confirm('İlanı reddetmek istediğinize emin misiniz?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-danger">Reddet</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% for a in inceleme_atiklar %}
+                        <tr>
+                            <td><span class="badge bg-success">Atık</span></td>
+                            <td>{{ a.baslik }}</td>
+                            <td><span class="badge bg-warning text-dark">{{ a.ai_risk_score or '?' }}/100</span></td>
+                            <td class="small text-muted">{{ a.moderation_reason or '-' }}</td>
+                            <td>
+                                <a href="{{ url_for('admin_moderation.ilan_detay', tur='atik', ilan_id=a.id) }}" class="btn btn-sm btn-outline-primary">Detay</a>
+                                <form method="POST" action="{{ url_for('admin.admin_moderasyon_onayla', tur='atik', id=a.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-success">Onayla</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('admin.admin_moderasyon_reddet', tur='atik', id=a.id) }}" class="d-inline"
+                                      onsubmit="return confirm('İlanı reddetmek istediğinize emin misiniz?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-danger">Reddet</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">İnceleme bekleyen ilan yok.</p>
+            {% endif %}
+        </div>
     </div>
 
     <div class="row g-4 mb-4">

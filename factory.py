@@ -245,6 +245,7 @@ def create_app(config_overrides=None):
     from blueprints.gamification import gamification_bp
     from blueprints.kurum import kurum_bp
     from blueprints.admin import admin_bp
+    from blueprints.admin_moderation import admin_moderation_bp
     from blueprints.admin_reports import admin_reports_bp
     from blueprints.api import api_bp
     from blueprints.atik import atik_bp
@@ -266,6 +267,7 @@ def create_app(config_overrides=None):
     app.register_blueprint(kurum_bp)
     app.register_blueprint(gamification_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(admin_moderation_bp)
     app.register_blueprint(admin_reports_bp)
 
     apply_force_https_exemptions(app)

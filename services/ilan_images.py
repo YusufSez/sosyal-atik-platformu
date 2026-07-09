@@ -115,22 +115,20 @@ def ai_analiz_ilk_foto(dosyalar, tur, aciklama, baslik=None, kategori_secim=None
     )
 
 
-def fotograf_moderasyonu(ai_sonuc, baslik, aciklama, dosyalar):
+def fotograf_moderasyonu(ai_sonuc, baslik, aciklama, dosyalar, tur="atik"):
     return moderasyon_kontrol(
         ai_sonuc,
         baslik=baslik,
         aciklama=aciklama,
         resim_var=bool(dosyalar),
+        tur=tur,
     )
 
 
 def moderasyon_reddedildi(ai_sonuc, dosyalar):
-    from constants import AI_RISK_BLOCK_THRESHOLD
+    from services.ilan_moderation import moderasyon_reddedildi as _reddedildi
 
-    if ai_sonuc.get("guvenli", True) and ai_sonuc.get("risk_skoru", 0) <= AI_RISK_BLOCK_THRESHOLD:
-        return False
-    fotograflari_temizle(dosyalar)
-    return True
+    return _reddedildi(ai_sonuc, dosyalar, fotograflari_temizle)
 
 
 def backfill_ilan_resimleri():

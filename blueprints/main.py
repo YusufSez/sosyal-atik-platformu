@@ -1,7 +1,8 @@
 from flask import Blueprint, abort, jsonify, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
-from sqlalchemy import or_, text
+from services.ilan_moderation import public_ilan_base_filter
+from sqlalchemy import text
 from sqlalchemy.orm import selectinload
 
 from content.kurumsal import KURUMSAL_SAYFALAR, SITE_HARITASI_GRUPLARI
@@ -16,8 +17,8 @@ main_bp = Blueprint("main", __name__)
 @main_bp.route("/")
 @main_bp.route("/anasayfa")
 def anasayfa():
-    kaynaklar = Kaynak.query.options(selectinload(Kaynak.fotograflar)).filter(
-        or_(Kaynak.ilan_durumu == "Aktif", Kaynak.ilan_durumu.is_(None))
+    kaynaklar = public_ilan_base_filter(
+        Kaynak.query.options(selectinload(Kaynak.fotograflar)), Kaynak
     ).order_by(Kaynak.id.desc()).limit(8).all()
     stats = {
         "kullanici": User.query.count(),
