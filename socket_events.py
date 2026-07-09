@@ -1,5 +1,6 @@
 """Flask-SocketIO event handlers — mesajlaşma, presence ve conversation odaları."""
 
+import logging
 import time
 from collections import defaultdict
 
@@ -12,6 +13,8 @@ from constants import RATE_SOCKET_MESSAGE_PER_SEC, RATE_SOCKET_TYPING_PER_SEC
 from extensions import db, socketio
 from models import Bildirim, Mesaj, User
 from utils import format_datetime, utc_now
+
+logger = logging.getLogger("atikport.socket")
 
 _connection_counts: defaultdict[int, int] = defaultdict(int)
 _rate_buckets: defaultdict[int, defaultdict[str, list]] = defaultdict(lambda: defaultdict(list))
@@ -47,6 +50,14 @@ def parse_conversation_parts(conversation_id: str) -> tuple[int, int, int] | Non
 
 def is_user_online(user_id: int) -> bool:
     return _connection_counts.get(user_id, 0) > 0
+
+
+def _log_emit(event: str, room: str, **extra) -> None:
+    logger.info("SOCKET EMIT %s room=%s %s", event, room, extra or "")
+
+
+def _log_socket(event: str, **extra) -> None:
+    logger.info("SOCKET %s %s", event, extra or "")
 
 
 def get_online_users() -> set[int]:
@@ -200,21 +211,23 @@ def _broadcast_presence(user_id: int, online: bool) -> None:
     user = db.session.get(User, user_id)
     payload = presence_payload(user, user_id)
     event = "friend_online" if online else "friend_offline"
+    _log_socket("PRESENCE", user_id=user_id, online=online)
     for partner_id in get_conversation_partner_ids(user_id):
         if is_user_online(partner_id):
             socketio.emit(event, payload, room=user_room(partner_id))
 
 
 def emit_unread_count_updated(user_id: int) -> None:
-    if not is_user_online(user_id):
-        return
-    socketio.emit("unread_count_updated", unread_counts_for(user_id), room=user_room(user_id))
+    room = user_room(user_id)
+    payload = unread_counts_for(user_id)
+    _log_emit("unread_count_updated", room, user_id=user_id)
+    socketio.emit("unread_count_updated", payload, room=room)
 
 
 def emit_notification_sync(user_id: int) -> None:
-    if not is_user_online(user_id):
-        return
-    socketio.emit("notification_sync", unread_counts_for(user_id), room=user_room(user_id))
+    room = user_room(user_id)
+    _log_emit("notification_sync", room, user_id=user_id)
+    socketio.emit("notification_sync", unread_counts_for(user_id), room=room)
 
 
 def emit_after_message_created(mesaj: Mesaj) -> None:
@@ -228,21 +241,28 @@ def emit_after_message_created(mesaj: Mesaj) -> None:
     )
     conv = conversation_room(canon)
 
-    socketio.emit("message_sent", serialize_message(mesaj, sender_id), room=conv)
+    sent_payload = serialize_message(mesaj, sender_id)
+    recv_payload = serialize_message(mesaj, receiver_id)
+
+    _log_emit("message_sent", conv, message_id=mesaj.id, sender=sender_id)
+    socketio.emit("message_sent", sent_payload, room=conv)
+
+    _log_emit("new_message", conv, message_id=mesaj.id, receiver=receiver_id)
+    socketio.emit("new_message", recv_payload, room=conv)
+
+    _log_emit("conversation_updated", user_room(sender_id), user_id=sender_id)
     socketio.emit(
         "conversation_updated",
         build_conversation_updated(mesaj, sender_id),
         room=user_room(sender_id),
     )
-
-    if is_user_online(receiver_id):
-        socketio.emit("new_message", serialize_message(mesaj, receiver_id), room=conv)
-        socketio.emit(
-            "conversation_updated",
-            build_conversation_updated(mesaj, receiver_id),
-            room=user_room(receiver_id),
-        )
-        emit_unread_count_updated(receiver_id)
+    _log_emit("conversation_updated", user_room(receiver_id), user_id=receiver_id)
+    socketio.emit(
+        "conversation_updated",
+        build_conversation_updated(mesaj, receiver_id),
+        room=user_room(receiver_id),
+    )
+    emit_unread_count_updated(receiver_id)
 
 
 def emit_messages_marked_read(messages: list, reader_id: int) -> None:
@@ -258,25 +278,25 @@ def emit_messages_marked_read(messages: list, reader_id: int) -> None:
         })
 
     for sender_id, items in by_sender.items():
-        if not is_user_online(sender_id):
-            continue
         sample = next(m for m in messages if m.sender_id == sender_id)
-        socketio.emit(
-            "message_read",
-            {
-                "reader_id": reader_id,
-                "message_ids": [item["message_id"] for item in items],
-                "messages": items,
-                "conversation_id": conversation_id_for(sample, sender_id),
-                "canonical_conversation_id": canonical_conversation_id(
-                    sample.sender_id,
-                    sample.receiver_id,
-                    sample.kaynak_id or 0,
-                    sample.atik_id or 0,
-                ),
-            },
-            room=user_room(sender_id),
+        canon = canonical_conversation_id(
+            sample.sender_id,
+            sample.receiver_id,
+            sample.kaynak_id or 0,
+            sample.atik_id or 0,
         )
+        payload = {
+            "reader_id": reader_id,
+            "message_ids": [item["message_id"] for item in items],
+            "messages": items,
+            "conversation_id": conversation_id_for(sample, sender_id),
+            "canonical_conversation_id": canon,
+        }
+        sender_room = user_room(sender_id)
+        _log_emit("message_read", sender_room, reader=reader_id, count=len(items))
+        socketio.emit("message_read", payload, room=sender_room)
+        _log_emit("message_read", conversation_room(canon), reader=reader_id, count=len(items))
+        socketio.emit("message_read", payload, room=conversation_room(canon))
 
     emit_unread_count_updated(reader_id)
 
@@ -299,7 +319,9 @@ def handle_connect():
     if not current_user.is_authenticated:
         raise ConnectionRefusedError("Giriş gerekli")
     became_online = _register_connection(current_user.id)
-    _join_room_safe(user_room(current_user.id))
+    room = user_room(current_user.id)
+    _join_room_safe(room)
+    _log_socket("JOIN", user_id=current_user.id, room=room, became_online=became_online)
     if became_online:
         _broadcast_presence(current_user.id, online=True)
 
@@ -309,7 +331,9 @@ def handle_disconnect():
     if not current_user.is_authenticated:
         return
     went_offline = _unregister_connection(current_user.id)
-    _leave_room_safe(user_room(current_user.id))
+    room = user_room(current_user.id)
+    _leave_room_safe(room)
+    _log_socket("LEAVE", user_id=current_user.id, room=room, went_offline=went_offline)
     if went_offline:
         _set_last_seen(current_user.id)
         _broadcast_presence(current_user.id, online=False)
@@ -322,6 +346,7 @@ def handle_join():
     _connection_counts[current_user.id] = max(1, _connection_counts.get(current_user.id, 0))
     room = user_room(current_user.id)
     _join_room_safe(room)
+    _log_socket("JOIN", user_id=current_user.id, room=room, via="join_event")
     return {
         "room": room,
         "user_id": current_user.id,
@@ -335,6 +360,7 @@ def handle_leave():
         return {"error": "Giriş gerekli"}
     room = user_room(current_user.id)
     _leave_room_safe(room)
+    _log_socket("LEAVE", user_id=current_user.id, room=room, via="leave_event")
     return {"left": room}
 
 
@@ -351,6 +377,13 @@ def handle_join_conversation(data):
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     room = conversation_room(canon)
     _join_room_safe(room)
+    _log_socket(
+        "JOIN_CONVERSATION",
+        user_id=current_user.id,
+        room=room,
+        partner_id=partner_id,
+        canonical=canon,
+    )
     partner = db.session.get(User, partner_id)
     return {
         "room": room,
@@ -370,7 +403,9 @@ def handle_leave_conversation(data):
     atik_id = int(data.get("atik_id") or 0)
     if partner_id:
         canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
-        _leave_room_safe(conversation_room(canon))
+        room = conversation_room(canon)
+        _leave_room_safe(room)
+        _log_socket("LEAVE_CONVERSATION", user_id=current_user.id, room=room)
     return {"left": True}
 
 
@@ -389,17 +424,15 @@ def handle_typing_start(data):
     if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
-    socketio.emit(
-        "typing_start",
-        {
-            "sender_id": current_user.id,
-            "sender_name": current_user.username,
-            "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
-            "canonical_conversation_id": canon,
-        },
-        room=conversation_room(canon),
-        include_self=False,
-    )
+    conv = conversation_room(canon)
+    payload = {
+        "sender_id": current_user.id,
+        "sender_name": current_user.username,
+        "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
+        "canonical_conversation_id": canon,
+    }
+    _log_emit("typing_start", conv, sender=current_user.id)
+    socketio.emit("typing_start", payload, room=conv, include_self=False)
 
 
 @socketio.on("typing_stop")
@@ -415,16 +448,14 @@ def handle_typing_stop(data):
     if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
-    socketio.emit(
-        "typing_stop",
-        {
-            "sender_id": current_user.id,
-            "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
-            "canonical_conversation_id": canon,
-        },
-        room=conversation_room(canon),
-        include_self=False,
-    )
+    conv = conversation_room(canon)
+    payload = {
+        "sender_id": current_user.id,
+        "conversation_id": f"{partner_id}-{kaynak_id}-{atik_id}",
+        "canonical_conversation_id": canon,
+    }
+    _log_emit("typing_stop", conv, sender=current_user.id)
+    socketio.emit("typing_stop", payload, room=conv, include_self=False)
 
 
 @socketio.on("typing")
@@ -463,6 +494,7 @@ def handle_message_read(data):
         mesaj.is_read = True
         mesaj.read_at = now
     db.session.commit()
+    _log_socket("MESSAGE_READ", reader=current_user.id, count=len(messages))
     emit_messages_marked_read(messages, current_user.id)
     return {"updated": len(messages)}
 
@@ -488,6 +520,13 @@ def handle_sync_state(data):
     if after_id:
         query = query.filter(Mesaj.id > after_id)
     rows = query.order_by(Mesaj.id.asc()).limit(100).all()
+    _log_socket(
+        "SYNC",
+        user_id=current_user.id,
+        partner_id=partner_id,
+        after_id=after_id,
+        count=len(rows),
+    )
     return {
         "messages": [serialize_message(m, current_user.id) for m in rows],
         "unread": unread_counts_for(current_user.id),

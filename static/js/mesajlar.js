@@ -21,6 +21,7 @@
   var lastMessageId = 0;
   var pendingNewCount = 0;
   var socket = null;
+  var conversationJoined = false;
 
   function getSocket() {
     if (socket) return socket;
@@ -28,6 +29,13 @@
       socket = window.getMessageSocket();
     }
     return socket;
+  }
+
+  function localCanonicalId() {
+    if (canonicalId) return canonicalId;
+    var low = Math.min(currentUserId, aliciId);
+    var high = Math.max(currentUserId, aliciId);
+    return low + "-" + high + "-" + kaynakId + "-" + atikId;
   }
 
   function isNearBottom() {
@@ -49,28 +57,51 @@
 
   function matchesConversation(msg) {
     if (!msg) return false;
-    if (msg.canonical_conversation_id && canonicalId) {
-      return msg.canonical_conversation_id === canonicalId;
+    var canon = localCanonicalId();
+    if (msg.canonical_conversation_id && canon) {
+      return msg.canonical_conversation_id === canon;
     }
-    return msg.conversation_id === conversationId;
+    if (msg.conversation_id === conversationId) return true;
+    if (msg.sender_id === aliciId || msg.receiver_id === aliciId) {
+      return msg.canonical_conversation_id === canon;
+    }
+    return false;
   }
 
   function joinConversationRoom() {
     var sock = getSocket();
     if (!sock) return;
-    sock.emit(
-      "join_conversation",
-      { partner_id: aliciId, kaynak_id: kaynakId, atik_id: atikId },
-      function (res) {
-        if (res && res.canonical_conversation_id) {
-          canonicalId = res.canonical_conversation_id;
-          mesajKutusu.dataset.canonicalId = canonicalId;
-        }
-        if (res && res.partner) {
-          updatePartnerPresence(res.partner);
-        }
+    var payload = { partner_id: aliciId, kaynak_id: kaynakId, atik_id: atikId };
+    if (typeof window.registerConversation === "function") {
+      window.registerConversation(aliciId, kaynakId, atikId);
+    }
+    sock.emit("join_conversation", payload, function (res) {
+      if (res && res.error) {
+        console.warn("join_conversation failed:", res.error);
+        return;
       }
-    );
+      conversationJoined = true;
+      if (res && res.canonical_conversation_id) {
+        canonicalId = res.canonical_conversation_id;
+        mesajKutusu.dataset.canonicalId = canonicalId;
+      }
+      if (res && res.partner) {
+        updatePartnerPresence(res.partner);
+      }
+    });
+  }
+
+  function ensureConversationJoined() {
+    var sock = getSocket();
+    if (!sock) {
+      setTimeout(ensureConversationJoined, 150);
+      return;
+    }
+    if (sock.connected) {
+      joinConversationRoom();
+    } else {
+      sock.once("connect", joinConversationRoom);
+    }
   }
 
   function syncAfterReconnect() {
@@ -89,6 +120,14 @@
         res.messages.forEach(function (msg) {
           insertMessage(msg, false);
         });
+        var unreadIds = res.messages
+          .filter(function (m) {
+            return m.receiver_id === currentUserId && !m.is_read;
+          })
+          .map(function (m) {
+            return m.message_id;
+          });
+        if (unreadIds.length) markMessagesRead(unreadIds);
         if (isNearBottom()) scrollToBottom();
       }
     );
@@ -233,9 +272,11 @@
           insertMessage(
             {
               id: msg.id,
+              message_id: msg.id,
               sender_id: msg.sender_id,
               sender_username: msg.sender_username,
               content: msg.content,
+              message: msg.content,
               timestamp: msg.timestamp,
               is_read: msg.is_read,
               read_at_local: msg.read_at_local,
@@ -249,7 +290,7 @@
 
   function emitTypingStart() {
     var sock = getSocket();
-    if (!sock) return;
+    if (!sock || !sock.connected) return;
     sock.emit("typing_start", {
       partner_id: aliciId,
       kaynak_id: kaynakId,
@@ -259,7 +300,7 @@
 
   function emitTypingStop() {
     var sock = getSocket();
-    if (!sock) return;
+    if (!sock || !sock.connected) return;
     sock.emit("typing_stop", {
       partner_id: aliciId,
       kaynak_id: kaynakId,
@@ -276,7 +317,7 @@
     typingIndicator.textContent = (name || "Kullanıcı") + " yazıyor...";
     typingIndicator.classList.remove("d-none");
     clearTimeout(typingHideTimer);
-    typingHideTimer = setTimeout(hideTypingIndicator, 2000);
+    typingHideTimer = setTimeout(hideTypingIndicator, 3000);
   }
 
   function updatePartnerPresence(data) {
@@ -299,12 +340,13 @@
 
     if (!sock._mesajlarHandlersBound) {
       sock.on("connect", function () {
-        joinConversationRoom();
+        ensureConversationJoined();
         syncAfterReconnect();
       });
 
       sock.on("reconnect", function () {
-        joinConversationRoom();
+        conversationJoined = false;
+        ensureConversationJoined();
         syncAfterReconnect();
       });
 
@@ -318,26 +360,41 @@
 
       sock._mesajlarHandlersBound = true;
     }
+
+    if (sock.connected) {
+      ensureConversationJoined();
+    }
   }
 
   function onNewMessage(msg) {
     if (!matchesConversation(msg)) return;
+    if (msg.sender_id === currentUserId) return;
     insertMessage(msg);
-    if (msg.receiver_id === currentUserId) {
+    if (msg.receiver_id === currentUserId && msg.message_id) {
       markMessagesRead([msg.message_id]);
     }
   }
 
   function onMessageSent(msg) {
     if (!matchesConversation(msg)) return;
+    if (msg.sender_id !== currentUserId) return;
     insertMessage(msg);
   }
 
   function onMessageRead(data) {
     if (!data) return;
+    var canon = localCanonicalId();
     if (
-      data.conversation_id !== conversationId &&
-      data.canonical_conversation_id !== canonicalId
+      data.canonical_conversation_id &&
+      canon &&
+      data.canonical_conversation_id !== canon
+    ) {
+      return;
+    }
+    if (
+      !data.canonical_conversation_id &&
+      data.conversation_id &&
+      data.conversation_id !== conversationId
     ) {
       return;
     }
@@ -345,26 +402,14 @@
   }
 
   function onTypingStart(data) {
-    if (!data) return;
-    if (
-      data.conversation_id !== conversationId &&
-      data.canonical_conversation_id !== canonicalId
-    ) {
-      return;
-    }
-    if (data.sender_id !== aliciId) return;
+    if (!data || data.sender_id !== aliciId) return;
+    if (!matchesConversation(data)) return;
     showTypingIndicator(data.sender_name);
   }
 
   function onTypingStop(data) {
-    if (!data) return;
-    if (
-      data.conversation_id !== conversationId &&
-      data.canonical_conversation_id !== canonicalId
-    ) {
-      return;
-    }
-    if (data.sender_id !== aliciId) return;
+    if (!data || data.sender_id !== aliciId) return;
+    if (!matchesConversation(data)) return;
     hideTypingIndicator();
   }
 
@@ -389,22 +434,20 @@
     }
   });
 
-  fetchMessages();
-  joinConversationRoom();
   setupSocketHandlers();
+  fetchMessages();
 
   if (mesajInput) {
     mesajInput.addEventListener("input", function () {
       clearTimeout(typingDebounce);
+      clearTimeout(stopTypingTimer);
       if (!mesajInput.value.trim()) {
         emitTypingStop();
         return;
       }
-      typingDebounce = setTimeout(function () {
-        emitTypingStart();
-        clearTimeout(stopTypingTimer);
-        stopTypingTimer = setTimeout(emitTypingStop, 2000);
-      }, 500);
+      emitTypingStart();
+      typingDebounce = setTimeout(emitTypingStart, 300);
+      stopTypingTimer = setTimeout(emitTypingStop, 2500);
     });
   }
 

@@ -8,6 +8,8 @@
   function getSocket() {
     if (!socket && typeof io !== "undefined") {
       socket = io({
+        path: "/socket.io/",
+        transports: ["websocket", "polling"],
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: Infinity,

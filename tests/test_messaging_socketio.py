@@ -245,13 +245,15 @@ def test_unauthorized_room_join_rejected(client, app):
     outsider_socket.disconnect()
 
 
-def test_offline_user_skips_receiver_emit(app):
+def test_offline_user_still_emits_to_conversation_room(app):
+    """Oda üyeleri bağlıyken mesaj her zaman conversation odasına gider."""
     with app.app_context():
         sender_id, receiver_id, _ = _create_users(app)
         mesaj = Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="Offline")
         db.session.add(mesaj)
         db.session.commit()
         mesaj = db.session.get(Mesaj, mesaj.id)
+        canon = canonical_conversation_id(sender_id, receiver_id, 0, 0)
 
         with patch("socket_events.socketio.emit") as emit_mock:
             with patch("socket_events.is_user_online", return_value=False):
@@ -259,7 +261,9 @@ def test_offline_user_skips_receiver_emit(app):
 
         event_names = [call.args[0] for call in emit_mock.call_args_list]
         assert "message_sent" in event_names
-        assert "new_message" not in event_names
+        assert "new_message" in event_names
+        new_msg_call = next(c for c in emit_mock.call_args_list if c.args[0] == "new_message")
+        assert new_msg_call.kwargs["room"] == conversation_room(canon)
 
 
 def test_mesajlar_getir_emits_read_receipt(app):
@@ -282,7 +286,7 @@ def test_mesajlar_getir_emits_read_receipt(app):
                 assert any(call.args[0] == "message_read" for call in emit_mock.call_args_list)
 
 
-def test_emit_messages_marked_read_offline_sender(app):
+def test_emit_messages_marked_read_always_emits(app):
     with app.app_context():
         sender_id, receiver_id, _ = _create_users(app)
         mesaj = Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="x", is_read=True)
@@ -297,7 +301,7 @@ def test_emit_messages_marked_read_offline_sender(app):
                     receiver_id,
                 )
 
-        emit_mock.assert_not_called()
+        assert any(call.args[0] == "message_read" for call in emit_mock.call_args_list)
 
 
 def test_is_user_online_tracks_join(app, client):
