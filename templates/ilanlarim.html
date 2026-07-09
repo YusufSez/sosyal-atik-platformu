@@ -51,7 +51,7 @@
                                     <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
                                 </form>
                             </td>
-                            <td><small>{{ kaynak.tarih.strftime('%d.%m.%Y') }}</small></td>
+                            <td><small>{{ kaynak.tarih|format_dt('%d.%m.%Y') }}</small></td>
                             <td>
                                 <a href="{{ url_for('ilan.ilan_duzenle_kaynak', id=kaynak.id) }}" class="btn btn-sm btn-warning">Düzenle</a>
                                 <form method="POST" action="{{ url_for('ilan.ilan_sil', tur='kaynak', id=kaynak.id) }}" class="d-inline"
@@ -113,7 +113,7 @@
                                     <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
                                 </form>
                             </td>
-                            <td><small>{{ atik.tarih.strftime('%d.%m.%Y') }}</small></td>
+                            <td><small>{{ atik.tarih|format_dt('%d.%m.%Y') }}</small></td>
                             <td>
                                 <a href="{{ url_for('ilan.ilan_duzenle_atik', id=atik.id) }}" class="btn btn-sm btn-warning">Düzenle</a>
                                 <form method="POST" action="{{ url_for('ilan.ilan_sil', tur='atik', id=atik.id) }}" class="d-inline"

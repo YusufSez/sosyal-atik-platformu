@@ -8,7 +8,7 @@ from constants import RATE_PUBLIC_API
 from extensions import db, limiter
 from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
 from services.notifications import bildirim_olustur
-from utils import mesafe_hesapla, sanitize_input
+from utils import format_datetime, mesafe_hesapla, sanitize_input
 
 api_bp = Blueprint("api", __name__)
 
@@ -209,7 +209,7 @@ def bildirimleri_getir():
         "tur": b.tur,
         "okundu": b.okundu,
         "link": b.link,
-        "timestamp": b.timestamp.strftime("%d.%m.%Y %H:%M"),
+        "timestamp": format_datetime(b.timestamp, "%d.%m.%Y %H:%M"),
     } for b in bildirimler])
 
 

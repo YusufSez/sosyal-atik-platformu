@@ -198,9 +198,9 @@ def aylik_kirilim(user_id=None, ay_sayisi=6):
     from calendar import monthrange
     from datetime import datetime
 
-    from utils import tr_time
+    from utils import local_now, to_utc
 
-    now = tr_time()
+    now = local_now()
     aylar = []
     for offset in range(ay_sayisi - 1, -1, -1):
         month = now.month - offset
@@ -215,8 +215,8 @@ def aylik_kirilim(user_id=None, ay_sayisi=6):
         last_day = monthrange(year, month)[1]
         ay_son = datetime(year, month, last_day, 23, 59, 59)
         q = db.session.query(func.coalesce(func.sum(CevreselEtki.co2e_kg), 0)).filter(
-            CevreselEtki.timestamp >= ay_bas,
-            CevreselEtki.timestamp <= ay_son,
+            CevreselEtki.timestamp >= to_utc(ay_bas),
+            CevreselEtki.timestamp <= to_utc(ay_son),
         )
         if user_id is not None:
             q = q.filter(CevreselEtki.user_id == user_id)

@@ -30,7 +30,7 @@
                         {% endif %}
                     </p>
 
-                    <small class="text-muted">{{ msg.timestamp.strftime('%d-%m-%Y %H:%M') }}</small>
+                    <small class="text-muted">{{ msg.timestamp|format_dt('%d-%m-%Y %H:%M') }}</small>
 
                     <div>
                         <small class="text-muted">📦 {{ urun.baslik if urun else "Ürün bilgisi yok" }}</small>

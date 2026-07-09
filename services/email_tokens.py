@@ -10,8 +10,11 @@ from extensions import db
 from models import EmailToken, User
 
 
+from utils import utc_now
+
+
 def _now() -> datetime:
-    return datetime.utcnow()
+    return utc_now()
 
 VERIFY_SALT = "email-verify-v1"
 RESET_SALT = "password-reset-v1"

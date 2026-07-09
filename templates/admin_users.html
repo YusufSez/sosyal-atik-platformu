@@ -42,7 +42,7 @@
                     </td>
                     <td>
                         {% if u.terms_accepted_at %}
-                            {{ u.terms_accepted_at.strftime('%d.%m.%Y %H:%M') }}
+                            {{ u.terms_accepted_at|format_dt }}
                         {% else %}
                             -
                         {% endif %}

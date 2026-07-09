@@ -7,7 +7,7 @@ from extensions import db, limiter, rate_limit_user_or_ip
 from models import Atik, Kaynak, Mesaj, User
 from services.content_filter import mesaj_uygun_mu
 from services.notifications import bildirim_olustur
-from utils import sanitize_input
+from utils import format_datetime, sanitize_input
 
 messages_bp = Blueprint("messages", __name__)
 
@@ -102,7 +102,7 @@ def mesajlar_getir(alici_id, kaynak_id, atik_id):
         "sender_id": m.sender_id,
         "sender_username": m.sender.username,
         "is_read": m.is_read,
-        "timestamp": m.timestamp.strftime("%d.%m.%Y %H:%M"),
+        "timestamp": format_datetime(m.timestamp, "%d.%m.%Y %H:%M"),
     } for m in mesajlar_list])
 
 

@@ -8,7 +8,7 @@
             <span class="badge bg-primary ms-1">İlan Sahibi</span>
             {% endif %}
         </div>
-        <small class="text-muted">{{ y.timestamp.strftime('%d.%m.%Y %H:%M') }}</small>
+        <small class="text-muted">{{ y.timestamp|format_dt }}</small>
     </div>
     <p class="mb-2">{{ y.content|display_text }}</p>
 
@@ -22,7 +22,7 @@
                 <span class="badge bg-primary ms-1">İlan Sahibi</span>
                 {% endif %}
             </div>
-            <small class="text-muted">{{ c.timestamp.strftime('%d.%m.%Y %H:%M') }}</small>
+            <small class="text-muted">{{ c.timestamp|format_dt }}</small>
         </div>
         <p class="mb-0">{{ c.content|display_text }}</p>
     </div>

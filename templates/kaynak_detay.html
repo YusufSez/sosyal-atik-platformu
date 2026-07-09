@@ -16,7 +16,7 @@
                 <li class="list-group-item"><strong>Kategori:</strong> {{ item.kategori }}</li>
                 <li class="list-group-item"><strong>Durum:</strong> {{ item.durum }}</li>
                 <li class="list-group-item"><strong>İlan Durumu:</strong> {{ item.ilan_durumu or 'Aktif' }}</li>
-                <li class="list-group-item"><strong>Tarih:</strong> {{ item.tarih.strftime('%d.%m.%Y %H:%M') if item.tarih else '-' }}</li>
+                <li class="list-group-item"><strong>Tarih:</strong> {{ item.tarih|format_dt if item.tarih else '-' }}</li>
                 <li class="list-group-item">
                     <strong>Görüntülenme:</strong> <span id="goruntulenmeSayisi">—</span>
                 </li>

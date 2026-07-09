@@ -77,7 +77,7 @@
                 <tbody>
                     {% for e in son_teslimler %}
                     <tr>
-                        <td>{{ e.timestamp.strftime('%d.%m.%Y') if e.timestamp else '-' }}</td>
+                        <td>{{ e.timestamp|format_dt('%d.%m.%Y') if e.timestamp else '-' }}</td>
                         <td>
                             {% if e.tur == 'kaynak' %}
                             <span class="badge bg-primary">Kaynak</span>

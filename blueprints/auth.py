@@ -1,8 +1,6 @@
 import json
 import os
 import re
-from datetime import datetime
-
 from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
@@ -29,10 +27,22 @@ from utils import (
     parse_coordinates,
     sanitize_input,
     save_profile_picture,
+    utc_now,
     validate_password,
 )
 
 auth_bp = Blueprint("auth", __name__)
+
+
+def _find_user_by_login(identifier: str):
+    """Girilen değer e-posta (@ içeriyorsa) veya kullanıcı adı olarak aranır."""
+    identifier = (identifier or "").strip()
+    if not identifier:
+        return None
+    if "@" in identifier:
+        email = identifier.lower()
+        return User.query.filter(db.func.lower(User.email) == email).first()
+    return User.query.filter(db.func.lower(User.username) == identifier.lower()).first()
 
 
 @auth_bp.route("/kayit", methods=["GET", "POST"])
@@ -86,7 +96,7 @@ def kayit():
             username=username,
             email=email,
             password=hash_password(password),
-            terms_accepted_at=datetime.now(),
+            terms_accepted_at=utc_now(),
         )
         # Superadmin ataması: sadece SUPERADMIN_EMAIL ile eşleşen kullanıcıya
         # (SUPERADMIN_EMAIL tanımlı değilse geriye uyumluluk için ADMIN_EMAIL'e fallback).
@@ -172,20 +182,20 @@ def giris():
             flash(captcha_err, "danger")
             return redirect(url_for("auth.giris"))
 
-        email = sanitize_input(request.form.get("email"), max_length=150).lower().strip()
+        login_id = sanitize_input(request.form.get("email"), max_length=150).strip()
         password = request.form.get("password")
 
-        if not re.match(r"^[\w.+-]+@[\w-]+\.[\w.-]+$", email):
-            flash("Geçerli bir e-posta adresi giriniz.", "danger")
+        if not login_id:
+            flash("Kullanıcı adı veya e-posta gerekli.", "danger")
             return redirect(url_for("auth.giris"))
 
-        user = User.query.filter_by(email=email).first()
+        user = _find_user_by_login(login_id)
         if user and getattr(user, "is_banned", False):
             flash("Hesabınız banlandı. Giriş yapamazsınız.", "danger")
             return redirect(url_for("auth.giris"))
 
         if not user or not verify_password(password, user.password):
-            flash("Hatalı e-posta veya şifre!", "danger")
+            flash("Hatalı kullanıcı adı/e-posta veya şifre!", "danger")
             return redirect(url_for("auth.giris"))
 
         if needs_password_update(user.password):
@@ -299,7 +309,7 @@ def eposta_dogrula_onay(token):
         return redirect(url_for("auth.giris"))
 
     user.email_verified = True
-    user.email_verified_at = datetime.now()
+    user.email_verified_at = utc_now()
     db.session.commit()
     flash("E-posta adresiniz başarıyla doğrulandı!", "success")
     if current_user.is_authenticated and current_user.id == user.id:

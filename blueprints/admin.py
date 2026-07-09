@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -11,7 +10,7 @@ from models import AdminAuditLog, Atik, Kaynak, Sikayet, User
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
-from utils import cleanup_ilan_relations, sanitize_input
+from utils import cleanup_ilan_relations, sanitize_input, utc_now
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -62,7 +61,7 @@ def admin_ban_user(user_id: int):
     reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
 
     target.is_banned = True
-    target.banned_at = datetime.now()
+    target.banned_at = utc_now()
     target.ban_reason = reason
     db.session.commit()
 
@@ -121,7 +120,7 @@ def admin_soft_delete_user(user_id: int):
         reason = "Silindi"
 
     target.is_banned = True
-    target.banned_at = datetime.now()
+    target.banned_at = utc_now()
     target.ban_reason = reason
     db.session.commit()
 

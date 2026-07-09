@@ -203,7 +203,7 @@
             <tbody>
             {% for log in audit_kayitlari %}
             <tr>
-                <td><small>{{ log.tarih.strftime('%d.%m.%Y %H:%M') if log.tarih else '-' }}</small></td>
+                <td><small>{{ log.tarih|format_dt if log.tarih else '-' }}</small></td>
                 <td>{{ log.admin.username if log.admin else '-' }}</td>
                 <td><code>{{ log.action }}</code></td>
                 <td>{{ log.target or '-' }}</td>

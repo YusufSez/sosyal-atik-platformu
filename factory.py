@@ -264,9 +264,13 @@ def create_app(config_overrides=None):
             except Exception as exc:
                 app.logger.warning("Otomatik yedekleme başarısız: %s", exc)
 
-    from utils import unescape_stored_text
+    from utils import format_datetime, unescape_stored_text
     from services.impact import format_etki_sayi
     from services.ilan_images import ilan_fotograf_listesi, kapak_resim
+
+    @app.template_filter("format_dt")
+    def format_dt_filter(value, fmt="%d.%m.%Y %H:%M"):
+        return format_datetime(value, fmt)
 
     @app.template_filter("display_text")
     def display_text_filter(value):
@@ -284,8 +288,8 @@ def create_app(config_overrides=None):
     def ilan_fotograflari_filter(ilan):
         return ilan_fotograf_listesi(ilan)
 
-    from datetime import datetime
     from content.kurumsal import FOOTER_COLUMNS, NAVBAR_KURUMSAL, SOSYAL_MEDYA
+    from utils import local_now
 
     @app.context_processor
     def inject_site_footer():
@@ -293,7 +297,7 @@ def create_app(config_overrides=None):
             "footer_columns": FOOTER_COLUMNS,
             "navbar_kurumsal": NAVBAR_KURUMSAL,
             "sosyal_medya": SOSYAL_MEDYA,
-            "now_year": datetime.now().year,
+            "now_year": local_now().year,
         }
 
     return app

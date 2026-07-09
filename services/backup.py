@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from services.database_config import is_sqlite_uri
+from utils import utc_now
 
 
 def _db_path_from_uri(uri: str) -> Path:
@@ -36,7 +37,7 @@ def _release_lock(lock_path: Path) -> None:
 def _cleanup_old_backups(backup_dir: Path, retention_days: int) -> int:
     if retention_days <= 0:
         return 0
-    cutoff = datetime.now() - timedelta(days=retention_days)
+    cutoff = utc_now() - timedelta(days=retention_days)
     removed = 0
     for path in backup_dir.glob("site_*.db"):
         try:
@@ -67,7 +68,7 @@ def backup_database(
         if not db_path.is_file():
             return None
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
         dest = backup_dir / f"site_{timestamp}.db"
 
         src_conn = sqlite3.connect(str(db_path))
@@ -79,7 +80,7 @@ def backup_database(
             src_conn.close()
 
         marker = backup_dir / ".last_backup"
-        marker.write_text(datetime.now().isoformat(), encoding="utf-8")
+        marker.write_text(utc_now().isoformat(), encoding="utf-8")
         _cleanup_old_backups(backup_dir, retention_days)
         return dest
     finally:
@@ -95,7 +96,7 @@ def should_run_daily_backup(backup_dir: str | Path, interval_hours: int = 24) ->
         last = datetime.fromisoformat(marker.read_text(encoding="utf-8").strip())
     except ValueError:
         return True
-    return datetime.now() - last >= timedelta(hours=interval_hours)
+    return utc_now() - last >= timedelta(hours=interval_hours)
 
 
 def maybe_run_scheduled_backup(app) -> Path | None:
