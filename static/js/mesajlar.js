@@ -334,37 +334,73 @@
     partnerPresence.innerHTML = '<span class="text-muted">Çevrimdışı</span>';
   }
 
-  function setupSocketHandlers() {
+  function onSocketConnect() {
+    ensureConversationJoined();
+    syncAfterReconnect();
+  }
+
+  function onSocketReconnect() {
+    conversationJoined = false;
+    ensureConversationJoined();
+    syncAfterReconnect();
+  }
+
+  function bindSocketEvents(sock) {
+    if (!sock) return false;
+
+    sock.off("connect", onSocketConnect);
+    sock.on("connect", onSocketConnect);
+
+    sock.off("reconnect", onSocketReconnect);
+    sock.on("reconnect", onSocketReconnect);
+
+    sock.off("new_message", onNewMessage);
+    sock.on("new_message", onNewMessage);
+
+    sock.off("message_sent", onMessageSent);
+    sock.on("message_sent", onMessageSent);
+
+    sock.off("message_read", onMessageRead);
+    sock.on("message_read", onMessageRead);
+
+    sock.off("typing_start", onTypingStart);
+    sock.on("typing_start", onTypingStart);
+
+    sock.off("typing_stop", onTypingStop);
+    sock.on("typing_stop", onTypingStop);
+
+    sock.off("friend_online", onFriendOnline);
+    sock.on("friend_online", onFriendOnline);
+
+    sock.off("friend_offline", onFriendOffline);
+    sock.on("friend_offline", onFriendOffline);
+
+    return true;
+  }
+
+  function initializeMessaging() {
     var sock = getSocket();
-    if (!sock) return;
-
-    if (!sock._mesajlarHandlersBound) {
-      sock.on("connect", function () {
-        ensureConversationJoined();
-        syncAfterReconnect();
-      });
-
-      sock.on("reconnect", function () {
-        conversationJoined = false;
-        ensureConversationJoined();
-        syncAfterReconnect();
-      });
-
-      sock.on("new_message", onNewMessage);
-      sock.on("message_sent", onMessageSent);
-      sock.on("message_read", onMessageRead);
-      sock.on("typing_start", onTypingStart);
-      sock.on("typing_stop", onTypingStop);
-      sock.on("friend_online", onFriendOnline);
-      sock.on("friend_offline", onFriendOffline);
-
-      sock._mesajlarHandlersBound = true;
-    }
-
+    if (!sock) return false;
+    bindSocketEvents(sock);
     if (sock.connected) {
       ensureConversationJoined();
     }
+    return true;
   }
+
+  function tryInitializeMessaging() {
+    if (initializeMessaging()) return;
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (initializeMessaging() || attempts >= 40) {
+        clearInterval(timer);
+      }
+    }, 50);
+  }
+
+  window.bindSocketEvents = bindSocketEvents;
+  window.initializeMessaging = initializeMessaging;
 
   function onNewMessage(msg) {
     if (!matchesConversation(msg)) return;
@@ -434,7 +470,8 @@
     }
   });
 
-  setupSocketHandlers();
+  window.addEventListener("atikport:message-socket-ready", initializeMessaging);
+  tryInitializeMessaging();
   fetchMessages();
 
   if (mesajInput) {

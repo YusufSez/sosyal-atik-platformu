@@ -313,5 +313,6 @@
   window.handleConversationUpdated = handleConversationUpdated;
 
   getSocket();
+  window.dispatchEvent(new CustomEvent("atikport:message-socket-ready"));
   bildirimleriGetir();
 })();
