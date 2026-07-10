@@ -523,7 +523,7 @@ ai_sonuc = ai_mesaj_moderasyon(metin)
 Manuel AI testi:
 
 ```bash
-python scripts/test_ai.py
+python scripts/check_ai.py
 ```
 
 ---
