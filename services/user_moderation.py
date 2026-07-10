@@ -77,12 +77,6 @@ def is_user_banned(user) -> bool:
         return False
     expires = getattr(user, "ban_expires_at", None)
     if expires and expires <= utc_now():
-        user.is_banned = False
-        user.banned_at = None
-        user.ban_reason = None
-        user.ban_expires_at = None
-        user.banned_by_id = None
-        db.session.commit()
         return False
     return True
 

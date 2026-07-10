@@ -22,7 +22,7 @@ from services.email_tokens import (
     verify_email_token,
     verify_reset_token,
 )
-from services.user_moderation import expire_temporary_bans, is_user_banned
+from services.user_moderation import is_user_banned
 from utils import (
     delete_profile_picture,
     parse_coordinates,
@@ -205,7 +205,6 @@ def giris():
             return redirect(url_for("auth.giris"))
 
         user = _find_user_by_login(login_id)
-        expire_temporary_bans()
         if user and getattr(user, "is_deactivated", False):
             flash("Hesabınız pasifleştirildi. Giriş yapamazsınız.", "danger")
             return redirect(url_for("auth.giris"))

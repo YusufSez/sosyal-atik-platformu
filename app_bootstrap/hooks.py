@@ -14,17 +14,6 @@ def register_proxy_and_security(app, behind_proxy: bool):
 
 def register_request_hooks(app):
     @app.before_request
-    def _expire_temporary_bans():
-        if skip_startup_hooks():
-            return
-        try:
-            from services.user_moderation import expire_temporary_bans
-
-            expire_temporary_bans()
-        except Exception:
-            pass
-
-    @app.before_request
     def _enforce_active_account():
         if skip_startup_hooks():
             return

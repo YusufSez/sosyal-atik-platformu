@@ -15,6 +15,7 @@ from app_bootstrap.hooks import (
     register_request_hooks,
 )
 from app_bootstrap.logging import register_rate_limit_and_csrf_handlers, setup_logging
+from app_bootstrap.scheduler import start_background_scheduler
 from app_bootstrap.startup import run_startup_tasks
 from app_bootstrap.template_filters import register_template_filters
 
@@ -30,6 +31,7 @@ def create_app(config_overrides=None):
     register_blueprints(app)
     register_https_exemptions(app)
     run_startup_tasks(app)
+    start_background_scheduler(app)
     register_template_filters(app)
     register_cli(app)
     return app
