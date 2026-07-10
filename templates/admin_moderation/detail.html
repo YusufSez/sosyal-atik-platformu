@@ -65,7 +65,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button class="btn btn-warning btn-sm">↻ Yeniden AI Analizi</button>
                     </form>
-                    <a href="{{ url_for('admin_moderation.ham_json', tur=tur, ilan_id=ilan.id) }}" class="btn btn-outline-dark btn-sm" target="_blank">📄 AI Ham JSON</a>
+                    <a href="{{ url_for('admin_moderation.ham_json', tur=tur, ilan_id=ilan.id) }}" class="btn btn-admin-outline btn-sm" target="_blank">📄 AI Ham JSON</a>
                 </div>
                 <div class="card-body border-top">
                     <form method="POST" action="{{ url_for('admin_moderation.risk_duzenle', tur=tur, ilan_id=ilan.id) }}" class="row g-2">

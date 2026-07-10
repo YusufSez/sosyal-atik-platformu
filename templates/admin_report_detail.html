@@ -12,7 +12,7 @@
             <a href="{{ url_for('admin_reports.admin_reports_list') }}" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Listeye Dön
             </a>
-            <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-outline-dark">Loglar</a>
+            <a href="{{ url_for('admin_reports.admin_logs') }}" class="btn btn-sm btn-admin-outline">Loglar</a>
         </div>
     </div>
 
@@ -164,7 +164,7 @@
                 <form method="POST" action="{{ url_for('admin_reports.admin_report_soft_delete_user', id=sikayet.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="ban_reason" value="Silindi">
-                    <button class="btn btn-sm btn-outline-dark" onclick="return confirm('Soft delete uygulansın mı?');">
+                    <button class="btn btn-sm btn-admin-outline" onclick="return confirm('Soft delete uygulansın mı?');">
                         Kullanıcıyı Soft Delete
                     </button>
                 </form>
