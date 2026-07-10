@@ -34,11 +34,6 @@
                 </li>
                 {% if current_user.is_authenticated %}
                 <li class="nav-item">
-                    <a href="{{ url_for('support.destek') }}" class="nav-link">
-                        <i class="bi bi-life-preserver"></i><span class="nav-text">Destek</span>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a href="{{ url_for('ilan.ilanlarim') }}" class="nav-link">
                         <i class="bi bi-card-list"></i><span class="nav-text">İlanlarım</span>
                     </a>
@@ -65,6 +60,11 @@
                         </li>
                         {% endfor %}
                     </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('support.destek') }}" class="nav-link">
+                        <i class="bi bi-life-preserver"></i><span class="nav-text">Destek</span>
+                    </a>
                 </li>
             </ul>
 
