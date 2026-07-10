@@ -1,11 +1,15 @@
+import logging
 import os
 import secrets
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 from constants import ITEMS_PER_PAGE, MAX_UPLOAD_BYTES
 from services.database_config import is_sqlite_uri, resolve_database_uri
 from utils import env_to_bool
+
+logger = logging.getLogger(__name__)
 
 _WEAK_SECRET_KEYS = frozenset({
     "degistirin-gizli-anahtar",
@@ -64,6 +68,19 @@ def validate_production_runtime(app) -> None:
         raise RuntimeError(
             "Production ortamında zorunlu yapılandırma eksik: "
             + ", ".join(missing)
+        )
+
+
+def _ensure_backup_dir_at_startup(backup_dir: str) -> None:
+    """Startup'ta yedek klasörünü oluşturmayı dener; yazılamazsa uygulamayı durdurmaz."""
+    if not (backup_dir or "").strip():
+        return
+    try:
+        Path(backup_dir).mkdir(parents=True, exist_ok=True)
+    except OSError:
+        logger.warning(
+            "Backup directory '%s' is not writable; skipping startup creation.",
+            backup_dir,
         )
 
 
@@ -183,7 +200,7 @@ def configure_app(app, config_overrides=None):
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(app.config["SUPPORT_UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(os.path.join(app.root_path, "static", "profile_pics"), exist_ok=True)
-    os.makedirs(app.config["BACKUP_DIR"], exist_ok=True)
+    _ensure_backup_dir_at_startup(app.config["BACKUP_DIR"])
     os.makedirs(os.path.join(app.root_path, app.config["LOG_DIR"]), exist_ok=True)
 
     validate_production_runtime(app)
