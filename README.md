@@ -313,6 +313,42 @@ curl http://localhost:8080/health
 
 ---
 
+## CI
+
+GitHub Actions ile her `push` ve `pull_request` (hedef dallar: `main`, `develop`) otomatik doğrulanır. Workflow yalnızca CI içindir; production deploy yapmaz ve GitHub Secrets gerektirmez.
+
+### Ne yapıyor?
+
+| Job | Adımlar |
+|-----|---------|
+| **Tests** | Python 3.12, `pip install -r requirements.txt`, minimal `ruff` syntax kontrolü, `pytest` (tüm testler) |
+| **Docker build** | `docker build .` ve `docker compose build` (container başlatılmaz) |
+
+Test job ortam değişkenleri: `TESTING=True`, `SECRET_KEY`, `DATABASE_URL=sqlite://`, `MAIL_SUPPRESS_SEND=True`, `USE_POSTGRES=False`, `FLASK_ENV=testing`. Bağımlılıklar `actions/setup-python` pip cache ile hızlandırılır.
+
+`pytest` veya Docker build başarısız olursa workflow kırmızıya düşer ve merge engellenir (branch protection tanımlıysa).
+
+### Nasıl çalışıyor?
+
+1. Depoya push veya PR açıldığında `.github/workflows/ci.yml` tetiklenir.
+2. **Tests** job'ı test ortamını kurar ve tüm test suite'i çalıştırır.
+3. **Docker build** job'ı imajın derlenebildiğini doğrular (çalıştırma yok).
+4. İki job da yeşilse CI geçmiş sayılır.
+
+Yerel geliştirme etkilenmez; workflow yalnızca GitHub runner üzerinde çalışır.
+
+### Badge
+
+`README.md` üstüne (veya istediğiniz yere) aşağıdaki satırı ekleyin (`OWNER` ve `REPO` değerlerini kendi deponuzla değiştirin):
+
+```markdown
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+```
+
+Private repolarda badge, depoya erişimi olan kullanıcılara görünür.
+
+---
+
 ## PostgreSQL Kurulumu
 
 ### Yerel PostgreSQL
