@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3><i class="bi bi-headset"></i> Destek Talepleri</h3>
+            <small class="text-muted">Kullanıcı destek istekleri</small>
+        </div>
+        <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-sm btn-outline-secondary">Admin Panel</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tarih</th>
+                    <th>Kullanıcı</th>
+                    <th>Kategori</th>
+                    <th>Başlık</th>
+                    <th>Durum</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in talepler %}
+                <tr>
+                    <td>{{ t.id }}</td>
+                    <td>{{ t.created_at|format_dt if t.created_at else '—' }}</td>
+                    <td>{{ t.user.username if t.user else '—' }}</td>
+                    <td>{{ t.kategori }}</td>
+                    <td>{{ t.baslik }}</td>
+                    <td><span class="badge bg-secondary">{{ t.durum }}</span></td>
+                    <td>
+                        <a href="{{ url_for('admin.admin_destek_detail', talep_id=t.id) }}" class="btn btn-sm btn-outline-primary">Oku</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="text-muted text-center">Talep yok.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

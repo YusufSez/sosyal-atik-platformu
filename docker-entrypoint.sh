@@ -3,7 +3,7 @@ set -e
 
 # Root olarak başlatıldıysa yazılabilir dizin izinlerini düzelt, ardından atikport'a geç
 if [ "$(id -u)" = "0" ]; then
-  for dir in /app/static/item_pics /app/static/profile_pics /app/logs; do
+  for dir in /app/static/item_pics /app/static/profile_pics /app/data/support_attachments /app/logs; do
     mkdir -p "$dir"
     chown -R atikport:atikport "$dir" 2>/dev/null || true
     chmod -R u+rwX,g+rwX "$dir" 2>/dev/null || true

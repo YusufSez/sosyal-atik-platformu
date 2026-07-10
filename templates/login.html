@@ -8,6 +8,17 @@
             <h3>Giriş Yap</h3>
         </div>
         <div class="card-body p-4">
+            {% if ban_notice %}
+            <div class="alert alert-danger mb-4" role="alert">
+                <h5 class="alert-heading mb-2">Hesabınız askıya alınmıştır.</h5>
+                <p class="mb-2"><strong>Ban sebebi:</strong> {{ ban_notice.reason }}</p>
+                <p class="mb-0 small">
+                    Bu kararın hatalı olduğunu düşünüyorsanız
+                    <a href="{{ url_for('support.ban_itiraz') }}" class="alert-link">destek sistemi</a>
+                    üzerinden bizimle iletişime geçebilirsiniz.
+                </p>
+            </div>
+            {% endif %}
             <form method="POST" action="">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">

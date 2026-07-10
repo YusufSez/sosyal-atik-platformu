@@ -78,6 +78,9 @@ def create_app(config_overrides=None):
             "pool_recycle": 300,
         }
     app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", "item_pics")
+    app.config["SUPPORT_UPLOAD_FOLDER"] = os.path.join(
+        app.root_path, "data", "support_attachments"
+    )
     app.config["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
     app.config["ALLOW_SEED_ROUTE"] = env_to_bool(os.getenv("ALLOW_SEED_ROUTE"), default=False)
@@ -157,6 +160,7 @@ def create_app(config_overrides=None):
             )
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["SUPPORT_UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(os.path.join(app.root_path, "static", "profile_pics"), exist_ok=True)
     os.makedirs(app.config["BACKUP_DIR"], exist_ok=True)
     os.makedirs(os.path.join(app.root_path, app.config["LOG_DIR"]), exist_ok=True)
@@ -269,6 +273,7 @@ def create_app(config_overrides=None):
     from blueprints.kaynak import kaynak_bp
     from blueprints.main import main_bp
     from blueprints.messages import messages_bp
+    from blueprints.support import support_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
@@ -276,6 +281,7 @@ def create_app(config_overrides=None):
     app.register_blueprint(atik_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(messages_bp)
+    app.register_blueprint(support_bp)
     app.register_blueprint(ilan_bp)
     app.register_blueprint(impact_bp)
     app.register_blueprint(kurum_bp)

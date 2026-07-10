@@ -64,6 +64,7 @@ def expire_temporary_bans() -> int:
         user.banned_at = None
         user.ban_reason = None
         user.ban_expires_at = None
+        user.banned_by_id = None
     if expired:
         db.session.commit()
     return len(expired)
@@ -78,6 +79,7 @@ def is_user_banned(user) -> bool:
         user.banned_at = None
         user.ban_reason = None
         user.ban_expires_at = None
+        user.banned_by_id = None
         db.session.commit()
         return False
     return True
@@ -129,14 +131,26 @@ def parse_ban_duration(duration_key: str | None) -> int | None:
     return BAN_DURATION_OPTIONS.get(duration_key)
 
 
-def apply_ban(user: User, reason: str | None, duration_days: int | None) -> None:
+def normalize_ban_reason(reason: str | None) -> str | None:
+    cleaned = (reason or "").strip()
+    return cleaned or None
+
+
+def apply_ban(
+    user: User,
+    reason: str | None,
+    duration_days: int | None,
+    *,
+    banned_by_id: int | None = None,
+) -> None:
     now = utc_now()
     user.is_banned = True
     user.banned_at = now
-    user.ban_reason = (reason or "").strip() or None
+    user.ban_reason = normalize_ban_reason(reason)
     user.ban_expires_at = (
         now + timedelta(days=duration_days) if duration_days else None
     )
+    user.banned_by_id = banned_by_id
     user.is_deactivated = False
 
 
@@ -145,6 +159,7 @@ def clear_ban(user: User) -> None:
     user.banned_at = None
     user.ban_reason = None
     user.ban_expires_at = None
+    user.banned_by_id = None
 
 
 def toggle_admin_role(user: User) -> tuple[str, str]:
@@ -159,8 +174,11 @@ def toggle_admin_role(user: User) -> tuple[str, str]:
     return old, new
 
 
-def soft_delete_user(user: User, reason: str | None) -> None:
-    apply_ban(user, reason or "Silindi", None)
+def soft_delete_user(user: User, reason: str | None, *, banned_by_id: int | None = None) -> None:
+    normalized = normalize_ban_reason(reason)
+    if not normalized:
+        raise ValueError("Ban sebebi zorunludur")
+    apply_ban(user, normalized, None, banned_by_id=banned_by_id)
 
 
 def deactivate_user(user: User) -> None:

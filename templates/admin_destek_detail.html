@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3><i class="bi bi-headset"></i> Destek Talebi #{{ talep.id }}</h3>
+            <small class="text-muted">{{ talep.created_at|format_dt if talep.created_at else '' }}</small>
+        </div>
+        <a href="{{ url_for('admin.admin_destek_list') }}" class="btn btn-sm btn-outline-secondary">Listeye Dön</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">{{ talep.baslik }}</div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Kategori:</strong> {{ talep.kategori }}</p>
+                    <p class="mb-2"><strong>Kullanıcı:</strong> {{ talep.user.username if talep.user else '—' }}</p>
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ talep.mesaj }}</p>
+                    {% if talep.ek_resim %}
+                    <div class="mt-3">
+                        <img src="{{ url_for('support.support_attachment', talep_id=talep.id) }}"
+                             alt="Ek" class="img-fluid rounded border" style="max-height: 320px;">
+                        {% if talep.ek_resim_orijinal %}
+                        <div class="small text-muted mt-1">{{ talep.ek_resim_orijinal }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">Yönetim</div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="durum" class="form-label">Durum</label>
+                            <select class="form-select" id="durum" name="durum">
+                                {% for d in durumlar %}
+                                <option value="{{ d }}" {% if talep.durum == d %}selected{% endif %}>{{ d }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="admin_not" class="form-label">Admin notu</label>
+                            <textarea class="form-control" id="admin_not" name="admin_not" rows="5" maxlength="5000">{{ talep.admin_not or '' }}</textarea>
+                        </div>
+                        {% if talep.reviewer %}
+                        <p class="small text-muted">Son inceleyen: {{ talep.reviewer.username }}</p>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">Kaydet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

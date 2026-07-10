@@ -72,6 +72,7 @@
     'id': item.id,
     'authenticated': current_user.is_authenticated
 } | tojson }}</script>
+<script src="{{ url_for('static', filename='js/ilan-lightbox.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ilan-detay.js') }}"></script>
 
 {% endblock %}

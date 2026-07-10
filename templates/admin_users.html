@@ -54,7 +54,10 @@
                             <span class="badge bg-success">Aktif</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td class="text-nowrap">
+                        <a href="{{ url_for('admin.admin_user_detail', user_id=u.id) }}" class="btn btn-sm btn-outline-primary">
+                            Kullanıcı Detayı
+                        </a>
                         {% if u.id == current_user.id %}
                             <span class="text-muted small">—</span>
                         {% elif role_name == 'superadmin' %}
@@ -68,19 +71,16 @@
                                     </button>
                                 </form>
                             {% else %}
-                                <form method="POST" action="{{ url_for('admin.admin_ban_user', user_id=u.id) }}" class="d-inline">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Kullanıcıyı banlamak istiyor musunuz?');">
-                                        Banla
-                                    </button>
-                                </form>
-
-                                <form method="POST" action="{{ url_for('admin.admin_soft_delete_user', user_id=u.id) }}" class="d-inline">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button class="btn btn-sm btn-outline-secondary ms-1" onclick="return confirm('Kullanıcıyı silmek (soft-ban) istiyor musunuz?');">
-                                        Sil (Soft)
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal" data-bs-target="#banModal"
+                                        data-user-id="{{ u.id }}" data-username="{{ u.username }}">
+                                    Banla
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-1"
+                                        data-bs-toggle="modal" data-bs-target="#softDeleteModal"
+                                        data-user-id="{{ u.id }}" data-username="{{ u.username }}">
+                                    Sil (Soft)
+                                </button>
                             {% endif %}
                         {% endif %}
                     </td>
@@ -91,5 +91,84 @@
     </div>
 </div>
 
+<div class="modal fade" id="banModal" tabindex="-1" aria-labelledby="banModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="banForm" class="modal-content">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-header">
+                <h5 class="modal-title" id="banModalLabel">Kullanıcıyı Banla</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong id="banTargetName"></strong> banlanacak.</p>
+                <div class="mb-3">
+                    <label for="ban_reason" class="form-label">Ban Sebebi <span class="text-danger">*</span></label>
+                    <textarea name="ban_reason" id="ban_reason" class="form-control" rows="3" required maxlength="500"></textarea>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label">Süre</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <label class="form-check"><input class="form-check-input" type="radio" name="ban_duration" value="permanent" checked> Süresiz</label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="ban_duration" value="1"> 1 gün</label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="ban_duration" value="7"> 7 gün</label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="ban_duration" value="30"> 30 gün</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="submit" class="btn btn-danger">Banla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="softDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="softDeleteForm" class="modal-content">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-header">
+                <h5 class="modal-title">Soft Sil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3"><strong id="softDeleteTargetName"></strong> soft-ban uygulanacak.</p>
+                <label for="soft_ban_reason" class="form-label">Sebep <span class="text-danger">*</span></label>
+                <textarea name="ban_reason" id="soft_ban_reason" class="form-control" rows="3" required maxlength="500"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="submit" class="btn btn-outline-danger">Sil (Soft)</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
 
+{% block scripts %}
+<script>
+(function () {
+  var banModal = document.getElementById("banModal");
+  if (banModal) {
+    banModal.addEventListener("show.bs.modal", function (e) {
+      var btn = e.relatedTarget;
+      var userId = btn.getAttribute("data-user-id");
+      var username = btn.getAttribute("data-username");
+      document.getElementById("banTargetName").textContent = username;
+      document.getElementById("banForm").action = "/admin/users/ban/" + userId;
+    });
+  }
+  var softModal = document.getElementById("softDeleteModal");
+  if (softModal) {
+    softModal.addEventListener("show.bs.modal", function (e) {
+      var btn = e.relatedTarget;
+      var userId = btn.getAttribute("data-user-id");
+      var username = btn.getAttribute("data-username");
+      document.getElementById("softDeleteTargetName").textContent = username;
+      document.getElementById("softDeleteForm").action = "/admin/users/soft-delete/" + userId;
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -25,6 +25,7 @@ class User(UserMixin, db.Model):
     banned_at = db.Column(db.DateTime, nullable=True)
     ban_reason = db.Column(db.Text, nullable=True)
     ban_expires_at = db.Column(db.DateTime, nullable=True)
+    banned_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
     is_deactivated = db.Column(db.Boolean, default=False, nullable=False)
     last_login_at = db.Column(db.DateTime, nullable=True)
     last_seen = db.Column(db.DateTime, nullable=True)
@@ -37,6 +38,12 @@ class User(UserMixin, db.Model):
     profile_image = db.Column(db.String(60), nullable=True, default="default.jpg")
     kaynaklar = db.relationship("Kaynak", backref="sahip", lazy=True)
     atiklar = db.relationship("Atik", backref="sahip", lazy=True)
+    banned_by = db.relationship(
+        "User",
+        foreign_keys=[banned_by_id],
+        remote_side="User.id",
+        backref=db.backref("banladigi_kullanicilar", lazy=True),
+    )
 
 
 class IlanResim(db.Model):
@@ -165,7 +172,9 @@ class Bildirim(db.Model):
     okundu = db.Column(db.Boolean, default=False)
     timestamp = db.Column(db.DateTime, default=tr_time)
     link = db.Column(db.String(200), nullable=True)
+    mesaj_id = db.Column(db.Integer, db.ForeignKey("mesaj.id"), nullable=True, index=True)
     user = db.relationship("User", backref="bildirimler", lazy=True)
+    mesaj = db.relationship("Mesaj", backref="bildirimler", lazy=True)
 
 
 class Sikayet(db.Model):
@@ -394,3 +403,22 @@ class AdminAuditLog(db.Model):
     tarih = db.Column(db.DateTime, default=tr_time, index=True)
     admin = db.relationship("User", foreign_keys=[admin_id], backref=db.backref("admin_audit_logs", lazy=True))
     target_user = db.relationship("User", foreign_keys=[target_user_id], backref=db.backref("hedef_audit_logs", lazy=True))
+
+
+class DestekTalebi(db.Model):
+    __tablename__ = "destek_talebi"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    baslik = db.Column(db.String(200), nullable=False)
+    kategori = db.Column(db.String(30), nullable=False, index=True)
+    mesaj = db.Column(db.Text, nullable=False)
+    ek_resim = db.Column(db.String(120), nullable=True)
+    ek_resim_orijinal = db.Column(db.String(255), nullable=True)
+    durum = db.Column(db.String(30), nullable=False, default="Bekliyor", index=True)
+    admin_not = db.Column(db.Text, nullable=True)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time)
+    updated_at = db.Column(db.DateTime, default=tr_time, onupdate=tr_time)
+    user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("destek_talepleri", lazy=True))
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id], backref=db.backref("incelenen_destekler", lazy=True))

@@ -42,6 +42,9 @@
   }
 
   function isNearBottom() {
+    if (window.MessageScrollHelper) {
+      return window.MessageScrollHelper.isNearBottom(mesajKutusu, 80);
+    }
     return mesajKutusu.scrollHeight - mesajKutusu.scrollTop - mesajKutusu.clientHeight < 80;
   }
 

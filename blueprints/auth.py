@@ -190,7 +190,10 @@ def giris():
             flash("Hesabınız pasifleştirildi. Giriş yapamazsınız.", "danger")
             return redirect(url_for("auth.giris"))
         if user and is_user_banned(user):
-            flash("Hesabınız banlandı. Giriş yapamazsınız.", "danger")
+            session["ban_notice"] = {
+                "reason": user.ban_reason or "Belirtilmedi",
+            }
+            flash("Hesabınız askıya alınmıştır.", "danger")
             return redirect(url_for("auth.giris"))
 
         if not user or not verify_password(password, user.password):
@@ -215,7 +218,7 @@ def giris():
         flash("Giriş başarılı! Hoş geldiniz, " + user.username + "!", "success")
         return redirect(url_for("main.anasayfa"))
 
-    return render_template("login.html", title="Giriş Yap")
+    return render_template("login.html", title="Giriş Yap", ban_notice=session.pop("ban_notice", None))
 
 
 @auth_bp.route("/cikis")

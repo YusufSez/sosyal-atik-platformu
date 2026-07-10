@@ -79,6 +79,11 @@ BAN_DURATION_OPTIONS = {
     "90": 90,
 }
 
+DESTEK_KATEGORI_BAN_ITIRAZI = "BAN_ITIRAZI"
+DESTEK_KATEGORILERI = ("Öneri", "İstek", "Şikayet", "Hata Bildirimi")
+DESTEK_DURUMLARI = ("Bekliyor", "İnceleniyor", "Yanıtlandı", "Kapatıldı")
+RATE_BAN_ITIRAZ = "5 per hour"
+
 # Eski durumlar → yeni (migration + runtime)
 SIKAYET_DURUM_LEGACY_MAP = {
     "Beklemede": "Bekliyor",

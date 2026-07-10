@@ -25,6 +25,7 @@ from services.user_moderation import (
     clear_ban,
     deactivate_user,
     normalize_role,
+    normalize_ban_reason,
     parse_ban_duration,
     soft_delete_user,
     toggle_admin_role,
@@ -189,12 +190,16 @@ def admin_report_ban_user(id: int):
     if not can_superadmin_manage_user(current_user, target):
         abort(403)
 
-    reason = sanitize_input(request.form.get("ban_reason"), max_length=500)
+    reason = normalize_ban_reason(sanitize_input(request.form.get("ban_reason"), max_length=500))
+    if not reason:
+        flash("Ban sebebi zorunludur.", "danger")
+        return _redirect_detail(id)
+
     duration_key = sanitize_input(request.form.get("ban_duration"), max_length=20)
     duration_days = parse_ban_duration(duration_key)
 
     old = f"banned={target.is_banned}"
-    apply_ban(target, reason, duration_days)
+    apply_ban(target, reason, duration_days, banned_by_id=current_user.id)
     db.session.commit()
 
     log_admin_action(
@@ -333,8 +338,14 @@ def admin_report_soft_delete_user(id: int):
     if not can_superadmin_manage_user(current_user, target):
         abort(403)
 
-    reason = sanitize_input(request.form.get("ban_reason"), max_length=500) or "Silindi"
-    soft_delete_user(target, reason)
+    reason = normalize_ban_reason(
+        sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    )
+    if not reason:
+        flash("Ban sebebi zorunludur.", "danger")
+        return _redirect_detail(id)
+
+    soft_delete_user(target, reason, banned_by_id=current_user.id)
     db.session.commit()
     log_admin_action(
         "user_soft_delete",

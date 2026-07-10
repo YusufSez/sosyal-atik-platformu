@@ -47,6 +47,7 @@ def _persist_message(sender, receiver_id, content, kaynak_id, atik_id):
             kaynak_id=kaynak_id or 0,
             atik_id=atik_id or 0,
         ),
+        mesaj_id=mesaj.id,
     )
     emit_after_message_created(mesaj)
     return mesaj

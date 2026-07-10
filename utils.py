@@ -303,6 +303,18 @@ def _save_image_to_folder(form_picture, folder, thumbnail_size):
     return picture_fn
 
 
+def resolve_support_attachment_path(filename: str) -> str:
+    """Private destek ekleri klasöründe güvenli dosya yolu."""
+    folder = current_app.config["SUPPORT_UPLOAD_FOLDER"]
+    return resolve_safe_path_in_folder(folder, filename)
+
+
+def save_support_attachment(form_picture):
+    """İlan yükleme ile aynı güvenlik pipeline'ı (doğrulama + re-encode)."""
+    folder = current_app.config["SUPPORT_UPLOAD_FOLDER"]
+    return _save_image_to_folder(form_picture, folder, (600, 400))
+
+
 def save_picture(form_picture):
     folder = current_app.config["UPLOAD_FOLDER"]
     return _save_image_to_folder(form_picture, folder, (600, 400))

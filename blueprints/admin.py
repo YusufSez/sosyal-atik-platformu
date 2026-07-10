@@ -3,15 +3,17 @@ import os
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED
+from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED, DESTEK_DURUMLARI
 from decorators import admin_required, is_super_admin, super_admin_required
 from extensions import db, limiter
 from helpers import ai_tam_analiz
-from models import AdminAuditLog, Atik, Kaynak, Sikayet, User
+from models import AdminAuditLog, Atik, DestekTalebi, Kaynak, Sikayet, User
+from sqlalchemy.orm import joinedload
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
-from services.user_moderation import apply_ban, clear_ban, parse_ban_duration
+from services.admin_user_detail import build_admin_user_detail
+from services.user_moderation import apply_ban, clear_ban, normalize_ban_reason, parse_ban_duration
 from utils import cleanup_ilan_relations, resolve_item_picture_path, sanitize_input, utc_now
 
 admin_bp = Blueprint("admin", __name__)
@@ -51,6 +53,15 @@ def admin_users():
     return render_template("admin_users.html", users=users)
 
 
+@admin_bp.route("/admin/users/<int:user_id>")
+@login_required
+@super_admin_required
+def admin_user_detail(user_id: int):
+    user = User.query.get_or_404(user_id)
+    detail = build_admin_user_detail(user)
+    return render_template("admin_user_detail.html", **detail)
+
+
 @admin_bp.route("/admin/users/ban/<int:user_id>", methods=["POST"])
 @login_required
 @super_admin_required
@@ -64,12 +75,18 @@ def admin_ban_user(user_id: int):
     if is_super_admin(target):
         abort(403)
 
-    reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    reason = normalize_ban_reason(
+        sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    )
+    if not reason:
+        flash("Ban sebebi zorunludur.", "danger")
+        return redirect(request.referrer or url_for("admin.admin_users"))
+
     duration_days = parse_ban_duration(
         sanitize_input(request.form.get("ban_duration"), max_length=20) if request.form else None
     )
 
-    apply_ban(target, reason, duration_days)
+    apply_ban(target, reason, duration_days, banned_by_id=current_user.id)
     db.session.commit()
 
     log_admin_action(
@@ -124,11 +141,14 @@ def admin_soft_delete_user(user_id: int):
     if is_super_admin(target):
         abort(403)
 
-    reason = sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    reason = normalize_ban_reason(
+        sanitize_input(request.form.get("ban_reason"), max_length=500) if request.form else None
+    )
     if not reason:
-        reason = "Silindi"
+        flash("Silme (soft-ban) için sebep zorunludur.", "danger")
+        return redirect(request.referrer or url_for("admin.admin_users"))
 
-    apply_ban(target, reason, None)
+    apply_ban(target, reason, None, banned_by_id=current_user.id)
     db.session.commit()
 
     log_admin_action(
@@ -277,3 +297,54 @@ def ai_test(tur):
         return jsonify({"hata": "Test için resim bulunamadı."})
 
     return jsonify(ai_tam_analiz(test_resim, tur=tur, aciklama="Test açıklama"))
+
+
+@admin_bp.route("/admin/destek")
+@login_required
+@admin_required
+def admin_destek_list():
+    talepler = (
+        DestekTalebi.query.options(joinedload(DestekTalebi.user))
+        .order_by(DestekTalebi.id.desc())
+        .limit(100)
+        .all()
+    )
+    return render_template("admin_destek.html", talepler=talepler, durumlar=DESTEK_DURUMLARI)
+
+
+@admin_bp.route("/admin/destek/<int:talep_id>", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_destek_detail(talep_id: int):
+    talep = (
+        DestekTalebi.query.options(
+            joinedload(DestekTalebi.user),
+            joinedload(DestekTalebi.reviewer),
+        )
+        .get_or_404(talep_id)
+    )
+    if request.method == "POST":
+        durum = sanitize_input(request.form.get("durum"), max_length=30)
+        admin_not = sanitize_input(request.form.get("admin_not"), max_length=5000)
+        if durum in DESTEK_DURUMLARI:
+            talep.durum = durum
+        if admin_not is not None:
+            talep.admin_not = admin_not
+        talep.reviewer_id = current_user.id
+        talep.updated_at = utc_now()
+        db.session.commit()
+        log_admin_action(
+            "destek_guncelle",
+            target=f"destek:{talep.id}",
+            target_user_id=talep.user_id,
+            detail=f"durum={talep.durum}",
+            new_value=admin_not,
+        )
+        flash("Destek talebi güncellendi.", "success")
+        return redirect(url_for("admin.admin_destek_detail", talep_id=talep.id))
+
+    return render_template(
+        "admin_destek_detail.html",
+        talep=talep,
+        durumlar=DESTEK_DURUMLARI,
+    )

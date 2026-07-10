@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="page-header mb-4">
+        <h3><i class="bi bi-life-preserver"></i> Destek</h3>
+        <small class="text-muted">Öneri, istek, şikayet veya hata bildirimi gönderin</small>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="baslik" class="form-label">Başlık <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="baslik" name="baslik" maxlength="200" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="kategori" class="form-label">Kategori <span class="text-danger">*</span></label>
+                            <select class="form-select" id="kategori" name="kategori" required>
+                                <option value="">Seçiniz</option>
+                                {% for k in kategoriler %}
+                                <option value="{{ k }}">{{ k }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="mesaj" class="form-label">Mesaj <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="mesaj" name="mesaj" rows="6" maxlength="5000" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ek_resim" class="form-label">Ek resim (opsiyonel)</label>
+                            <input type="file" class="form-control" id="ek_resim" name="ek_resim" accept="image/*">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Gönder</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Taleplerim</h5>
+                    <p class="text-muted small">Gönderdiğiniz destek taleplerinin durumunu takip edebilirsiniz.</p>
+                    <a href="{{ url_for('support.destek_taleplerim') }}" class="btn btn-outline-secondary btn-sm">
+                        Taleplerimi Görüntüle
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

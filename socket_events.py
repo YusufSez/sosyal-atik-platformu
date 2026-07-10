@@ -375,6 +375,15 @@ def emit_messages_marked_read(messages: list, reader_id: int) -> None:
 
     emit_unread_count_updated(reader_id)
 
+    try:
+        from services.notification_sync import mark_message_notifications_read
+
+        mark_message_notifications_read(reader_id, messages=messages)
+    except Exception:
+        logger.exception(
+            "Mesaj okundu bildirim senkronu başarısız reader_id=%s", reader_id
+        )
+
 
 def _register_connection(user_id: int) -> bool:
     _connection_counts[user_id] += 1

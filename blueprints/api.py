@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 from constants import RATE_PUBLIC_API
 from extensions import db, limiter
 from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
+from services.admin_notifications import notify_admins
 from services.user_moderation import resolve_reported_user_id
 from services.notifications import bildirim_olustur
 from socket_events import emit_notification_sync, emit_unread_count_updated
@@ -303,7 +304,7 @@ def sikayet_olustur():
         kaynak_id=kaynak_id if kaynak_id else None,
         atik_id=atik_id if atik_id else None,
     )
-    db.session.add(Sikayet(
+    sikayet = Sikayet(
         user_id=current_user.id,
         kaynak_id=kaynak_id if kaynak_id else None,
         atik_id=atik_id if atik_id else None,
@@ -311,8 +312,15 @@ def sikayet_olustur():
         tur=tur,
         reported_user_id=reported_user_id,
         aciklama=sanitize_input(sebep, max_length=500),
-    ))
+    )
+    db.session.add(sikayet)
     db.session.commit()
+    notify_admins(
+        "Yeni İlan Şikayeti",
+        f"{current_user.username}: {sebep[:120]}",
+        "admin_sikayet",
+        f"/admin/report/{sikayet.id}",
+    )
     return jsonify({"success": True})
 
 
@@ -342,7 +350,7 @@ def mesaj_sikayet():
 
     reported_id = mesaj.sender_id if mesaj.sender_id != current_user.id else mesaj.receiver_id
 
-    db.session.add(Sikayet(
+    kayit = Sikayet(
         user_id=current_user.id,
         kaynak_id=mesaj.kaynak_id,
         atik_id=mesaj.atik_id,
@@ -351,8 +359,16 @@ def mesaj_sikayet():
         tur="mesaj",
         reported_user_id=reported_id,
         aciklama=ek_sebep or None,
-    ))
+    )
+    db.session.add(kayit)
+    db.session.flush()
     db.session.commit()
+    notify_admins(
+        "Yeni Mesaj Şikayeti",
+        f"{current_user.username}: mesaj #{mesaj.id}",
+        "admin_sikayet",
+        f"/admin/report/{kayit.id}",
+    )
     return jsonify({"success": True})
 
 

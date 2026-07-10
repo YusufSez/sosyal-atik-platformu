@@ -69,7 +69,7 @@ def test_banned_user_cannot_login(monkeypatch, client, app):
     )
     assert resp.status_code == 200
     text = resp.data.decode("utf-8", errors="ignore").lower()
-    assert "ban" in text
+    assert "askıya" in text
 
 
 def test_admin_users_access_control(monkeypatch, client, app):
@@ -168,7 +168,11 @@ def test_superadmin_cannot_ban_self_or_other_superadmin(monkeypatch, client, app
         assert refreshed.is_banned is False
 
     # Ban normal user => success
-    resp = client.post(f"/admin/users/ban/{normal_id}", follow_redirects=True)
+    resp = client.post(
+        f"/admin/users/ban/{normal_id}",
+        data={"ban_reason": "Test ban", "ban_duration": "permanent"},
+        follow_redirects=True,
+    )
     assert resp.status_code == 200
     with app.app_context():
         refreshed = db.session.get(User, normal_id)
