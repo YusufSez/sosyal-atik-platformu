@@ -24,6 +24,15 @@ services:
       retries: 12
       start_period: 15s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # İsteğe bağlı Redis (çoklu worker / rate limit / Socket.IO message queue):
   #   docker compose --profile redis -f docker-compose.prod.yml up -d
@@ -38,6 +47,15 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   web:
     build:
@@ -74,7 +92,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import json, urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5); d=json.load(r); exit(0 if r.getcode()==200 and d.get('status')=='ok' else 1)",
+          "import json, urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5); d=json.load(r); exit(0 if r.getcode()==200 and d.get('status') in ('ok','degraded') else 1)",
         ]
       interval: 15s
       timeout: 10s
@@ -85,6 +103,24 @@ services:
       - ../static/profile_pics:/app/static/profile_pics
       - ../data/support_attachments:/app/data/support_attachments
       - ../logs:/app/logs
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
     restart: unless-stopped
     expose:
       - "5000"
@@ -99,6 +135,22 @@ services:
       web:
         condition: service_healthy
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # SQLite → PostgreSQL tek seferlik aktarım
   migrate-sqlite:

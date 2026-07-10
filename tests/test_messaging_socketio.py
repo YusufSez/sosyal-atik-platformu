@@ -6,7 +6,7 @@ import pytest
 
 from auth_utils import hash_password
 from extensions import db, socketio
-from models import Mesaj, User
+from models import Kaynak, Mesaj, User
 from socket_events import (
     canonical_conversation_id,
     conversation_room,
@@ -206,18 +206,38 @@ def test_read_receipt_unit(app):
         assert any(call.args[0] == "message_read" for call in emit_mock.call_args_list)
 
 
-def test_unread_count_updated_for_receiver(client, app):
-    _, receiver_id, _ = _create_users(app)
+def test_unread_count_updated_for_receiver(app):
+    sender_id, receiver_id, _ = _create_users(app)
+    with app.app_context():
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="önceden")
+        )
+        db.session.commit()
 
     receiver_client = app.test_client()
     _login(receiver_client, "sock_receiver@test.com")
     receiver_socket = _socket_client(app, receiver_client)
 
-    _login(client, "sock_sender@test.com")
-    client.post(
+    with app.app_context():
+        sender = db.session.get(User, sender_id)
+    with app.test_request_context(
         "/send_message",
-        json={"alici_id": receiver_id, "content": "Badge test", "kaynak_id": 0, "atik_id": 0},
-    )
+        method="POST",
+        json={
+            "alici_id": receiver_id,
+            "content": "Badge test",
+            "kaynak_id": 0,
+            "atik_id": 0,
+        },
+    ):
+        from flask_login import login_user
+
+        from blueprints.messages import send_message as send_message_view
+
+        login_user(sender)
+        result = send_message_view()
+        status = result.status_code if hasattr(result, "status_code") else result[1]
+        assert status == 200
 
     events = receiver_socket.get_received()
     assert "unread_count_updated" in _event_names(events)

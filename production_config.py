@@ -29,6 +29,14 @@ def _origin_from_site_url(site_url: str) -> str | None:
     return None
 
 
+def _redact_uri(uri: str) -> str:
+    if not uri:
+        return uri
+    if uri.startswith("memory://"):
+        return uri
+    return "redis://***"
+
+
 def resolve_rate_limit_storage_uri() -> str:
     """Rate limit deposu: memory:// (varsayılan) veya Redis/Valkey URI."""
     explicit = os.getenv("RATELIMIT_STORAGE_URI", "").strip()
@@ -71,7 +79,7 @@ def _validate_storage_uri(uri: str) -> str:
 
             client = redis.from_url(uri, socket_connect_timeout=1)
             client.ping()
-            logger.info("Rate limit storage: Redis (%s)", uri)
+            logger.info("Rate limit storage: Redis (%s)", _redact_uri(uri))
             return uri
         except ImportError as exc:
             if strict:
@@ -149,7 +157,7 @@ def resolve_socketio_message_queue() -> str | None:
     from services.redis_manager import ping_redis_url
 
     if ping_redis_url(redis_url):
-        logger.info("Socket.IO message queue: Redis (%s)", redis_url)
+        logger.info("Socket.IO message queue: Redis (%s)", _redact_uri(redis_url))
         return redis_url
 
     logger.warning(

@@ -36,6 +36,37 @@ def _validate_secret_key(secret_key, is_testing):
         raise RuntimeError("SECRET_KEY zayıf/varsayılan değer kullanılamaz. Güçlü bir anahtar tanımlayın.")
 
 
+def _is_production_runtime(app) -> bool:
+    if app.config.get("TESTING"):
+        return False
+    if app.config.get("DEBUG"):
+        return False
+    if skip_startup_hooks():
+        return False
+    return True
+
+
+def validate_production_runtime(app) -> None:
+    """Production ortamında zorunlu güvenlik ayarlarını doğrular."""
+    if not _is_production_runtime(app):
+        return
+    missing = []
+    if not app.config.get("FORCE_HTTPS"):
+        missing.append("FORCE_HTTPS=true")
+    if app.config.get("DEBUG"):
+        missing.append("DEBUG=False")
+    if not (app.config.get("SITE_URL") or "").strip():
+        missing.append("SITE_URL")
+    cors = (os.getenv("SOCKETIO_CORS_ORIGINS") or "").strip()
+    if not cors:
+        missing.append("SOCKETIO_CORS_ORIGINS")
+    if missing:
+        raise RuntimeError(
+            "Production ortamında zorunlu yapılandırma eksik: "
+            + ", ".join(missing)
+        )
+
+
 def configure_app(app, config_overrides=None):
     """Flask config, dizinler ve ortam doğrulaması."""
     basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
@@ -154,5 +185,7 @@ def configure_app(app, config_overrides=None):
     os.makedirs(os.path.join(app.root_path, "static", "profile_pics"), exist_ok=True)
     os.makedirs(app.config["BACKUP_DIR"], exist_ok=True)
     os.makedirs(os.path.join(app.root_path, app.config["LOG_DIR"]), exist_ok=True)
+
+    validate_production_runtime(app)
 
     return behind_proxy

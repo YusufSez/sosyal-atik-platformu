@@ -410,6 +410,8 @@ def test_backup_scripts_read_credentials_from_env():
 
     backup = (deploy_scripts / "backup-db.sh").read_text(encoding="utf-8")
     assert "support_attachments" in backup
+    assert "manifest_" in backup
+    assert "item_pics" in backup
 
 
 def test_docker_compose_support_attachments_volume():

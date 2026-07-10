@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from constants import RATE_MESSAGE, RATE_MESSAGE_FETCH
@@ -19,10 +19,25 @@ from socket_events import (
     emit_messages_marked_read,
     presence_payload,
     serialize_message,
+    user_can_access_conversation,
 )
 from utils import sanitize_input, utc_now
 
 messages_bp = Blueprint("messages", __name__)
+
+
+def _norm_conversation_ids(kaynak_id, atik_id) -> tuple[int, int]:
+    return int(kaynak_id or 0), int(atik_id or 0)
+
+
+def _require_conversation_access(partner_id: int, kaynak_id, atik_id):
+    """Socket ile aynı yetki kontrolü; yetkisizse yanıt döner."""
+    k_id, a_id = _norm_conversation_ids(kaynak_id, atik_id)
+    if user_can_access_conversation(current_user.id, int(partner_id), k_id, a_id):
+        return None
+    if request.is_json or request.path.endswith("/send_message") or "/mesajlar_getir/" in request.path:
+        return jsonify({"error": "Yetkisiz"}), 403
+    abort(403)
 
 
 def _persist_message(sender, receiver_id, content, kaynak_id, atik_id):
@@ -88,6 +103,10 @@ def inject_unread_from_cache():
 @limiter.limit(RATE_MESSAGE, methods=["POST"], key_func=rate_limit_user_or_ip)
 @limiter.limit(RATE_MESSAGE_FETCH, methods=["GET"], key_func=rate_limit_user_or_ip)
 def mesajlar(user_id, kaynak_id, atik_id):
+    denied = _require_conversation_access(user_id, kaynak_id, atik_id)
+    if denied:
+        return denied
+
     alici = User.query.get_or_404(user_id)
     urun = None
 
@@ -124,6 +143,10 @@ def mesajlar(user_id, kaynak_id, atik_id):
 @login_required
 @limiter.limit(RATE_MESSAGE_FETCH, key_func=rate_limit_user_or_ip)
 def mesajlar_getir(alici_id, kaynak_id, atik_id):
+    denied = _require_conversation_access(alici_id, kaynak_id, atik_id)
+    if denied:
+        return denied
+
     before_id = request.args.get("before_id", type=int)
     mesajlar_list, has_more, oldest_id = fetch_message_page(
         current_user.id,
@@ -163,6 +186,10 @@ def send_message():
 
     if not alici_id or not content:
         return jsonify({"error": "Eksik veri"}), 400
+
+    denied = _require_conversation_access(int(alici_id), kaynak_id or 0, atik_id or 0)
+    if denied:
+        return denied
 
     uygun, hata = mesaj_uygun_mu(content)
     if not uygun:

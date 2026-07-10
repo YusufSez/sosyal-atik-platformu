@@ -1,6 +1,7 @@
 """Uygulama günlüğü ve hata izleme yapılandırması."""
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -8,10 +9,18 @@ from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
 
+def _resolve_log_level(app: Flask) -> int:
+    raw = (os.getenv("LOG_LEVEL") or "").strip().upper()
+    if raw:
+        return getattr(logging, raw, logging.INFO)
+    return logging.DEBUG if app.config.get("DEBUG") else logging.INFO
+
+
 def init_logging(app: Flask) -> None:
     if app.config.get("TESTING"):
         return
 
+    log_level = _resolve_log_level(app)
     log_dir = Path(app.root_path) / app.config.get("LOG_DIR", "logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -37,13 +46,16 @@ def init_logging(app: Flask) -> None:
         handler.setFormatter(formatter)
         app.logger.addHandler(handler)
 
-    app.logger.setLevel(logging.INFO)
+    app.logger.setLevel(log_level)
     app.logger.propagate = True
 
     ai_logger = logging.getLogger("atikport.ai")
-    ai_logger.setLevel(logging.INFO)
+    ai_logger.setLevel(log_level)
     ai_logger.addHandler(app_handler)
     ai_logger.propagate = False
+
+    socket_logger = logging.getLogger("atikport.socket")
+    socket_logger.setLevel(log_level)
 
     werkzeug_logger = logging.getLogger("werkzeug")
     if not app.config.get("DEBUG"):

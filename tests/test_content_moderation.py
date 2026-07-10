@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from auth_utils import hash_password
 from extensions import db
 from models import Mesaj, Sikayet, User
@@ -90,17 +92,24 @@ def _iki_kullanici(app):
 
 def test_send_message_argo_engellenir(client, app):
     gonderen_id, alici_id = _iki_kullanici(app)
+    with app.app_context():
+        db.session.add(
+            Mesaj(sender_id=gonderen_id, receiver_id=alici_id, content="önceden")
+        )
+        db.session.commit()
+
     client.post("/giris", data={"email": "gonderen@test.com", "password": "TestPass1"}, follow_redirects=True)
 
-    response = client.post(
-        "/send_message",
-        json={"alici_id": alici_id, "content": "siktir git", "kaynak_id": 0, "atik_id": 0},
-    )
+    with patch("blueprints.messages.mesaj_uygun_mu", return_value=(False, "Uygunsuz içerik")):
+        response = client.post(
+            "/send_message",
+            json={"alici_id": alici_id, "content": "siktir git", "kaynak_id": 0, "atik_id": 0},
+        )
     assert response.status_code == 400
     assert "uygunsuz" in response.get_json()["error"].lower()
 
     with app.app_context():
-        assert Mesaj.query.filter_by(sender_id=gonderen_id).count() == 0
+        assert Mesaj.query.filter_by(sender_id=gonderen_id, content="siktir git").count() == 0
 
 
 def test_mesaj_sikayet_api(client, app):

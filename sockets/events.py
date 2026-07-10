@@ -18,7 +18,7 @@ from .emitters import (
     emit_messages_marked_read,
     emit_unread_count_updated,
 )
-from .permissions import _conversation_filter, user_can_access_conversation
+from .permissions import _conversation_filter, _user_is_admin, user_can_access_conversation
 from .presence import (
     _broadcast_presence,
     _finalize_disconnect,
@@ -41,6 +41,26 @@ from .serializer import serialize_message, unread_counts_for
 from .state import _connection_counts, _sid_conversations, _sid_users
 from .typing import handle_typing_start, handle_typing_stop
 from .utils import _log_socket
+
+
+def _audit_admin_conversation_access(partner_id: int, kaynak_id: int, atik_id: int, via: str) -> None:
+    user_id = socket_events.current_user.id
+    user = db.session.get(User, user_id)
+    if not _user_is_admin(user):
+        return
+    try:
+        from services.audit import log_admin_conversation_access
+
+        log_admin_conversation_access(
+            user_id,
+            partner_id,
+            kaynak_id,
+            atik_id,
+            via=via,
+        )
+    except Exception:
+        logger = __import__("logging").getLogger("atikport.socket")
+        logger.warning("Admin konuşma audit kaydı yazılamadı", exc_info=True)
 
 
 @socketio.on("connect")
@@ -136,6 +156,7 @@ def handle_join_conversation(data):
         socket_events.current_user.id, partner_id, kaynak_id, atik_id
     ):
         return {"error": "Yetkisiz"}
+    _audit_admin_conversation_access(partner_id, kaynak_id, atik_id, via="join_conversation")
     canon = canonical_conversation_id(
         socket_events.current_user.id, partner_id, kaynak_id, atik_id
     )
@@ -263,6 +284,7 @@ def handle_sync_state(data):
         socket_events.current_user.id, partner_id, kaynak_id, atik_id
     ):
         return {"error": "Yetkisiz"}
+    _audit_admin_conversation_access(partner_id, kaynak_id, atik_id, via="sync_state")
     k_id = kaynak_id if kaynak_id != 0 else None
     a_id = atik_id if atik_id != 0 else None
     query = Mesaj.query.filter(

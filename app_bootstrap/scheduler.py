@@ -9,6 +9,15 @@ _scheduler_lock = threading.Lock()
 _scheduler_started = False
 
 
+def scheduler_status() -> dict:
+    """Health endpoint için scheduler durumu."""
+    return {
+        "maintenance_running": _scheduler_started,
+        "backup_scheduler_running": False,
+        "interval_seconds": _MAINTENANCE_INTERVAL_SEC,
+    }
+
+
 def run_scheduled_backup(app):
     """Zamanlanmış veritabanı yedeklemesini çalıştırır."""
     try:

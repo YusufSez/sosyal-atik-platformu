@@ -63,7 +63,7 @@ def get_redis():
     except Exception as exc:
         logger.warning(
             "Redis'e bağlanılamadı (%s); memory fallback kullanılıyor: %s",
-            url,
+            "redis://***",
             exc,
         )
         _client = None

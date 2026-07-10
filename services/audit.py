@@ -16,9 +16,12 @@ def log_admin_action(
     reason: str | None = None,
     old_value: str | None = None,
     new_value: str | None = None,
+    admin_id: int | None = None,
 ) -> None:
-    if not current_user.is_authenticated:
-        return
+    if admin_id is None:
+        if not current_user.is_authenticated:
+            return
+        admin_id = current_user.id
 
     ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     if ip and "," in ip:
@@ -27,7 +30,7 @@ def log_admin_action(
     user_agent = (request.headers.get("User-Agent") or "")[:500]
 
     kayit = AdminAuditLog(
-        admin_id=current_user.id,
+        admin_id=admin_id,
         action=action,
         target=target[:200],
         target_user_id=target_user_id,
@@ -40,3 +43,21 @@ def log_admin_action(
     )
     db.session.add(kayit)
     db.session.commit()
+
+
+def log_admin_conversation_access(
+    admin_id: int,
+    partner_id: int,
+    kaynak_id: int,
+    atik_id: int,
+    *,
+    via: str,
+) -> None:
+    """Admin DM erişimini denetim kaydına yazar (socket)."""
+    log_admin_action(
+        "admin_conversation_access",
+        target=f"conversation:{partner_id}:{kaynak_id}:{atik_id}",
+        detail=f"via={via} partner_id={partner_id} kaynak_id={kaynak_id} atik_id={atik_id}",
+        target_user_id=partner_id,
+        admin_id=admin_id,
+    )

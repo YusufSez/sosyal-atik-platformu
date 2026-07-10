@@ -204,6 +204,7 @@ def test_mesajlar_getir_rate_limit(client, app):
     try:
         with app.app_context():
             sender_id, receiver_id = _create_pair(app)
+            _add_messages(sender_id, receiver_id, 1)
             receiver = db.session.get(User, receiver_id)
 
         client.post(

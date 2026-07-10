@@ -39,7 +39,23 @@ $COMPOSE stop web
 
 echo "==> Dump geri yükleniyor..."
 docker cp "$DUMP_FILE" "$($COMPOSE ps -q postgres):/tmp/restore.dump"
-$COMPOSE exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists /tmp/restore.dump || true
+set +e
+$COMPOSE exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists /tmp/restore.dump
+RESTORE_EXIT=$?
+set -e
+if [ "$RESTORE_EXIT" -ne 0 ]; then
+  echo "Uyarı: pg_restore çıkış kodu $RESTORE_EXIT (bazı nesneler zaten mevcut olabilir)"
+fi
+
+echo "==> Geri yükleme doğrulaması..."
+USER_COUNT=$($COMPOSE exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c 'SELECT COUNT(*) FROM "user";')
+KAYNAK_COUNT=$($COMPOSE exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c 'SELECT COUNT(*) FROM kaynak;')
+ATIK_COUNT=$($COMPOSE exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c 'SELECT COUNT(*) FROM atik;')
+
+if [ -z "$USER_COUNT" ] || [ "$USER_COUNT" -lt 1 ]; then
+  echo "Hata: Geri yükleme doğrulaması başarısız — user tablosu boş veya okunamadı."
+  exit 1
+fi
 
 echo "==> Stack yeniden başlatılıyor..."
 $COMPOSE up -d
@@ -47,3 +63,4 @@ $COMPOSE up -d
 echo "==> Kayıt sayıları:"
 $COMPOSE exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c \
   "SELECT 'user', COUNT(*) FROM \"user\" UNION ALL SELECT 'kaynak', COUNT(*) FROM kaynak UNION ALL SELECT 'atik', COUNT(*) FROM atik;"
+echo "Doğrulama: user=$USER_COUNT kaynak=$KAYNAK_COUNT atik=$ATIK_COUNT"
