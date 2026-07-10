@@ -1,8 +1,11 @@
 import logging
 
+from flask import current_app
+
 from extensions import db
 from models import Bildirim, User
 from services.email import eposta_gonder
+from utils import safe_notification_link
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +41,13 @@ def bildirim_olustur(
 ):
     if not user_id:
         return None
+    site_url = current_app.config.get("SITE_URL") if current_app else None
     bildirim = Bildirim(
         user_id=user_id,
         baslik=baslik,
         icerik=icerik,
         tur=tur,
-        link=link,
+        link=safe_notification_link(link, site_url=site_url),
         mesaj_id=mesaj_id,
     )
     db.session.add(bildirim)
@@ -58,6 +62,7 @@ def bildirim_olustur_coklu(kayitlar: list[dict]) -> list[Bildirim]:
     """Tüm bildirimleri tek transaction ile oluşturur."""
     if not kayitlar:
         return []
+    site_url = current_app.config.get("SITE_URL") if current_app else None
     created = []
     for item in kayitlar:
         user_id = item.get("user_id")
@@ -68,7 +73,7 @@ def bildirim_olustur_coklu(kayitlar: list[dict]) -> list[Bildirim]:
             baslik=item["baslik"],
             icerik=item["icerik"],
             tur=item["tur"],
-            link=item.get("link"),
+            link=safe_notification_link(item.get("link"), site_url=site_url),
             mesaj_id=item.get("mesaj_id"),
         )
         db.session.add(row)

@@ -80,12 +80,13 @@ nano .env   # Tüm <...> değerlerini doldurun
 
 ### Bind mount izinleri (upload / log)
 
-`docker-compose.prod.yml` host dizinlerini bağlar: `static/item_pics`, `static/profile_pics`, `logs`.
+`docker-compose.prod.yml` host dizinlerini bağlar: `static/item_pics`, `static/profile_pics`, `data/support_attachments`, `logs`.
 
 Container entrypoint bu dizinlerin sahipliğini `atikport` (UID **1000**) kullanıcısına ayarlamaya çalışır. Host'ta dizinler root veya farklı bir kullanıcıya aitse ve `chown` başarısız olursa yükleme/log yazımı `PermissionError` verebilir:
 
 ```bash
-sudo chown -R 1000:1000 static/item_pics static/profile_pics logs
+sudo chown -R 1000:1000 static/item_pics static/profile_pics data/support_attachments logs
+mkdir -p data/support_attachments
 ```
 
 Windows bind mount kullanıyorsanız Docker Desktop genelde yazmayı izin verir; sorun yaşarsanız named volume veya WSL2 dosya yolu tercih edin.
@@ -174,6 +175,14 @@ Manuel yedek:
 ```bash
 bash /opt/atikport/deploy/scripts/backup-db.sh
 ```
+
+Script `.env` içindeki `POSTGRES_USER` ve `POSTGRES_DB` değerlerini kullanır; `data/support_attachments` klasörünü de arşivler.
+
+### Rate limit (üretim)
+
+- Tek worker / geliştirme: `RATELIMIT_BACKEND=memory` yeterli; loglarda memory uyarısı görülebilir.
+- Çoklu worker (Gunicorn): `docker compose --profile redis` ile Redis açın ve `.env` içinde `RATELIMIT_BACKEND=redis`, `REDIS_URL=redis://redis:6379/0` ayarlayın.
+- Redis zorunlu olsun: `RATELIMIT_STRICT=True` — Redis yoksa uygulama başlamaz.
 
 ---
 

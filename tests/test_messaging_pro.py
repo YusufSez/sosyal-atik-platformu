@@ -82,6 +82,10 @@ def test_typing_start_stop_uses_conversation_room(app):
     from socket_events import handle_typing_start, handle_typing_stop, user_room
     with app.app_context():
         sender_id, receiver_id = _create_pair(app)
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="typing room")
+        )
+        db.session.commit()
         sender = db.session.get(User, sender_id)
         canon = canonical_conversation_id(sender_id, receiver_id, 0, 0)
 
@@ -125,7 +129,12 @@ def test_message_emit_uses_conversation_room(app):
 
 
 def test_join_conversation_requires_valid_partner(app, client):
-    _, receiver_id = _create_pair(app)
+    sender_id, receiver_id = _create_pair(app)
+    with app.app_context():
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="önceden")
+        )
+        db.session.commit()
     _login(client, "pro_sender@test.com")
     socket_client = _socket_client(app, client)
 
@@ -258,6 +267,10 @@ def test_typing_rate_limit(app):
     from socket_events import handle_typing_start
     with app.app_context():
         sender_id, receiver_id = _create_pair(app)
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="rate")
+        )
+        db.session.commit()
         sender = db.session.get(User, sender_id)
 
         with app.test_request_context():
@@ -279,7 +292,7 @@ def test_notification_sync_emit_unit(app):
         assert emit_mock.call_args.args[0] == "notification_sync"
 
 
-def test_stranger_gets_own_conversation_room(app, client):
+def test_stranger_cannot_join_foreign_conversation(app, client):
     with app.app_context():
         sender_id, receiver_id = _create_pair(app)
         stranger = User(
@@ -290,8 +303,11 @@ def test_stranger_gets_own_conversation_room(app, client):
             email_verified=True,
         )
         db.session.add(stranger)
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="gizli")
+        )
         db.session.commit()
-        stranger_id = stranger.id
+        sender_id = sender_id
 
     stranger_client = app.test_client()
     _login(stranger_client, "stranger@test.com")
@@ -302,11 +318,5 @@ def test_stranger_gets_own_conversation_room(app, client):
         {"partner_id": sender_id, "kaynak_id": 0, "atik_id": 0},
         callback=True,
     )
-    sender_receiver_room = conversation_room(
-        canonical_conversation_id(sender_id, receiver_id, 0, 0)
-    )
-    assert result["room"] != sender_receiver_room
-    assert result["room"] == conversation_room(
-        canonical_conversation_id(stranger_id, sender_id, 0, 0)
-    )
+    assert result.get("error") == "Yetkisiz"
     socket_client.disconnect()

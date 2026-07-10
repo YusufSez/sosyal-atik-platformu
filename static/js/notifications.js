@@ -240,6 +240,33 @@
     }
   }
 
+  function sanitizeNotificationHref(link) {
+    if (!link) return "#";
+    var trimmed = String(link).trim();
+    if (!trimmed) return "#";
+    if (trimmed.indexOf("//") === 0) return "#";
+    var lower = trimmed.toLowerCase();
+    if (
+      lower.indexOf("javascript:") === 0 ||
+      lower.indexOf("data:") === 0 ||
+      lower.indexOf("vbscript:") === 0
+    ) {
+      return "#";
+    }
+    if (trimmed.charAt(0) === "/" || trimmed.charAt(0) === "#") {
+      return trimmed;
+    }
+    try {
+      var parsed = new URL(trimmed, window.location.origin);
+      if (parsed.origin === window.location.origin) {
+        return parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch (e) {
+      return "#";
+    }
+    return "#";
+  }
+
   async function bildirimleriGetir() {
     try {
       var response = await fetch("/bildirimleri_getir", {
@@ -275,7 +302,7 @@
       for (var k = 0; k < bildirimler.length; k++) {
         (function (b) {
           var item = document.createElement("a");
-          item.href = b.link || "#";
+          item.href = sanitizeNotificationHref(b.link);
           item.className =
             "dropdown-item notification-item" + (!b.okundu ? " notification-unread" : "");
 

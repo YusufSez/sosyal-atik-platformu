@@ -1,6 +1,7 @@
 import os
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from sqlalchemy import or_
 from flask_login import current_user, login_required
 
 from services.ilan_moderation import public_ilan_base_filter

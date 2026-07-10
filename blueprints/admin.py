@@ -135,7 +135,9 @@ def admin_ban_user(user_id: int):
     )
     if not reason:
         flash("Ban sebebi zorunludur.", "danger")
-        return redirect(request.referrer or url_for("admin.admin_users"))
+        from utils import safe_redirect_url
+
+        return redirect(safe_redirect_url(request.referrer, "admin.admin_users"))
 
     duration_days = parse_ban_duration(
         sanitize_input(request.form.get("ban_duration"), max_length=20) if request.form else None
@@ -201,7 +203,9 @@ def admin_soft_delete_user(user_id: int):
     )
     if not reason:
         flash("Silme (soft-ban) için sebep zorunludur.", "danger")
-        return redirect(request.referrer or url_for("admin.admin_users"))
+        from utils import safe_redirect_url
+
+        return redirect(safe_redirect_url(request.referrer, "admin.admin_users"))
 
     apply_ban(target, reason, None, banned_by_id=current_user.id)
     db.session.commit()

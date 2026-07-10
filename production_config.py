@@ -46,6 +46,17 @@ def resolve_rate_limit_storage_uri() -> str:
         return _validate_storage_uri(redis_url)
 
     logger.info("Rate limit storage: memory://")
+    debug = _env_to_bool(os.getenv("DEBUG"), default=False)
+    testing = _env_to_bool(os.getenv("TESTING"), default=False) or bool(
+        os.getenv("PYTEST_CURRENT_TEST")
+    )
+    if not debug and not testing:
+        logger.warning(
+            "PRODUCTION UYARISI: Rate limit memory:// backend kullanılıyor. "
+            "Çoklu worker/process ortamında limitler tutarsız olabilir. "
+            "Redis için RATELIMIT_BACKEND=redis, REDIS_URL ayarlayın; "
+            "zorunlu Redis için RATELIMIT_STRICT=True kullanın."
+        )
     return "memory://"
 
 
@@ -81,6 +92,18 @@ def _validate_storage_uri(uri: str) -> str:
             return "memory://"
     if uri == "memory://":
         logger.info("Rate limit storage: memory://")
+        debug = _env_to_bool(os.getenv("DEBUG"), default=False)
+        testing = _env_to_bool(os.getenv("TESTING"), default=False) or bool(
+            os.getenv("PYTEST_CURRENT_TEST")
+        )
+        if not debug and not testing:
+            logger.warning(
+                "PRODUCTION UYARISI: Rate limit memory:// backend kullanılıyor. "
+                "Çoklu worker/process ortamında limitler tutarsız olabilir. "
+                "Redis için RATELIMIT_BACKEND=redis, REDIS_URL ayarlayın; "
+                "zorunlu Redis için RATELIMIT_STRICT=True kullanın."
+            )
+        return uri
     return uri
 
 

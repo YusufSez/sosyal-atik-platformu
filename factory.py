@@ -239,7 +239,15 @@ def create_app(config_overrides=None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        if user_id is None:
+            return None
+        try:
+            uid = int(user_id)
+        except (TypeError, ValueError):
+            return None
+        if uid <= 0:
+            return None
+        return db.session.get(User, uid)
 
     @app.before_request
     def _expire_temporary_bans():

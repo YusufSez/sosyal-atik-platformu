@@ -135,7 +135,12 @@ def test_new_message_emitted_to_conversation_room(app):
 
 
 def test_sender_gets_message_sent_confirmation(client, app):
-    _, receiver_id, _ = _create_users(app)
+    sender_id, receiver_id, _ = _create_users(app)
+    with app.app_context():
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="önceden")
+        )
+        db.session.commit()
     _login(client, "sock_sender@test.com")
     sender_socket = _socket_client(app, client)
     sender_socket.emit(
@@ -158,6 +163,11 @@ def test_sender_gets_message_sent_confirmation(client, app):
 
 def test_typing_and_stop_typing_unit(app, client):
     sender_id, receiver_id, _ = _create_users(app)
+    with app.app_context():
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="typing")
+        )
+        db.session.commit()
 
     with app.test_request_context():
         import socket_events

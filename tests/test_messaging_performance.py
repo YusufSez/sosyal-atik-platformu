@@ -180,6 +180,10 @@ def test_sync_state_rate_limit(app):
     socket_events._rate_buckets.clear()
     with app.app_context():
         sender_id, receiver_id = _create_pair(app)
+        db.session.add(
+            Mesaj(sender_id=sender_id, receiver_id=receiver_id, content="sync rate")
+        )
+        db.session.commit()
         receiver = db.session.get(User, receiver_id)
 
         with app.test_request_context():

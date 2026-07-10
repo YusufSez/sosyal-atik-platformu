@@ -16,8 +16,8 @@ from constants import (
     RATE_SOCKET_TYPING_PER_SEC,
 )
 from extensions import db, socketio
-from models import Bildirim, Mesaj, User
-from utils import format_datetime, utc_now
+from models import Atik, Bildirim, Kaynak, Mesaj, User
+from utils import format_datetime, ilan_erisilebilir_mi, utc_now
 
 logger = logging.getLogger("atikport.socket")
 
@@ -170,23 +170,51 @@ def _conversation_filter(user_id: int, partner_id: int, kaynak_id, atik_id):
     )
 
 
+def _user_is_admin(user: User | None) -> bool:
+    if not user:
+        return False
+    role = getattr(user, "role", None)
+    if role in ("admin", "superadmin"):
+        return True
+    return bool(getattr(user, "is_admin", False))
+
+
 def user_can_access_conversation(user_id: int, partner_id: int, kaynak_id: int, atik_id: int) -> bool:
     if partner_id == user_id:
         return False
-    if not db.session.get(User, partner_id):
+    partner = db.session.get(User, partner_id)
+    if not partner:
         return False
+    user = db.session.get(User, user_id)
+    if not user:
+        return False
+    if _user_is_admin(user):
+        return True
+
     k_id = kaynak_id if kaynak_id != 0 else None
     a_id = atik_id if atik_id != 0 else None
     exists = db.session.query(Mesaj.id).filter(
         _conversation_filter(user_id, partner_id, k_id, a_id)
     ).first()
-    return exists is not None
+    if exists is not None:
+        return True
+
+    if k_id:
+        kaynak = db.session.get(Kaynak, k_id)
+        if kaynak and ilan_erisilebilir_mi(kaynak, user):
+            if user_id == kaynak.user_id or partner_id == kaynak.user_id:
+                return True
+    if a_id:
+        atik = db.session.get(Atik, a_id)
+        if atik and ilan_erisilebilir_mi(atik, user):
+            if user_id == atik.user_id or partner_id == atik.user_id:
+                return True
+
+    return False
 
 
 def user_can_join_conversation(user_id: int, partner_id: int, kaynak_id: int, atik_id: int) -> bool:
-    if partner_id == user_id:
-        return False
-    return db.session.get(User, partner_id) is not None
+    return user_can_access_conversation(user_id, partner_id, kaynak_id, atik_id)
 
 
 def get_conversation_partner_ids(user_id: int) -> set[int]:
@@ -470,7 +498,7 @@ def handle_join_conversation(data):
     partner_id = int(data.get("partner_id") or 0)
     kaynak_id = int(data.get("kaynak_id") or 0)
     atik_id = int(data.get("atik_id") or 0)
-    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+    if not user_can_access_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return {"error": "Yetkisiz"}
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     room = conversation_room(canon)
@@ -501,6 +529,8 @@ def handle_leave_conversation(data):
     kaynak_id = int(data.get("kaynak_id") or 0)
     atik_id = int(data.get("atik_id") or 0)
     if partner_id:
+        if not user_can_access_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+            return {"error": "Yetkisiz"}
         canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
         room = conversation_room(canon)
         _leave_room_safe(room)
@@ -521,7 +551,7 @@ def handle_typing_start(data):
     atik_id = int(data.get("atik_id") or 0)
     if not partner_id or partner_id == current_user.id:
         return
-    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+    if not user_can_access_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     conv = conversation_room(canon)
@@ -545,7 +575,7 @@ def handle_typing_stop(data):
     atik_id = int(data.get("atik_id") or 0)
     if not partner_id or partner_id == current_user.id:
         return
-    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+    if not user_can_access_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return
     canon = canonical_conversation_id(current_user.id, partner_id, kaynak_id, atik_id)
     conv = conversation_room(canon)
@@ -586,6 +616,16 @@ def handle_message_read(data):
         Mesaj.receiver_id == current_user.id,
         Mesaj.is_read.is_(False),
     ).all()
+    messages = [
+        mesaj
+        for mesaj in messages
+        if user_can_access_conversation(
+            current_user.id,
+            mesaj.sender_id,
+            mesaj.kaynak_id or 0,
+            mesaj.atik_id or 0,
+        )
+    ]
     if not messages:
         return {"updated": 0}
 
@@ -612,7 +652,7 @@ def handle_sync_state(data):
     after_id = int(data.get("after_message_id") or 0)
     if not partner_id:
         return {"error": "Eksik veri"}
-    if not user_can_join_conversation(current_user.id, partner_id, kaynak_id, atik_id):
+    if not user_can_access_conversation(current_user.id, partner_id, kaynak_id, atik_id):
         return {"error": "Yetkisiz"}
     k_id = kaynak_id if kaynak_id != 0 else None
     a_id = atik_id if atik_id != 0 else None

@@ -11,7 +11,7 @@ from services.admin_notifications import notify_admins
 from services.user_moderation import resolve_reported_user_id
 from services.notifications import bildirim_olustur
 from socket_events import emit_notification_sync, emit_unread_count_updated
-from utils import format_datetime, mesafe_hesapla, sanitize_input
+from utils import format_datetime, safe_notification_link, mesafe_hesapla, sanitize_input
 
 api_bp = Blueprint("api", __name__)
 
@@ -211,7 +211,7 @@ def bildirimleri_getir():
         "icerik": b.icerik,
         "tur": b.tur,
         "okundu": b.okundu,
-        "link": b.link,
+        "link": safe_notification_link(b.link, site_url=current_app.config.get("SITE_URL")),
         "timestamp": format_datetime(b.timestamp, "%d.%m.%Y %H:%M"),
     } for b in bildirimler])
 

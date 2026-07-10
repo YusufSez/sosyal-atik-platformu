@@ -81,6 +81,7 @@ services:
     volumes:
       - ../static/item_pics:/app/static/item_pics
       - ../static/profile_pics:/app/static/profile_pics
+      - ../data/support_attachments:/app/data/support_attachments
       - ../logs:/app/logs
     restart: unless-stopped
     expose:
