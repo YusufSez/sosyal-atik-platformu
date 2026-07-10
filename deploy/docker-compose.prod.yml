@@ -25,7 +25,9 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  # İsteğe bağlı: docker compose --profile redis -f docker-compose.prod.yml up -d
+  # İsteğe bağlı Redis (çoklu worker / rate limit / Socket.IO message queue):
+  #   docker compose --profile redis -f docker-compose.prod.yml up -d
+  #   .env içinde: REDIS_URL=redis://redis:6379/0
   redis:
     image: redis:7-alpine
     profiles:

@@ -301,11 +301,35 @@ docker compose -f docker-compose.prod.yml up --build -d
 | `web` | Gunicorn; `flask db upgrade` otomatik |
 | `nginx` | Reverse proxy → **http://localhost:8080** |
 
+### Redis (isteğe bağlı)
+
+Redis **zorunlu değildir**. Tanımlı değilse rate limit, Socket.IO ve diğer bileşenler mevcut `memory://` davranışıyla çalışır.
+
+**Ne zaman önerilir?**
+
+- Gunicorn **birden fazla worker** ile çalıştırıldığında (rate limit tutarlılığı)
+- Socket.IO **message queue** ile worker'lar arası olay yayını
+- İleride paylaşımlı cache / presence state taşınması planlandığında
+
+**Production'da Redis ile başlatma:**
+
+```bash
+# .env dosyasına ekleyin:
+# REDIS_URL=redis://redis:6379/0
+
+cd deploy
+docker compose --profile redis -f docker-compose.prod.yml up --build -d
+```
+
+`REDIS_URL` tanımlandığında uygulama otomatik olarak Redis'i dener; bağlantı başarısız olursa **uygulama kapanmaz**, WARNING log üretir ve **memory fallback** kullanır.
+
 Durum kontrolü:
 
 ```bash
 docker compose -f docker-compose.prod.yml ps
 curl http://localhost:8080/health
+# Örnek: {"status":"ok","database":"up","redis":"healthy","storage":"redis"}
+# Redis yoksa: "redis":"disabled", "storage":"memory"
 ```
 
 ![Docker Stack](docs/screenshots/docker-stack.png)

@@ -18,22 +18,26 @@ def init_extensions(app):
     if app.config.get("TESTING"):
         limiter.enabled = False
 
-    from production_config import resolve_socketio_cors_origins
+    from production_config import resolve_socketio_cors_origins, resolve_socketio_message_queue
 
     socketio_async_mode = (
         "threading"
         if app.config.get("TESTING")
         else os.getenv("SOCKETIO_ASYNC_MODE", "eventlet")
     )
-    socketio.init_app(
-        app,
-        async_mode=socketio_async_mode,
-        manage_session=False,
-        cors_allowed_origins=resolve_socketio_cors_origins(
+    socketio_kwargs = {
+        "async_mode": socketio_async_mode,
+        "manage_session": False,
+        "cors_allowed_origins": resolve_socketio_cors_origins(
             is_testing=bool(app.config.get("TESTING")),
             debug=bool(app.config.get("DEBUG")),
         ),
-    )
+    }
+    message_queue = resolve_socketio_message_queue()
+    if message_queue:
+        socketio_kwargs["message_queue"] = message_queue
+
+    socketio.init_app(app, **socketio_kwargs)
     import socket_events  # noqa: F401 — event handler kaydı
 
     @login_manager.user_loader

@@ -35,9 +35,12 @@ def resolve_rate_limit_storage_uri() -> str:
     if explicit:
         return _validate_storage_uri(explicit)
 
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    if redis_url:
+        return _validate_storage_uri(redis_url)
+
     backend = os.getenv("RATELIMIT_BACKEND", "memory").strip().lower()
     if backend == "redis":
-        redis_url = os.getenv("REDIS_URL", "").strip()
         if not redis_url:
             raise RuntimeError(
                 "RATELIMIT_BACKEND=redis için REDIS_URL tanımlanmalıdır. "
@@ -133,5 +136,25 @@ def resolve_socketio_cors_origins(*, is_testing: bool, debug: bool) -> list[str]
     logger.warning(
         "SOCKETIO_CORS_ORIGINS ve SITE_URL yok; Socket.IO CORS kısıtlanmadı. "
         "Üretimde SOCKETIO_CORS_ORIGINS ayarlayın."
+    )
+    return None
+
+
+def resolve_socketio_message_queue() -> str | None:
+    """Socket.IO çoklu worker için Redis message queue (yalnızca Redis erişilebilirse)."""
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    if not redis_url:
+        return None
+
+    from services.redis_manager import ping_redis_url
+
+    if ping_redis_url(redis_url):
+        logger.info("Socket.IO message queue: Redis (%s)", redis_url)
+        return redis_url
+
+    logger.warning(
+        "Socket.IO message queue devre dışı; Redis erişilemiyor (%s). "
+        "Tek process modu kullanılacak.",
+        redis_url,
     )
     return None

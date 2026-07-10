@@ -71,6 +71,7 @@ def configure_app(app, config_overrides=None):
         app.root_path, "data", "support_attachments"
     )
     app.config["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
+    app.config["REDIS_URL"] = os.getenv("REDIS_URL") or None
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
     app.config["ALLOW_SEED_ROUTE"] = env_to_bool(os.getenv("ALLOW_SEED_ROUTE"), default=False)
     app.config["DEBUG"] = env_to_bool(os.getenv("DEBUG"), default=False)
