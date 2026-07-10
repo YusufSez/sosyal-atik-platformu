@@ -1,35 +1,39 @@
 import html
-import io
 import os
 import re
-import secrets
 
 import bleach
-from urllib.parse import urlparse
-
-from flask import current_app, has_request_context, request
-from flask_login import current_user
-from PIL import Image
-from werkzeug.utils import secure_filename
-
-from constants import (
-    ALLOWED_IMAGE_EXTENSIONS,
-    ALLOWED_IMAGE_MIMES,
-    BLOCKED_UPLOAD_EXTENSIONS,
-    DEFAULT_LAT,
-    DEFAULT_LNG,
-    EXTENSION_TO_PIL_FORMAT,
-    MAX_IMAGE_PIXELS,
-    MAX_SINGLE_IMAGE_BYTES,
-    PIL_FORMAT_TO_EXT,
-    PIL_FORMAT_TO_MIME,
-)
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
+from flask import has_request_context, request
+
+from constants import DEFAULT_LAT, DEFAULT_LNG
 from extensions import db
 
-Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+from .image import (
+    _check_image_dimensions,
+    _normalize_mime,
+    _random_image_filename,
+    _strip_exif,
+    _validate_image_bytes,
+    allowed_file,
+)
+from .upload import (
+    _save_image_to_folder,
+    canonical_upload_basename,
+    delete_picture,
+    delete_profile_picture,
+    resolve_item_picture_path,
+    resolve_item_picture_path_from_ref,
+    resolve_profile_picture_path,
+    resolve_safe_path_in_folder,
+    resolve_support_attachment_path,
+    save_picture,
+    save_profile_picture,
+    save_support_attachment,
+)
 
 APP_TIMEZONE = ZoneInfo("Europe/Istanbul")
 UTC = timezone.utc
@@ -161,220 +165,6 @@ def validate_password(password):
     if not any(c.isdigit() for c in password):
         return False, "Şifre en az 1 rakam içermelidir"
     return True, "Şifre güvenli"
-
-
-def allowed_file(filename):
-    if not filename or "." not in filename:
-        return False
-    safe_name = secure_filename(filename).lower()
-    if not safe_name:
-        return False
-    for part in safe_name.split(".")[1:]:
-        if part in BLOCKED_UPLOAD_EXTENSIONS:
-            return False
-    ext = safe_name.rsplit(".", 1)[1]
-    return ext in ALLOWED_IMAGE_EXTENSIONS
-
-
-def canonical_upload_basename(filename: str) -> str:
-    """Dosya adını basename + secure_filename ile normalize eder."""
-    if not filename or filename == "default.jpg":
-        raise ValueError("Geçersiz dosya adı")
-    safe = os.path.basename(str(filename).replace("\\", "/"))
-    if not safe or safe in (".", ".."):
-        raise ValueError("Geçersiz dosya adı")
-    safe = secure_filename(safe)
-    if not safe or not allowed_file(safe):
-        raise ValueError("Geçersiz dosya adı")
-    return safe
-
-
-def resolve_safe_path_in_folder(folder: str, filename: str) -> str:
-    """Klasör içinde canonical path; dışına çıkış reddedilir."""
-    safe = canonical_upload_basename(filename)
-    base = os.path.realpath(os.path.abspath(folder))
-    candidate = os.path.realpath(os.path.join(base, safe))
-    if candidate != base and not candidate.startswith(base + os.sep):
-        raise ValueError("Geçersiz dosya yolu")
-    return candidate
-
-
-def resolve_item_picture_path(filename: str) -> str:
-    """UPLOAD_FOLDER altında güvenli ilan fotoğraf yolu."""
-    return resolve_safe_path_in_folder(current_app.config["UPLOAD_FOLDER"], filename)
-
-
-def resolve_profile_picture_path(filename: str) -> str:
-    """profile_pics altında güvenli profil fotoğraf yolu."""
-    folder = os.path.join(current_app.root_path, "static", "profile_pics")
-    return resolve_safe_path_in_folder(folder, filename)
-
-
-def resolve_item_picture_path_from_ref(path_or_name: str) -> str:
-    """Dosya adı veya upload klasörü altındaki tam yol."""
-    folder = current_app.config["UPLOAD_FOLDER"]
-    base = os.path.realpath(os.path.abspath(folder))
-    if os.path.isabs(path_or_name) or "/" in str(path_or_name).replace("\\", "/"):
-        candidate = os.path.realpath(os.path.abspath(path_or_name))
-        if candidate != base and not candidate.startswith(base + os.sep):
-            raise ValueError("Geçersiz dosya yolu")
-        return candidate
-    return resolve_item_picture_path(path_or_name)
-
-
-def _check_image_dimensions(img: Image.Image) -> None:
-    width, height = img.size
-    if width <= 0 or height <= 0:
-        raise ValueError("Geçersiz görsel boyutu")
-    if width * height > MAX_IMAGE_PIXELS:
-        raise ValueError("Görsel çözünürlüğü çok yüksek")
-
-
-def _strip_exif(img: Image.Image) -> Image.Image:
-    """EXIF/GPS/kamera metadata kaldırır."""
-    if img.mode in ("RGBA", "LA"):
-        background = Image.new("RGB", img.size, (255, 255, 255))
-        background.paste(img, mask=img.split()[-1])
-        return background
-    if img.mode == "P":
-        img = img.convert("RGBA")
-        background = Image.new("RGB", img.size, (255, 255, 255))
-        background.paste(img, mask=img.split()[-1])
-        return background
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    clean = Image.new("RGB", img.size)
-    clean.paste(img)
-    return clean
-
-
-def _normalize_mime(mime_type):
-    if not mime_type:
-        return ""
-    return mime_type.split(";")[0].strip().lower()
-
-
-def _validate_image_bytes(file_storage):
-    """Uzantı, MIME, boyut ve Pillow ile gerçek görsel içeriğini doğrula."""
-    if not file_storage or not file_storage.filename:
-        return False, "Dosya seçilmedi", None
-    if not allowed_file(file_storage.filename):
-        return False, "Sadece JPG, JPEG, PNG veya WEBP yüklenebilir", None
-
-    safe_name = secure_filename(file_storage.filename).lower()
-    claimed_ext = safe_name.rsplit(".", 1)[1]
-    expected_format = EXTENSION_TO_PIL_FORMAT.get(claimed_ext)
-    if not expected_format:
-        return False, "Geçersiz dosya uzantısı", None
-
-    file_storage.seek(0, os.SEEK_END)
-    size = file_storage.tell()
-    file_storage.seek(0)
-    if size == 0:
-        return False, "Boş dosya yüklenemez", None
-    if size > MAX_SINGLE_IMAGE_BYTES:
-        max_mb = MAX_SINGLE_IMAGE_BYTES // (1024 * 1024)
-        return False, f"Dosya boyutu {max_mb} MB sınırını aşıyor", None
-
-    claimed_mime = _normalize_mime(getattr(file_storage, "content_type", None))
-    if claimed_mime and claimed_mime not in ALLOWED_IMAGE_MIMES:
-        return False, "Geçersiz dosya MIME türü", None
-
-    try:
-        raw = file_storage.read()
-        file_storage.seek(0)
-        with Image.open(io.BytesIO(raw)) as img:
-            img.verify()
-        with Image.open(io.BytesIO(raw)) as img:
-            _check_image_dimensions(img)
-            img.load()
-            detected_format = (img.format or "").upper()
-            if detected_format not in PIL_FORMAT_TO_EXT:
-                return False, "Geçersiz görsel dosyası", None
-            if detected_format != expected_format:
-                return False, "Dosya uzantısı ile içerik uyuşmuyor", None
-            if claimed_mime:
-                expected_mime = PIL_FORMAT_TO_MIME.get(detected_format)
-                if expected_mime and claimed_mime != expected_mime:
-                    return False, "Dosya MIME türü ile içerik uyuşmuyor", None
-        file_storage.seek(0)
-    except ValueError as exc:
-        file_storage.seek(0)
-        return False, str(exc), None
-    except Exception:
-        file_storage.seek(0)
-        return False, "Geçersiz görsel dosyası", None
-
-    return True, None, expected_format
-
-
-def _random_image_filename(pil_format):
-    ext = PIL_FORMAT_TO_EXT.get(pil_format, ".jpg")
-    return secrets.token_hex(16) + ext
-
-
-def _save_image_to_folder(form_picture, folder, thumbnail_size):
-    ok, err, pil_format = _validate_image_bytes(form_picture)
-    if not ok:
-        raise ValueError(err)
-
-    os.makedirs(folder, exist_ok=True)
-    picture_fn = _random_image_filename(pil_format)
-
-    img = Image.open(form_picture)
-    img.load()
-    _check_image_dimensions(img)
-    img.thumbnail(thumbnail_size)
-    save_format = pil_format
-    img = _strip_exif(img)
-    picture_path = resolve_safe_path_in_folder(folder, picture_fn)
-    img.save(picture_path, format=save_format, optimize=True, quality=85)
-    form_picture.seek(0)
-    return picture_fn
-
-
-def resolve_support_attachment_path(filename: str) -> str:
-    """Private destek ekleri klasöründe güvenli dosya yolu."""
-    folder = current_app.config["SUPPORT_UPLOAD_FOLDER"]
-    return resolve_safe_path_in_folder(folder, filename)
-
-
-def save_support_attachment(form_picture):
-    """İlan yükleme ile aynı güvenlik pipeline'ı (doğrulama + re-encode)."""
-    folder = current_app.config["SUPPORT_UPLOAD_FOLDER"]
-    return _save_image_to_folder(form_picture, folder, (600, 400))
-
-
-def save_picture(form_picture):
-    folder = current_app.config["UPLOAD_FOLDER"]
-    return _save_image_to_folder(form_picture, folder, (600, 400))
-
-
-def delete_picture(filename):
-    if not filename or filename == "default.jpg":
-        return
-    try:
-        path = resolve_item_picture_path(filename)
-    except ValueError:
-        return
-    if os.path.isfile(path):
-        os.remove(path)
-
-
-def save_profile_picture(form_picture):
-    folder = os.path.join(current_app.root_path, "static", "profile_pics")
-    return _save_image_to_folder(form_picture, folder, (300, 300))
-
-
-def delete_profile_picture(filename):
-    if not filename or filename == "default.jpg":
-        return
-    try:
-        path = resolve_profile_picture_path(filename)
-    except ValueError:
-        return
-    if os.path.isfile(path):
-        os.remove(path)
 
 
 def parse_coordinates(lat_raw, lng_raw, user=None):
@@ -734,3 +524,47 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN new_value TEXT"))
             if "user_agent" not in audit_cols:
                 conn.execute(text("ALTER TABLE admin_audit_log ADD COLUMN user_agent VARCHAR(500)"))
+
+__all__ = [
+    "APP_TIMEZONE",
+    "UTC",
+    "_check_image_dimensions",
+    "_normalize_mime",
+    "_random_image_filename",
+    "_save_image_to_folder",
+    "_strip_exif",
+    "_validate_image_bytes",
+    "allowed_file",
+    "canonical_upload_basename",
+    "cleanup_atik_relations",
+    "cleanup_ilan_relations",
+    "cleanup_kaynak_relations",
+    "delete_picture",
+    "delete_profile_picture",
+    "ensure_schema",
+    "env_to_bool",
+    "format_datetime",
+    "harita_noktalari",
+    "ilan_erisilebilir_mi",
+    "is_varsayilan_konum",
+    "local_now",
+    "mesafe_hesapla",
+    "parse_coordinates",
+    "resolve_item_picture_path",
+    "resolve_item_picture_path_from_ref",
+    "resolve_profile_picture_path",
+    "resolve_safe_path_in_folder",
+    "resolve_support_attachment_path",
+    "safe_notification_link",
+    "safe_redirect_url",
+    "sanitize_input",
+    "save_picture",
+    "save_profile_picture",
+    "save_support_attachment",
+    "to_local",
+    "to_utc",
+    "tr_time",
+    "unescape_stored_text",
+    "utc_now",
+    "validate_password",
+]
