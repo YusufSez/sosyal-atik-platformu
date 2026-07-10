@@ -7,6 +7,7 @@ from flask_login import current_user
 
 from extensions import db
 from models import IlanModerasyonActivityLog, User
+from sqlalchemy.orm import joinedload
 from utils import utc_now
 
 
@@ -57,7 +58,12 @@ def activity_listesi(
         q = q.filter(IlanModerasyonActivityLog.admin_user_id == admin_id)
     if tur:
         q = q.filter(IlanModerasyonActivityLog.tur == tur)
-    return q.order_by(IlanModerasyonActivityLog.created_at.desc()).limit(limit).all()
+    return (
+        q.options(joinedload(IlanModerasyonActivityLog.admin))
+        .order_by(IlanModerasyonActivityLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 def activity_dict(log: IlanModerasyonActivityLog) -> dict:

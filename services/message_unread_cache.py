@@ -30,6 +30,10 @@ def set_unread_counts(
         _notification_unread_cache[user_id] = notification_unread
 
 
+def is_cache_warmed(user_id: int) -> bool:
+    return user_id in _cache_warmed
+
+
 def refresh_unread_cache(user_id: int) -> dict[str, int]:
     message_unread = Mesaj.query.filter_by(receiver_id=user_id, is_read=False).count()
     notification_unread = Bildirim.query.filter_by(user_id=user_id, okundu=False).count()

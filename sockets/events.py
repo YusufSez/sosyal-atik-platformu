@@ -4,6 +4,8 @@ import socket_events
 from extensions import socketio
 from socketio.exceptions import ConnectionRefusedError
 
+from sqlalchemy.orm import joinedload
+
 from constants import (
     RATE_SOCKET_MESSAGE_PER_SEC,
     RATE_SOCKET_SYNC_STATE_PER_SEC,
@@ -268,7 +270,12 @@ def handle_sync_state(data):
     )
     if after_id:
         query = query.filter(Mesaj.id > after_id)
-    rows = query.order_by(Mesaj.id.asc()).limit(100).all()
+    rows = (
+        query.options(joinedload(Mesaj.sender))
+        .order_by(Mesaj.id.asc())
+        .limit(100)
+        .all()
+    )
     _log_socket(
         "SYNC",
         user_id=socket_events.current_user.id,

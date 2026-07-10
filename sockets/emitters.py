@@ -9,17 +9,20 @@ from .serializer import build_conversation_updated, serialize_message, unread_co
 from .utils import _log_emit, logger
 
 
-def emit_unread_count_updated(user_id: int) -> None:
+def emit_unread_count_updated(user_id: int, payload: dict | None = None) -> None:
     room = user_room(user_id)
-    payload = unread_counts_for(user_id)
+    if payload is None:
+        payload = unread_counts_for(user_id)
     _log_emit("unread_count_updated", room, user_id=user_id)
     socketio.emit("unread_count_updated", payload, room=room)
 
 
-def emit_notification_sync(user_id: int) -> None:
+def emit_notification_sync(user_id: int, payload: dict | None = None) -> None:
     room = user_room(user_id)
+    if payload is None:
+        payload = unread_counts_for(user_id)
     _log_emit("notification_sync", room, user_id=user_id)
-    socketio.emit("notification_sync", unread_counts_for(user_id), room=room)
+    socketio.emit("notification_sync", payload, room=room)
 
 
 def emit_after_message_created(mesaj: Mesaj) -> None:

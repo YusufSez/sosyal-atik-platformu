@@ -13,9 +13,11 @@ logger = logging.getLogger(__name__)
 def _emit_bildirim_realtime(user_id: int) -> None:
     try:
         from socket_events import emit_notification_sync, emit_unread_count_updated
+        from sockets.serializer import unread_counts_for
 
-        emit_unread_count_updated(user_id)
-        emit_notification_sync(user_id)
+        payload = unread_counts_for(user_id)
+        emit_unread_count_updated(user_id, payload=payload)
+        emit_notification_sync(user_id, payload=payload)
     except Exception:
         logger.exception("Bildirim socket senkronu başarısız user_id=%s", user_id)
 

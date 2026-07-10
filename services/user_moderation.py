@@ -224,16 +224,32 @@ def activate_user(user: User) -> None:
 
 
 def kullanici_istatistikleri(user_id: int) -> dict:
+    from sqlalchemy import func, or_, select
+
     paylasim = (
-        Kaynak.query.filter_by(user_id=user_id).count()
-        + Atik.query.filter_by(user_id=user_id).count()
+        (db.session.scalar(
+            select(func.count()).select_from(Kaynak).where(Kaynak.user_id == user_id)
+        ) or 0)
+        + (db.session.scalar(
+            select(func.count()).select_from(Atik).where(Atik.user_id == user_id)
+        ) or 0)
     )
+    mesaj_gonderilen = db.session.scalar(
+        select(func.count()).select_from(Mesaj).where(Mesaj.sender_id == user_id)
+    ) or 0
+    mesaj_alinan = db.session.scalar(
+        select(func.count()).select_from(Mesaj).where(Mesaj.receiver_id == user_id)
+    ) or 0
     return {
         "paylasim": paylasim,
-        "mesaj_gonderilen": Mesaj.query.filter_by(sender_id=user_id).count(),
-        "mesaj_alinan": Mesaj.query.filter_by(receiver_id=user_id).count(),
-        "sikayet_alinan": Sikayet.query.filter_by(reported_user_id=user_id).count(),
-        "sikayet_olusturulan": Sikayet.query.filter_by(user_id=user_id).count(),
+        "mesaj_gonderilen": mesaj_gonderilen,
+        "mesaj_alinan": mesaj_alinan,
+        "sikayet_alinan": db.session.scalar(
+            select(func.count()).select_from(Sikayet).where(Sikayet.reported_user_id == user_id)
+        ) or 0,
+        "sikayet_olusturulan": db.session.scalar(
+            select(func.count()).select_from(Sikayet).where(Sikayet.user_id == user_id)
+        ) or 0,
     }
 
 

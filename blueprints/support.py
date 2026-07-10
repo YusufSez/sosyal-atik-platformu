@@ -13,6 +13,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from constants import (
+    ADMIN_DESTEK_PER_PAGE,
     DESTEK_KATEGORILERI,
     DESTEK_KATEGORI_BAN_ITIRAZI_LABEL,
     EMAIL_VERIFY_REQUIRED_MSG,
@@ -207,9 +208,14 @@ def _handle_authenticated_destek_post():
 @support_bp.route("/destek/taleplerim")
 @login_required
 def destek_taleplerim():
-    talepler = (
+    page = request.args.get("page", 1, type=int)
+    pagination = (
         DestekTalebi.query.filter_by(user_id=current_user.id)
         .order_by(DestekTalebi.id.desc())
-        .all()
+        .paginate(page=page, per_page=ADMIN_DESTEK_PER_PAGE, error_out=False)
     )
-    return render_template("destek_taleplerim.html", talepler=talepler)
+    return render_template(
+        "destek_taleplerim.html",
+        talepler=pagination.items,
+        pagination=pagination,
+    )

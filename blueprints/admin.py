@@ -3,7 +3,7 @@ import os
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED, DESTEK_DURUMLARI
+from constants import ADMIN_DESTEK_PER_PAGE, ADMIN_USERS_PER_PAGE, MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED, DESTEK_DURUMLARI
 from decorators import admin_required, is_super_admin, super_admin_required
 from extensions import db, limiter
 from helpers import ai_tam_analiz
@@ -12,6 +12,7 @@ from sqlalchemy.orm import joinedload
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
+from services.stats_queries import admin_dashboard_counts
 from services.admin_user_detail import build_admin_user_detail
 from services.admin_user_edit import (
     UserEditError,
@@ -31,11 +32,12 @@ admin_bp = Blueprint("admin", __name__)
 @login_required
 @admin_required
 def admin_panel():
+    counts = admin_dashboard_counts()
     return render_template(
         "admin.html",
-        user_count=User.query.count(),
-        kaynak_count=Kaynak.query.count(),
-        atik_count=Atik.query.count(),
+        user_count=counts["user_count"],
+        kaynak_count=counts["kaynak_count"],
+        atik_count=counts["atik_count"],
         etki_ozet=platform_ozeti(),
         etki_kategoriler=kategori_kirilimi(),
         etki_iller=il_kirilimi(),
@@ -57,15 +59,20 @@ def admin_panel():
 @super_admin_required
 def admin_users():
     # Rol/ban işlemleri sadece süper admin tarafında yapılır.
-    users = User.query.order_by(User.id.desc()).all()
-    return render_template("admin_users.html", users=users)
+    page = request.args.get("page", 1, type=int)
+    pagination = User.query.order_by(User.id.desc()).paginate(
+        page=page,
+        per_page=ADMIN_USERS_PER_PAGE,
+        error_out=False,
+    )
+    return render_template("admin_users.html", users=pagination.items, pagination=pagination)
 
 
 @admin_bp.route("/admin/users/<int:user_id>")
 @login_required
 @super_admin_required
 def admin_user_detail(user_id: int):
-    user = User.query.get_or_404(user_id)
+    user = User.query.options(joinedload(User.banned_by)).get_or_404(user_id)
     detail = build_admin_user_detail(user)
     detail["can_edit"] = is_super_admin(current_user)
     return render_template("admin_user_detail.html", **detail)
@@ -362,15 +369,16 @@ def ai_test(tur):
 @login_required
 @admin_required
 def admin_destek_list():
-    talepler = (
+    page = request.args.get("page", 1, type=int)
+    pagination = (
         DestekTalebi.query.options(joinedload(DestekTalebi.user))
         .order_by(DestekTalebi.id.desc())
-        .limit(100)
-        .all()
+        .paginate(page=page, per_page=ADMIN_DESTEK_PER_PAGE, error_out=False)
     )
     return render_template(
         "admin_destek.html",
-        talepler=talepler,
+        talepler=pagination.items,
+        pagination=pagination,
         durumlar=DESTEK_DURUMLARI,
         kategori_etiketi=kategori_etiketi,
     )

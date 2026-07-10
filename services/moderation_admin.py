@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from constants import (
     AI_RISK_REVIEW_MIN,
@@ -191,9 +191,15 @@ def moderasyon_listesi(
 def ilan_detay_paketi(tur: str, ilan_id: int) -> dict[str, Any] | None:
     """Admin detay sayfası veri paketi."""
     if tur == "kaynak":
-        ilan = Kaynak.query.options(joinedload(Kaynak.sahip)).get(ilan_id)
+        ilan = Kaynak.query.options(
+            joinedload(Kaynak.sahip),
+            selectinload(Kaynak.fotograflar),
+        ).get(ilan_id)
     else:
-        ilan = Atik.query.options(joinedload(Atik.sahip)).get(ilan_id)
+        ilan = Atik.query.options(
+            joinedload(Atik.sahip),
+            selectinload(Atik.fotograflar),
+        ).get(ilan_id)
     if not ilan:
         return None
 

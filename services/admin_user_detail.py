@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -23,30 +23,40 @@ from services.user_moderation import normalize_role
 def build_admin_user_detail(user: User) -> dict:
     user_id = user.id
     ilan_sayisi = (
-        Kaynak.query.filter_by(user_id=user_id).count()
-        + Atik.query.filter_by(user_id=user_id).count()
+        (db.session.scalar(
+            select(func.count()).select_from(Kaynak).where(Kaynak.user_id == user_id)
+        ) or 0)
+        + (db.session.scalar(
+            select(func.count()).select_from(Atik).where(Atik.user_id == user_id)
+        ) or 0)
     )
-    mesaj_sayisi = (
-        Mesaj.query.filter_by(sender_id=user_id).count()
-        + Mesaj.query.filter_by(receiver_id=user_id).count()
+    mesaj_sayisi = db.session.scalar(
+        select(func.count())
+        .select_from(Mesaj)
+        .where(or_(Mesaj.sender_id == user_id, Mesaj.receiver_id == user_id))
+    ) or 0
+    yorum_sayisi = db.session.scalar(
+        select(func.count()).select_from(Comment).where(Comment.user_id == user_id)
+    ) or 0
+    bildirim_sayisi = db.session.scalar(
+        select(func.count()).select_from(Bildirim).where(Bildirim.user_id == user_id)
+    ) or 0
+
+    kaynak_subq = select(Kaynak.id).where(Kaynak.user_id == user_id)
+    atik_subq = select(Atik.id).where(Atik.user_id == user_id)
+
+    moderasyon_kayitlari = (
+        IlanModerasyonAnaliz.query.filter(
+            IlanModerasyonAnaliz.is_current.is_(True),
+            or_(
+                IlanModerasyonAnaliz.kaynak_id.in_(kaynak_subq),
+                IlanModerasyonAnaliz.atik_id.in_(atik_subq),
+            ),
+        )
+        .order_by(IlanModerasyonAnaliz.id.desc())
+        .limit(20)
+        .all()
     )
-    yorum_sayisi = Comment.query.filter_by(user_id=user_id).count()
-    bildirim_sayisi = Bildirim.query.filter_by(user_id=user_id).count()
-
-    kaynak_ids = [row[0] for row in db.session.query(Kaynak.id).filter_by(user_id=user_id).all()]
-    atik_ids = [row[0] for row in db.session.query(Atik.id).filter_by(user_id=user_id).all()]
-
-    moderasyon_kayitlari = []
-    if kaynak_ids or atik_ids:
-        q = IlanModerasyonAnaliz.query.filter(IlanModerasyonAnaliz.is_current.is_(True))
-        filters = []
-        if kaynak_ids:
-            filters.append(IlanModerasyonAnaliz.kaynak_id.in_(kaynak_ids))
-        if atik_ids:
-            filters.append(IlanModerasyonAnaliz.atik_id.in_(atik_ids))
-        moderasyon_kayitlari = q.filter(or_(*filters)).order_by(
-            IlanModerasyonAnaliz.id.desc()
-        ).limit(20).all()
 
     audit_kayitlari = (
         AdminAuditLog.query.options(joinedload(AdminAuditLog.admin))

@@ -6,9 +6,10 @@ from services.ilan_moderation import public_ilan_base_filter
 from sqlalchemy.orm import selectinload
 
 from content.kurumsal import KURUMSAL_SAYFALAR, SITE_HARITASI_GRUPLARI
-from models import Atik, Kaynak, User
+from models import Atik, Kaynak
 from services.impact import platform_ozeti
 from services.recommendations import kullanici_onerileri
+from services.stats_queries import homepage_stats
 
 main_bp = Blueprint("main", __name__)
 
@@ -19,15 +20,7 @@ def anasayfa():
     kaynaklar = public_ilan_base_filter(
         Kaynak.query.options(selectinload(Kaynak.fotograflar)), Kaynak
     ).order_by(Kaynak.id.desc()).limit(8).all()
-    stats = {
-        "kullanici": User.query.count(),
-        "kaynak": Kaynak.query.count(),
-        "atik": Atik.query.count(),
-        "teslim": (
-            Kaynak.query.filter_by(ilan_durumu="Teslim Edildi").count()
-            + Atik.query.filter_by(ilan_durumu="Teslim Edildi").count()
-        ),
-    }
+    stats = homepage_stats()
     etki = platform_ozeti()
     oneriler_kaynak = []
     oneriler_atik = []
