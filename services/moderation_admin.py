@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, or_
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import and_, case, func, select, union_all
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from constants import (
     AI_RISK_REVIEW_MIN,
@@ -27,7 +26,11 @@ from services.moderation_analysis import analiz_dict, analiz_gecmisi, guncel_ana
 from services.moderation_compare import latest_reanalyze_comparison
 from services.moderation_decisions import ilan_karar_ozeti, karar_analitigi
 from services.moderation_flow import build_moderation_flow
-from services.moderation_priority import sort_moderation_items
+from services.moderation_list_queries import (
+    ModerasyonListeSatir,
+    batch_load_ilans,
+    sorted_moderation_rows,
+)
 from services.moderation_timeline import timeline_detay, timeline_listele
 from utils import utc_now
 
@@ -70,89 +73,27 @@ def _aciklama_ilk_satir(aciklama: str | None) -> str:
     return aciklama.strip().split("\n", 1)[0][:120]
 
 
-def _bulk_guncel_analiz_map() -> dict[tuple[str, int], IlanModerasyonAnaliz]:
-    """Tüm güncel analizleri tek sorguda yükler (N+1 önleme)."""
-    analizler = IlanModerasyonAnaliz.query.filter_by(is_current=True).all()
-    return {(a.tur, (a.kaynak_id or a.atik_id)): a for a in analizler if (a.kaynak_id or a.atik_id)}
-
-
-def _ilan_to_liste_ogesi(
-    tur: str,
-    ilan,
-    analiz: IlanModerasyonAnaliz | None,
-) -> ModerasyonListeOgesi:
-    sahip = getattr(ilan, "sahip", None)
+def _row_to_liste_ogesi(row: ModerasyonListeSatir, ilan) -> ModerasyonListeOgesi:
+    sahip = getattr(ilan, "sahip", None) if ilan else None
     return ModerasyonListeOgesi(
-        tur=tur,
-        ilan_id=ilan.id,
-        baslik=ilan.baslik,
-        aciklama_ozet=_aciklama_ilk_satir(ilan.aciklama),
+        tur=row.tur,
+        ilan_id=row.ilan_id,
+        baslik=row.baslik,
+        aciklama_ozet=_aciklama_ilk_satir(row.aciklama),
         kullanici=sahip.username if sahip else "?",
-        kullanici_id=ilan.user_id,
-        tarih=ilan.tarih,
-        risk_skoru=analiz.final_risk if analiz else ilan.ai_risk_score,
-        moderation_status=ilan.moderation_status,
-        category=(analiz.category if analiz else None) or getattr(ilan, "kategori", None),
-        purpose=analiz.purpose if analiz else None,
-        confidence=analiz.confidence if analiz else None,
-        spam_score=analiz.spam_score if analiz else None,
-        duplicate_score=analiz.duplicate_score if analiz else None,
-        kapak=kapak_resim(ilan),
-        kategori=getattr(ilan, "kategori", None),
-        alt_kategori=getattr(ilan, "durum", None) if tur == "kaynak" else None,
+        kullanici_id=row.user_id,
+        tarih=row.tarih,
+        risk_skoru=row.risk_skoru,
+        moderation_status=row.moderation_status,
+        category=row.category or row.kategori,
+        purpose=row.purpose,
+        confidence=row.confidence,
+        spam_score=row.spam_score,
+        duplicate_score=row.duplicate_score,
+        kapak=kapak_resim(ilan) if ilan else (row.resim or "default.jpg"),
+        kategori=row.kategori,
+        alt_kategori=row.alt_kategori if row.tur == "kaynak" else None,
     )
-
-
-def _filtre_uygula_ilan(query, model, filters: dict):
-    status = filters.get("status")
-    if status:
-        query = query.filter(model.moderation_status == status)
-    risk_min = filters.get("risk_min")
-    if risk_min:
-        query = query.filter(model.ai_risk_score >= int(risk_min))
-    kategori = filters.get("kategori")
-    if kategori:
-        query = query.filter(model.kategori == kategori)
-    username = filters.get("username")
-    if username:
-        query = query.join(User, model.user_id == User.id).filter(
-            User.username.ilike(f"%{username}%")
-        )
-    date_from = filters.get("date_from")
-    if date_from:
-        query = query.filter(model.tarih >= date_from)
-    date_to = filters.get("date_to")
-    if date_to:
-        query = query.filter(model.tarih <= date_to)
-    q = filters.get("q")
-    if q:
-        query = query.filter(
-            or_(model.baslik.ilike(f"%{q}%"), model.aciklama.ilike(f"%{q}%"))
-        )
-    return query
-
-
-def _collect_filtered_items(filters: dict, analiz_map: dict) -> list[ModerasyonListeOgesi]:
-    items: list[ModerasyonListeOgesi] = []
-    tur_filtre = filters.get("tur")
-
-    if tur_filtre in (None, "", "kaynak"):
-        q = _filtre_uygula_ilan(
-            Kaynak.query.options(joinedload(Kaynak.sahip)), Kaynak, filters
-        )
-        for ilan in q.order_by(Kaynak.id.desc()).limit(500).all():
-            analiz = analiz_map.get(("kaynak", ilan.id))
-            items.append(_ilan_to_liste_ogesi("kaynak", ilan, analiz))
-
-    if tur_filtre in (None, "", "atik"):
-        q = _filtre_uygula_ilan(
-            Atik.query.options(joinedload(Atik.sahip)), Atik, filters
-        )
-        for ilan in q.order_by(Atik.id.desc()).limit(500).all():
-            analiz = analiz_map.get(("atik", ilan.id))
-            items.append(_ilan_to_liste_ogesi("atik", ilan, analiz))
-
-    return sort_moderation_items(items)
 
 
 def moderasyon_listesi(
@@ -166,21 +107,29 @@ def moderasyon_listesi(
     page/per_page verilirse sayfalanmış sonuç; aksi halde geriye uyumlu liste.
     """
     filters = filters or {}
-    analiz_map = _bulk_guncel_analiz_map()
-    items = _collect_filtered_items(filters, analiz_map)
-    total = len(items)
+    sorted_rows = sorted_moderation_rows(filters)
+    total = len(sorted_rows)
+
+    if page is None:
+        slice_rows = sorted_rows
+    else:
+        per_page = max(1, min(per_page, 100))
+        pages = max(1, (total + per_page - 1) // per_page)
+        page = max(1, min(page, pages))
+        start = (page - 1) * per_page
+        slice_rows = sorted_rows[start : start + per_page]
+
+    ilan_map = batch_load_ilans(slice_rows)
+    items = [
+        _row_to_liste_ogesi(row, ilan_map.get((row.tur, row.ilan_id)))
+        for row in slice_rows
+    ]
 
     if page is None:
         return items
 
-    per_page = max(1, min(per_page, 100))
-    pages = max(1, (total + per_page - 1) // per_page)
-    page = max(1, min(page, pages))
-    start = (page - 1) * per_page
-    page_items = items[start:start + per_page]
-
     return ModerasyonListeSonuc(
-        items=page_items,
+        items=items,
         total=total,
         page=page,
         per_page=per_page,
@@ -242,74 +191,66 @@ def dashboard_istatistikleri() -> dict[str, Any]:
     """Moderasyon dashboard özet verileri (optimize aggregate sorgular)."""
     now = utc_now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    analiz = IlanModerasyonAnaliz
 
-    toplam = db.session.query(func.count(IlanModerasyonAnaliz.id)).scalar() or 0
-    bugun = (
-        db.session.query(func.count(IlanModerasyonAnaliz.id))
-        .filter(IlanModerasyonAnaliz.created_at >= today_start)
-        .scalar()
-        or 0
-    )
-
-    status_counts = Counter()
-    for model in (Kaynak, Atik):
-        rows = (
-            db.session.query(model.moderation_status, func.count(model.id))
-            .group_by(model.moderation_status)
-            .all()
+    toplam, bugun, whitelist_count, false_positive, avg_risk = db.session.execute(
+        select(
+            func.count(analiz.id),
+            func.count().filter(analiz.created_at >= today_start),
+            func.count().filter(analiz.whitelist_applied.is_(True)),
+            func.count().filter(
+                and_(
+                    analiz.whitelist_applied.is_(True),
+                    analiz.initial_risk >= AI_RISK_REVIEW_MIN,
+                )
+            ),
+            func.avg(analiz.final_risk).filter(analiz.final_risk.isnot(None)),
         )
-        for status, cnt in rows:
-            status_counts[status] += cnt
+    ).one()
+    avg_risk = round(float(avg_risk), 1) if avg_risk else 0.0
 
-    whitelist_count = (
-        db.session.query(func.count(IlanModerasyonAnaliz.id))
-        .filter(IlanModerasyonAnaliz.whitelist_applied.is_(True))
-        .scalar()
-        or 0
+    status_union = union_all(
+        select(Kaynak.moderation_status.label("st"), func.count().label("cnt"))
+        .group_by(Kaynak.moderation_status),
+        select(Atik.moderation_status.label("st"), func.count().label("cnt"))
+        .group_by(Atik.moderation_status),
+    ).subquery()
+    status_counts = Counter(
+        {
+            row[0]: int(row[1] or 0)
+            for row in db.session.execute(
+                select(status_union.c.st, func.sum(status_union.c.cnt)).group_by(
+                    status_union.c.st
+                )
+            ).all()
+        }
     )
 
     kategori_rows = (
-        db.session.query(IlanModerasyonAnaliz.category, func.count(IlanModerasyonAnaliz.id))
-        .filter(IlanModerasyonAnaliz.category.isnot(None), IlanModerasyonAnaliz.is_current.is_(True))
-        .group_by(IlanModerasyonAnaliz.category)
-        .order_by(func.count(IlanModerasyonAnaliz.id).desc())
+        db.session.query(analiz.category, func.count(analiz.id))
+        .filter(analiz.category.isnot(None), analiz.is_current.is_(True))
+        .group_by(analiz.category)
+        .order_by(func.count(analiz.id).desc())
         .limit(5)
         .all()
     )
     purpose_rows = (
-        db.session.query(IlanModerasyonAnaliz.purpose, func.count(IlanModerasyonAnaliz.id))
-        .filter(IlanModerasyonAnaliz.purpose.isnot(None), IlanModerasyonAnaliz.is_current.is_(True))
-        .group_by(IlanModerasyonAnaliz.purpose)
-        .order_by(func.count(IlanModerasyonAnaliz.id).desc())
+        db.session.query(analiz.purpose, func.count(analiz.id))
+        .filter(analiz.purpose.isnot(None), analiz.is_current.is_(True))
+        .group_by(analiz.purpose)
+        .order_by(func.count(analiz.id).desc())
         .limit(5)
         .all()
     )
 
-    avg_risk = (
-        db.session.query(func.avg(IlanModerasyonAnaliz.final_risk))
-        .filter(IlanModerasyonAnaliz.final_risk.isnot(None))
-        .scalar()
-    )
-    avg_risk = round(float(avg_risk), 1) if avg_risk else 0.0
-
-    false_positive = (
-        db.session.query(func.count(IlanModerasyonAnaliz.id))
-        .filter(
-            IlanModerasyonAnaliz.whitelist_applied.is_(True),
-            IlanModerasyonAnaliz.initial_risk >= AI_RISK_REVIEW_MIN,
-        )
-        .scalar()
-        or 0
-    )
-
     admin_override = (
-        db.session.query(func.count(IlanModerasyonTimeline.id))
-        .filter(
-            IlanModerasyonTimeline.event_type.in_(
-                ("admin_approved", "admin_rejected", "admin_risk_override")
+        db.session.scalar(
+            select(func.count()).select_from(IlanModerasyonTimeline).where(
+                IlanModerasyonTimeline.event_type.in_(
+                    ("admin_approved", "admin_rejected", "admin_risk_override")
+                )
             )
         )
-        .scalar()
         or 0
     )
 
@@ -317,11 +258,11 @@ def dashboard_istatistikleri() -> dict[str, Any]:
         start = now - timedelta(days=days)
         rows = (
             db.session.query(
-                func.date(IlanModerasyonAnaliz.created_at),
-                func.count(IlanModerasyonAnaliz.id),
+                func.date(analiz.created_at),
+                func.count(analiz.id),
             )
-            .filter(IlanModerasyonAnaliz.created_at >= start)
-            .group_by(func.date(IlanModerasyonAnaliz.created_at))
+            .filter(analiz.created_at >= start)
+            .group_by(func.date(analiz.created_at))
             .all()
         )
         return {str(d): c for d, c in sorted(rows)}
@@ -331,17 +272,17 @@ def dashboard_istatistikleri() -> dict[str, Any]:
     ai_health = ai_health_stats()
 
     return {
-        "toplam_analiz": toplam,
-        "bugun_analiz": bugun,
+        "toplam_analiz": int(toplam or 0),
+        "bugun_analiz": int(bugun or 0),
         "approved": status_counts.get(MODERATION_STATUS_APPROVED, 0),
         "pending_review": status_counts.get(MODERATION_STATUS_PENDING_REVIEW, 0),
         "rejected": status_counts.get(MODERATION_STATUS_REJECTED, 0),
-        "whitelist_kullanilan": whitelist_count,
+        "whitelist_kullanilan": int(whitelist_count or 0),
         "en_cok_kategori": kategori_rows,
         "ortalama_risk": avg_risk,
         "en_cok_purpose": purpose_rows,
-        "yanlis_pozitif": false_positive,
-        "admin_override": admin_override,
+        "yanlis_pozitif": int(false_positive or 0),
+        "admin_override": int(admin_override),
         "grafik_7_gun": _gunluk_sayim(7),
         "grafik_30_gun": _gunluk_sayim(30),
         "ai_accuracy": phase1["ai_accuracy"],
@@ -361,65 +302,94 @@ def dashboard_istatistikleri() -> dict[str, Any]:
 
 
 def spam_duplicate_analitigi() -> dict[str, Any]:
-    """Phase 2 dashboard metrikleri (optimize)."""
-    analizler = IlanModerasyonAnaliz.query.filter_by(is_current=True).all()
-    spam_buckets = {"0-30": 0, "31-60": 0, "61-100": 0}
-    duplicate_high = 0
+    """Phase 2 dashboard metrikleri (SQL aggregate)."""
+    analiz = IlanModerasyonAnaliz
+    current = analiz.is_current.is_(True)
+    spam_score = func.coalesce(analiz.spam_score, 0)
+    dup_score = func.coalesce(analiz.duplicate_score, 0)
+
+    bucket_0_30, bucket_31_60, bucket_61_100, duplicate_high, total = db.session.execute(
+        select(
+            func.count().filter(spam_score <= 30),
+            func.count().filter(spam_score > 30, spam_score <= 60),
+            func.count().filter(spam_score > 60),
+            func.count().filter(dup_score >= 50),
+            func.count(),
+        ).where(current)
+    ).one()
+    total = int(total or 0) or 1
+
+    spam_buckets = {
+        "0-30": int(bucket_0_30 or 0),
+        "31-60": int(bucket_31_60 or 0),
+        "61-100": int(bucket_61_100 or 0),
+    }
+
+    kaynak_spam = db.session.execute(
+        select(Kaynak.user_id, func.sum(spam_score))
+        .select_from(analiz)
+        .join(Kaynak, analiz.kaynak_id == Kaynak.id)
+        .where(current, analiz.tur == "kaynak", spam_score >= 40)
+        .group_by(Kaynak.user_id)
+    ).all()
+    atik_spam = db.session.execute(
+        select(Atik.user_id, func.sum(spam_score))
+        .select_from(analiz)
+        .join(Atik, analiz.atik_id == Atik.id)
+        .where(current, analiz.tur == "atik", spam_score >= 40)
+        .group_by(Atik.user_id)
+    ).all()
     user_spam: Counter = Counter()
-    ilan_dup: Counter = Counter()
-
-    user_ids = set()
-    ilan_refs: list[tuple[str, int, int]] = []
-
-    for a in analizler:
-        spam = a.spam_score or 0
-        if spam <= 30:
-            spam_buckets["0-30"] += 1
-        elif spam <= 60:
-            spam_buckets["31-60"] += 1
-        else:
-            spam_buckets["61-100"] += 1
-
-        dup = a.duplicate_score or 0
-        if dup >= 50:
-            duplicate_high += 1
-
-        if spam >= 40:
-            ilan_id = a.kaynak_id or a.atik_id
-            if ilan_id:
-                ilan_refs.append((a.tur, ilan_id, spam))
-
-        if dup >= 50:
-            ilan_id = a.kaynak_id or a.atik_id
-            if ilan_id:
-                ilan_dup[f"{a.tur}:{ilan_id}"] = dup
-
-    for tur, ilan_id, spam in ilan_refs:
-        model = Kaynak if tur == "kaynak" else Atik
-        uid = db.session.query(model.user_id).filter_by(id=ilan_id).scalar()
+    for uid, score_sum in kaynak_spam + atik_spam:
         if uid:
-            user_spam[uid] += spam
+            user_spam[int(uid)] += int(score_sum or 0)
 
-    total = len(analizler) or 1
     user_map = {
         u.id: u.username
-        for u in User.query.filter(User.id.in_(list(user_spam.keys()) or [0])).all()
+        for u in User.query.filter(User.id.in_(list(user_spam.keys()) or [0]))
+        .options(load_only(User.id, User.username))
+        .all()
     }
     en_spam = [
         (user_map.get(uid, f"user:{uid}"), score_sum)
         for uid, score_sum in user_spam.most_common(5)
     ]
 
+    dup_rows = db.session.execute(
+        select(analiz.tur, func.coalesce(analiz.kaynak_id, analiz.atik_id), dup_score)
+        .where(current, dup_score >= 50)
+        .order_by(dup_score.desc())
+        .limit(5)
+    ).all()
     en_tekrar = []
-    for key, score in ilan_dup.most_common(5):
-        tur, ilan_id = key.split(":", 1)
-        model = Kaynak if tur == "kaynak" else Atik
-        baslik = db.session.query(model.baslik).filter_by(id=int(ilan_id)).scalar()
-        en_tekrar.append((baslik or key, score, tur, int(ilan_id)))
+    kaynak_dup_ids = [int(row[1]) for row in dup_rows if row[0] == "kaynak" and row[1]]
+    atik_dup_ids = [int(row[1]) for row in dup_rows if row[0] == "atik" and row[1]]
+    kaynak_baslik = {
+        r.id: r.baslik
+        for r in Kaynak.query.filter(Kaynak.id.in_(kaynak_dup_ids or [0]))
+        .options(load_only(Kaynak.id, Kaynak.baslik))
+        .all()
+    }
+    atik_baslik = {
+        r.id: r.baslik
+        for r in Atik.query.filter(Atik.id.in_(atik_dup_ids or [0]))
+        .options(load_only(Atik.id, Atik.baslik))
+        .all()
+    }
+    for tur, ilan_id, score in dup_rows:
+        if not ilan_id:
+            continue
+        key = f"{tur}:{ilan_id}"
+        baslik = (
+            kaynak_baslik.get(int(ilan_id))
+            if tur == "kaynak"
+            else atik_baslik.get(int(ilan_id))
+        )
+        en_tekrar.append((baslik or key, int(score or 0), tur, int(ilan_id)))
 
     return {
         "spam_dagilimi": spam_buckets,
-        "duplicate_orani": round((duplicate_high / total) * 100, 1),
+        "duplicate_orani": round((int(duplicate_high or 0) / total) * 100, 1),
         "en_spam_kullanicilar": en_spam,
         "en_tekrar_ilanlar": en_tekrar,
     }

@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from sqlalchemy import and_, case, func, select
+
 from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED
 from extensions import db
 from models import IlanModerasyonKarar
@@ -133,44 +135,97 @@ def _ilan_karar_gecmisi(tur: str, ilan_id: int) -> list[IlanModerasyonKarar]:
 
 
 def karar_analitigi() -> dict[str, Any]:
-    """Dashboard Phase 1 istatistikleri."""
-    kararlar = IlanModerasyonKarar.query.filter(
-        IlanModerasyonKarar.action_type.in_(("approve", "reject", "risk_override"))
-    ).all()
+    """Dashboard Phase 1 istatistikleri (SQL aggregate)."""
+    karar = IlanModerasyonKarar
+    base = karar.action_type.in_(("approve", "reject", "risk_override"))
 
-    total = len(kararlar)
-    matches = sum(1 for k in kararlar if k.decision_match)
-    overrides = sum(1 for k in kararlar if k.override)
+    total, matches, overrides, false_positive, false_negative, pending_to_approved, pending_to_rejected = (
+        db.session.execute(
+            select(
+                func.count(),
+                func.sum(case((karar.decision_match.is_(True), 1), else_=0)),
+                func.sum(case((karar.override.is_(True), 1), else_=0)),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                karar.ai_decision.in_(
+                                    (MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED)
+                                ),
+                                karar.admin_decision == MODERATION_STATUS_APPROVED,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                karar.ai_decision == MODERATION_STATUS_APPROVED,
+                                karar.admin_decision == MODERATION_STATUS_REJECTED,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                karar.ai_decision == MODERATION_STATUS_PENDING_REVIEW,
+                                karar.admin_decision == MODERATION_STATUS_APPROVED,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                karar.ai_decision == MODERATION_STATUS_PENDING_REVIEW,
+                                karar.admin_decision == MODERATION_STATUS_REJECTED,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+            ).where(base)
+        ).one()
+    )
+    total = int(total or 0)
+    matches = int(matches or 0)
+    overrides = int(overrides or 0)
 
-    false_positive = sum(
-        1 for k in kararlar
-        if k.ai_decision in (MODERATION_STATUS_PENDING_REVIEW, MODERATION_STATUS_REJECTED)
-        and k.admin_decision == MODERATION_STATUS_APPROVED
+    override_kategori = Counter(
+        {
+            row[0]: int(row[1] or 0)
+            for row in db.session.execute(
+                select(karar.category, func.count())
+                .where(base, karar.override.is_(True), karar.category.isnot(None))
+                .group_by(karar.category)
+                .order_by(func.count().desc())
+                .limit(5)
+            ).all()
+        }
     )
-    false_negative = sum(
-        1 for k in kararlar
-        if k.ai_decision == MODERATION_STATUS_APPROVED
-        and k.admin_decision == MODERATION_STATUS_REJECTED
+    override_purpose = Counter(
+        {
+            row[0]: int(row[1] or 0)
+            for row in db.session.execute(
+                select(karar.purpose, func.count())
+                .where(base, karar.override.is_(True), karar.purpose.isnot(None))
+                .group_by(karar.purpose)
+                .order_by(func.count().desc())
+                .limit(5)
+            ).all()
+        }
     )
-    pending_to_approved = sum(
-        1 for k in kararlar
-        if k.ai_decision == MODERATION_STATUS_PENDING_REVIEW
-        and k.admin_decision == MODERATION_STATUS_APPROVED
-    )
-    pending_to_rejected = sum(
-        1 for k in kararlar
-        if k.ai_decision == MODERATION_STATUS_PENDING_REVIEW
-        and k.admin_decision == MODERATION_STATUS_REJECTED
-    )
-
-    override_kategori: Counter = Counter()
-    override_purpose: Counter = Counter()
-    for k in kararlar:
-        if k.override:
-            if k.category:
-                override_kategori[k.category] += 1
-            if k.purpose:
-                override_purpose[k.purpose] += 1
 
     ai_accuracy = round((matches / total) * 100, 1) if total else 0.0
     override_rate = round((overrides / total) * 100, 1) if total else 0.0
@@ -178,10 +233,10 @@ def karar_analitigi() -> dict[str, Any]:
     return {
         "ai_accuracy": ai_accuracy,
         "override_rate": override_rate,
-        "false_positive": false_positive,
-        "false_negative": false_negative,
-        "pending_to_approved": pending_to_approved,
-        "pending_to_rejected": pending_to_rejected,
+        "false_positive": int(false_positive or 0),
+        "false_negative": int(false_negative or 0),
+        "pending_to_approved": int(pending_to_approved or 0),
+        "pending_to_rejected": int(pending_to_rejected or 0),
         "en_cok_override_kategori": override_kategori.most_common(5),
         "en_cok_override_purpose": override_purpose.most_common(5),
         "toplam_karar": total,

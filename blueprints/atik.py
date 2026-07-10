@@ -24,6 +24,7 @@ from services.yorumlar import kok_yorumlari_getir, yorum_cevapla as yorum_cevabi
 from services.content_filter import yorum_uygun_mu
 from services.recommendations import kullanici_onerileri
 from services.query_options import ilan_detay_options, ilan_listesi_options
+from services.query_helpers import harita_ilan_load_options
 from utils import ilan_erisilebilir_mi, parse_coordinates, sanitize_input, harita_noktalari
 
 atik_bp = Blueprint("atik", __name__)
@@ -51,7 +52,11 @@ def atik_panel():
     pagination = query.options(*ilan_listesi_options(Atik)).paginate(
         page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False
     )
-    harita_atiklar = public_ilan_base_filter(Atik.query, Atik).all()
+    harita_atiklar = (
+        public_ilan_base_filter(Atik.query, Atik)
+        .options(harita_ilan_load_options(Atik))
+        .all()
+    )
     harita_nokta, konumsuz_sayisi = harita_noktalari(harita_atiklar)
     oneriler = kullanici_onerileri(current_user, "atik", limit=6) if current_user.is_authenticated else []
     return render_template(

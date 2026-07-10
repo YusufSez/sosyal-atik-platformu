@@ -26,6 +26,7 @@ from services.yorumlar import kok_yorumlari_getir, yorum_cevapla as yorum_cevabi
 from services.recommendations import kullanici_onerileri
 from services.query_options import ilan_detay_options, ilan_listesi_options
 from services.content_filter import yorum_uygun_mu
+from services.query_helpers import harita_ilan_load_options
 from utils import ilan_erisilebilir_mi, parse_coordinates, sanitize_input, harita_noktalari
 
 kaynak_bp = Blueprint("kaynak", __name__)
@@ -53,7 +54,11 @@ def kaynak_panel():
     pagination = query.options(*ilan_listesi_options(Kaynak)).paginate(
         page=page, per_page=current_app.config["ITEMS_PER_PAGE"], error_out=False
     )
-    harita_kaynaklar = public_ilan_base_filter(Kaynak.query, Kaynak).all()
+    harita_kaynaklar = (
+        public_ilan_base_filter(Kaynak.query, Kaynak)
+        .options(harita_ilan_load_options(Kaynak))
+        .all()
+    )
     harita_nokta, konumsuz_sayisi = harita_noktalari(harita_kaynaklar)
     oneriler = kullanici_onerileri(current_user, "kaynak", limit=6) if current_user.is_authenticated else []
     return render_template(
