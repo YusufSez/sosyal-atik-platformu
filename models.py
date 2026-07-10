@@ -7,6 +7,8 @@ from utils import tr_time
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), nullable=False)
+    ad = db.Column(db.String(100), nullable=True)
+    soyad = db.Column(db.String(100), nullable=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     dogum_tarihi = db.Column(db.String(20))
@@ -44,6 +46,11 @@ class User(UserMixin, db.Model):
         remote_side="User.id",
         backref=db.backref("banladigi_kullanicilar", lazy=True),
     )
+
+    @property
+    def display_name(self) -> str:
+        parts = [p for p in (self.ad, self.soyad) if p]
+        return " ".join(parts).strip() or self.username
 
 
 class IlanResim(db.Model):

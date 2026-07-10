@@ -10,9 +10,26 @@
         <div class="card-body p-4">
             <form method="POST" action="" id="registerForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-3">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="ad" class="form-label fw-medium">Ad</label>
+                        <input type="text" id="ad" name="ad" class="form-control" required
+                               maxlength="100" autocomplete="given-name" placeholder="Adınız">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="soyad" class="form-label fw-medium">Soyad</label>
+                        <input type="text" id="soyad" name="soyad" class="form-control" required
+                               maxlength="100" autocomplete="family-name" placeholder="Soyadınız">
+                    </div>
+                </div>
+                <div class="mb-3 mt-3">
                     <label for="username" class="form-label fw-medium">Kullanıcı Adı</label>
-                    <input type="text" id="username" name="username" class="form-control" required>
+                    <input type="text" id="username" name="username" class="form-control" required
+                           maxlength="30" autocomplete="username" pattern="[\\w]+"
+                           aria-describedby="usernameHelp">
+                    <div id="usernameHelp" class="form-text">
+                        Girişte kullanacağınız benzersiz kullanıcı adıdır; adınızı veya soyadınızı yazmayın.
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label for="email" class="form-label fw-medium">E-posta</label>

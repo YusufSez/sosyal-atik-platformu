@@ -8,13 +8,9 @@ from services.ilan_images import ilan_fotograf_listesi, ilan_fotograflari_ekle, 
 
 
 def _register_and_login(client, email="test@example.com", username="testuser"):
-    client.post("/kayit", data={
-        "username": username,
-        "email": email,
-        "password": "TestPass1",
-        "password_tekrar": "TestPass1",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    client.post("/kayit", data=kayit_form(username=username, email=email), follow_redirects=True)
     client.post("/profil_tamamla", data={
         "dogum_tarihi": "2000-01-01",
         "il": "İstanbul",
@@ -36,13 +32,14 @@ def test_register_and_login(client):
 
 
 def test_kayit_parola_eslesmiyor(client):
-    response = client.post("/kayit", data={
-        "username": "mismatch",
-        "email": "mismatch@test.com",
-        "password": "TestPass1",
-        "password_tekrar": "TestPass2",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    response = client.post("/kayit", data=kayit_form(
+        username="mismatch",
+        email="mismatch@test.com",
+        password="TestPass1",
+        password_tekrar="TestPass2",
+    ), follow_redirects=True)
     assert response.status_code == 200
     assert "eşleşmiyor" in response.data.decode("utf-8")
 
@@ -57,38 +54,37 @@ def test_kayit_smtp_hatasi_500_vermez(client, app, monkeypatch):
     app.config["MAIL_SUPPRESS_SEND"] = False
     app.config["EMAIL_VERIFICATION_REQUIRED"] = True
 
-    response = client.post("/kayit", data={
-        "username": "smtpfail",
-        "email": "smtpfail@test.com",
-        "password": "TestPass1",
-        "password_tekrar": "TestPass1",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    response = client.post("/kayit", data=kayit_form(
+        username="smtpfail",
+        email="smtpfail@test.com",
+    ), follow_redirects=True)
     assert response.status_code == 200
     assert b"500" not in response.data
     assert "gönderilemedi" in response.data.decode("utf-8").lower() or "Kay" in response.data.decode("utf-8")
 
 
 def test_kayit_gecersiz_eposta(client):
-    response = client.post("/kayit", data={
-        "username": "mailuser",
-        "email": "gecersiz-eposta",
-        "password": "TestPass1",
-        "password_tekrar": "TestPass1",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    response = client.post("/kayit", data=kayit_form(
+        username="mailuser",
+        email="gecersiz-eposta",
+    ), follow_redirects=True)
     assert response.status_code == 200
     assert "e-posta" in response.data.decode("utf-8").lower()
 
 
 def test_kayit_zayif_parola_once_kontrol(client):
-    response = client.post("/kayit", data={
-        "username": "weakuser",
-        "email": "weak@test.com",
-        "password": "abc",
-        "password_tekrar": "xyz",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    response = client.post("/kayit", data=kayit_form(
+        username="weakuser",
+        email="weak@test.com",
+        password="abc",
+        password_tekrar="xyz",
+    ), follow_redirects=True)
     assert response.status_code == 200
     text = response.data.decode("utf-8")
     assert "8 karakter" in text

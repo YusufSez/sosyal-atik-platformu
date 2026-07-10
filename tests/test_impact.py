@@ -155,13 +155,12 @@ def test_etki_panelim_requires_login(client):
 
 
 def test_ilan_durum_teslim_etki(client, app):
-    client.post("/kayit", data={
-        "username": "other",
-        "email": "other@test.com",
-        "password": "TestPass1",
-        "password_tekrar": "TestPass1",
-        "kullanim_kosullari": "on",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    client.post("/kayit", data=kayit_form(
+        username="other",
+        email="other@test.com",
+    ), follow_redirects=True)
     client.post("/profil_tamamla", data={
         "dogum_tarihi": "2000-01-01",
         "il": "İstanbul",

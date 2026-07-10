@@ -10,15 +10,11 @@ from extensions import socketio
 
 
 def _register_and_login(client, email="socket@test.com", username="socketuser"):
+    from tests.helpers import kayit_form
+
     client.post(
         "/kayit",
-        data={
-            "username": username,
-            "email": email,
-            "password": "TestPass1",
-            "password_tekrar": "TestPass1",
-            "kullanim_kosullari": "on",
-        },
+        data=kayit_form(username=username, email=email),
         follow_redirects=True,
     )
     client.post(

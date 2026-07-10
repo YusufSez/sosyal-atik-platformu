@@ -58,11 +58,11 @@ def test_gizlilik_ve_kullanim_kosullari_redirect(client):
 
 
 def test_kayit_requires_terms(client):
-    response = client.post("/kayit", data={
-        "username": "noterms",
-        "email": "noterms@test.com",
-        "password": "TestPass1",
-    }, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    data = kayit_form(username="noterms", email="noterms@test.com")
+    data.pop("kullanim_kosullari")
+    response = client.post("/kayit", data=data, follow_redirects=True)
     assert response.status_code == 200
     assert b"kabul" in response.data.lower()
 

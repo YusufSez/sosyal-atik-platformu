@@ -76,7 +76,9 @@ def test_kurum_panel_yetki(client, app):
         user = User(username="kurum", email="kurum@test.com", password="x", is_completed=True, is_kurum=True)
         db.session.add(user)
         db.session.commit()
-    client.post("/kayit", data={"username": "kurum2", "email": "k2@test.com", "password": "TestPass1", "password_tekrar": "TestPass1", "kullanim_kosullari": "on"}, follow_redirects=True)
+    from tests.helpers import kayit_form
+
+    client.post("/kayit", data=kayit_form(username="kurum2", email="k2@test.com"), follow_redirects=True)
     with app.app_context():
         u = User.query.filter_by(email="k2@test.com").first()
         u.is_kurum = True

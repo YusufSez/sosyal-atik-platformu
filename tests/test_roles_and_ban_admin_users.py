@@ -27,17 +27,13 @@ def _create_user(
 
 
 def test_registration_does_not_assign_superadmin_from_env(monkeypatch, client, app):
+    from tests.helpers import kayit_form
+
     monkeypatch.setenv("SUPERADMIN_EMAIL", "super@test.com")
 
     client.post(
         "/kayit",
-        data={
-            "username": "superuser",
-            "email": "super@test.com",
-            "password": "TestPass1",
-            "password_tekrar": "TestPass1",
-            "kullanim_kosullari": "on",
-        },
+        data=kayit_form(username="superuser", email="super@test.com"),
         follow_redirects=True,
     )
 

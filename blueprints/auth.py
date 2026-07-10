@@ -58,16 +58,34 @@ def kayit():
             flash(captcha_err, "danger")
             return redirect(url_for("auth.kayit"))
 
+        ad = sanitize_input(request.form.get("ad"), max_length=100)
+        soyad = sanitize_input(request.form.get("soyad"), max_length=100)
         username = sanitize_input(request.form.get("username"), max_length=30)
         email = sanitize_input(request.form.get("email"), max_length=150).lower().strip()
         password = request.form.get("password")
         password_tekrar = request.form.get("password_tekrar")
 
+        if len(ad) < 2:
+            flash("Ad en az 2 karakter olmalıdır.", "danger")
+            return redirect(url_for("auth.kayit"))
+        if len(soyad) < 2:
+            flash("Soyad en az 2 karakter olmalıdır.", "danger")
+            return redirect(url_for("auth.kayit"))
+        if not re.match(r"^[\w\sçğıöşüÇĞİÖŞÜ]+$", ad):
+            flash("Ad yalnızca harf ve boşluk içerebilir.", "danger")
+            return redirect(url_for("auth.kayit"))
+        if not re.match(r"^[\w\sçğıöşüÇĞİÖŞÜ]+$", soyad):
+            flash("Soyad yalnızca harf ve boşluk içerebilir.", "danger")
+            return redirect(url_for("auth.kayit"))
+
         if len(username) < 3:
             flash("Kullanıcı adı en az 3 karakter olmalıdır.", "danger")
             return redirect(url_for("auth.kayit"))
-        if not re.match(r"^[\w\s]+$", username):
-            flash("Kullanıcı adı sadece harf, rakam ve boşluk içerebilir.", "danger")
+        if not re.match(r"^[\w]+$", username):
+            flash(
+                "Kullanıcı adı yalnızca harf, rakam ve alt çizgi içerebilir (boşluk kullanmayın).",
+                "danger",
+            )
             return redirect(url_for("auth.kayit"))
         if not re.match(r"^[\w.+-]+@[\w-]+\.[\w.-]+$", email):
             flash("Geçerli bir e-posta adresi giriniz.", "danger")
@@ -95,6 +113,8 @@ def kayit():
 
         new_user = User(
             username=username,
+            ad=ad,
+            soyad=soyad,
             email=email,
             password=hash_password(password),
             terms_accepted_at=utc_now(),
