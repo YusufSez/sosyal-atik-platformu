@@ -285,7 +285,7 @@ def admin_report_deactivate_user(id: int):
         abort(403)
 
     old = str(target.is_deactivated)
-    deactivate_user(target)
+    deactivate_user(target, actor_id=current_user.id)
     db.session.commit()
     log_admin_action(
         "user_deactivate",

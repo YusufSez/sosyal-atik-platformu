@@ -5,7 +5,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
             <h3><i class="bi bi-headset"></i> Destek Talepleri</h3>
-            <small class="text-muted">Kullanıcı destek istekleri</small>
+            <small class="text-muted">Kullanıcı ve misafir destek istekleri</small>
         </div>
         <a href="{{ url_for('admin.admin_panel') }}" class="btn btn-sm btn-outline-secondary">Admin Panel</a>
     </div>
@@ -16,7 +16,8 @@
                 <tr>
                     <th>#</th>
                     <th>Tarih</th>
-                    <th>Kullanıcı</th>
+                    <th>Kaynak</th>
+                    <th>Ad Soyad</th>
                     <th>Kategori</th>
                     <th>Başlık</th>
                     <th>Durum</th>
@@ -28,8 +29,15 @@
                 <tr>
                     <td>{{ t.id }}</td>
                     <td>{{ t.created_at|format_dt if t.created_at else '—' }}</td>
-                    <td>{{ t.user.username if t.user else '—' }}</td>
-                    <td>{{ t.kategori }}</td>
+                    <td>
+                        {% if t.is_guest %}
+                        <span class="badge bg-info text-dark">Misafir</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Kullanıcı</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ t.gosterim_adi }}</td>
+                    <td>{{ kategori_etiketi(t.kategori) }}</td>
                     <td>{{ t.baslik }}</td>
                     <td><span class="badge bg-secondary">{{ t.durum }}</span></td>
                     <td>
@@ -37,7 +45,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="7" class="text-muted text-center">Talep yok.</td></tr>
+                <tr><td colspan="8" class="text-muted text-center">Talep yok.</td></tr>
             {% endfor %}
             </tbody>
         </table>

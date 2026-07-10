@@ -7,12 +7,20 @@ from constants import MODERATION_STATUS_APPROVED, MODERATION_STATUS_PENDING_REVI
 from decorators import admin_required, is_super_admin, super_admin_required
 from extensions import db, limiter
 from helpers import ai_tam_analiz
-from models import AdminAuditLog, Atik, DestekTalebi, Kaynak, Sikayet, User
+from models import AdminAuditLog, Atik, DestekDurumGecmisi, DestekTalebi, Kaynak, Sikayet, User
 from sqlalchemy.orm import joinedload
 from services.audit import log_admin_action
 from services.impact import il_kirilimi, kategori_kirilimi, platform_ozeti
 from services.query_options import audit_listesi_options, sikayet_listesi_options
 from services.admin_user_detail import build_admin_user_detail
+from services.admin_user_edit import (
+    UserEditError,
+    apply_admin_user_edit,
+    can_deactivate_user_in_admin_edit,
+    find_registered_user_by_email,
+    parse_admin_user_edit_form,
+)
+from services.support_tickets import kategori_etiketi, record_support_status_change
 from services.user_moderation import apply_ban, clear_ban, normalize_ban_reason, parse_ban_duration
 from utils import cleanup_ilan_relations, resolve_item_picture_path, sanitize_input, utc_now
 
@@ -59,7 +67,54 @@ def admin_users():
 def admin_user_detail(user_id: int):
     user = User.query.get_or_404(user_id)
     detail = build_admin_user_detail(user)
+    detail["can_edit"] = is_super_admin(current_user)
     return render_template("admin_user_detail.html", **detail)
+
+
+@admin_bp.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+@super_admin_required
+def admin_user_edit(user_id: int):
+    user = User.query.get_or_404(user_id)
+
+    json_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "static", "data", "il-ilce-list.json"
+    )
+    with open(json_path, encoding="utf-8") as f:
+        import json
+
+        data = json.load(f)
+    iller = {il["name"]: [d["name"] for d in il["districts"]] for il in data}
+
+    if request.method == "POST":
+        try:
+            form_data = parse_admin_user_edit_form(request.form, request.files)
+            changes = apply_admin_user_edit(
+                user,
+                form_data,
+                actor_id=current_user.id,
+            )
+            if changes:
+                flash("Kullanıcı bilgileri güncellendi.", "success")
+            else:
+                flash("Değişiklik yapılmadı.", "info")
+            return redirect(url_for("admin.admin_user_detail", user_id=user.id))
+        except UserEditError as exc:
+            flash(exc.message, "danger")
+        except Exception:
+            db.session.rollback()
+            flash("Güncelleme başarısız oldu.", "danger")
+
+    return render_template(
+        "admin_user_edit.html",
+        user=user,
+        iller=iller,
+        can_deactivate=can_deactivate_user_in_admin_edit(
+            user,
+            actor_id=current_user.id,
+        ),
+        editing_self=user.id == current_user.id,
+    )
 
 
 @admin_bp.route("/admin/users/ban/<int:user_id>", methods=["POST"])
@@ -309,7 +364,12 @@ def admin_destek_list():
         .limit(100)
         .all()
     )
-    return render_template("admin_destek.html", talepler=talepler, durumlar=DESTEK_DURUMLARI)
+    return render_template(
+        "admin_destek.html",
+        talepler=talepler,
+        durumlar=DESTEK_DURUMLARI,
+        kategori_etiketi=kategori_etiketi,
+    )
 
 
 @admin_bp.route("/admin/destek/<int:talep_id>", methods=["GET", "POST"])
@@ -320,25 +380,39 @@ def admin_destek_detail(talep_id: int):
         DestekTalebi.query.options(
             joinedload(DestekTalebi.user),
             joinedload(DestekTalebi.reviewer),
+            joinedload(DestekTalebi.durum_gecmisi).joinedload(DestekDurumGecmisi.admin),
         )
         .get_or_404(talep_id)
     )
+    matched_user = None
+    if talep.is_guest and talep.guest_email:
+        matched_user = find_registered_user_by_email(talep.guest_email)
+
     if request.method == "POST":
         durum = sanitize_input(request.form.get("durum"), max_length=30)
         admin_not = sanitize_input(request.form.get("admin_not"), max_length=5000)
+        eski_durum = talep.durum
         if durum in DESTEK_DURUMLARI:
             talep.durum = durum
         if admin_not is not None:
             talep.admin_not = admin_not
         talep.reviewer_id = current_user.id
         talep.updated_at = utc_now()
+        record_support_status_change(
+            talep,
+            eski_durum=eski_durum,
+            yeni_durum=talep.durum,
+            admin_id=current_user.id,
+            not_metni=admin_not,
+        )
         db.session.commit()
         log_admin_action(
             "destek_guncelle",
             target=f"destek:{talep.id}",
             target_user_id=talep.user_id,
             detail=f"durum={talep.durum}",
-            new_value=admin_not,
+            old_value=eski_durum,
+            new_value=talep.durum,
         )
         flash("Destek talebi güncellendi.", "success")
         return redirect(url_for("admin.admin_destek_detail", talep_id=talep.id))
@@ -347,4 +421,6 @@ def admin_destek_detail(talep_id: int):
         "admin_destek_detail.html",
         talep=talep,
         durumlar=DESTEK_DURUMLARI,
+        matched_user=matched_user,
+        kategori_etiketi=kategori_etiketi,
     )

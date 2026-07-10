@@ -17,6 +17,8 @@ _SUSPENDED_EXEMPT_PATHS = frozenset({
     "/kayit",
     "/cikis",
     "/sifremi-unuttum",
+    "/destek",
+    "/ban-itiraz",
 })
 
 _SUSPENDED_EXEMPT_PREFIXES = (
@@ -162,8 +164,37 @@ def clear_ban(user: User) -> None:
     user.banned_by_id = None
 
 
+def count_active_superadmins(*, exclude_user_id: int | None = None) -> int:
+    """Aktif (pasif olmayan) süper admin sayısı."""
+    query = User.query.filter(
+        User.role == "superadmin",
+        User.is_deactivated.is_(False),
+    )
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
+    return query.count()
+
+
+def validate_user_deactivation(
+    target: User,
+    *,
+    actor_id: int,
+    new_is_deactivated: bool,
+) -> None:
+    """Pasifleştirme işlemi güvenlik kurallarını doğrular."""
+    if not new_is_deactivated:
+        return
+    if target.id == actor_id:
+        raise ValueError("Kendi hesabınızı pasifleştiremezsiniz.")
+    if normalize_role(target) == "superadmin":
+        if count_active_superadmins(exclude_user_id=target.id) < 1:
+            raise ValueError("Son aktif süper admin pasifleştirilemez.")
+
+
 def toggle_admin_role(user: User) -> tuple[str, str]:
     old = normalize_role(user)
+    if old == "superadmin":
+        raise ValueError("Süper admin rolü düşürülemez.")
     if user.is_admin:
         user.is_admin = False
         user.role = "user"
@@ -181,7 +212,16 @@ def soft_delete_user(user: User, reason: str | None, *, banned_by_id: int | None
     apply_ban(user, normalized, None, banned_by_id=banned_by_id)
 
 
-def deactivate_user(user: User) -> None:
+def deactivate_user(user: User, *, actor_id: int | None = None) -> None:
+    if actor_id is not None:
+        validate_user_deactivation(
+            user,
+            actor_id=actor_id,
+            new_is_deactivated=True,
+        )
+    elif normalize_role(user) == "superadmin":
+        if count_active_superadmins(exclude_user_id=user.id) < 1:
+            raise ValueError("Son aktif süper admin pasifleştirilemez.")
     user.is_deactivated = True
 
 

@@ -1,0 +1,133 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="content-section">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3><i class="bi bi-pencil-square"></i> Kullanıcıyı Düzenle</h3>
+            <small class="text-muted">{{ user.username }} (#{{ user.id }})</small>
+        </div>
+        <a href="{{ url_for('admin.admin_user_detail', user_id=user.id) }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Detaya Dön
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-4">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="ad" class="form-label">Ad</label>
+                        <input type="text" class="form-control" id="ad" name="ad" maxlength="100"
+                               value="{{ user.ad or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="soyad" class="form-label">Soyad</label>
+                        <input type="text" class="form-control" id="soyad" name="soyad" maxlength="100"
+                               value="{{ user.soyad or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="username" class="form-label">Kullanıcı adı</label>
+                        <input type="text" class="form-control" id="username" name="username" maxlength="30"
+                               value="{{ user.username }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="email" class="form-label">E-posta</label>
+                        <input type="email" class="form-control" id="email" name="email" maxlength="150"
+                               value="{{ user.email }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="telefon" class="form-label">Telefon</label>
+                        <input type="text" class="form-control" id="telefon" name="telefon" maxlength="20"
+                               value="{{ user.telefon or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="il" class="form-label">Şehir</label>
+                        <select class="form-select" id="il" name="il">
+                            <option value="">Seçiniz</option>
+                            {% for il_adi in iller.keys() %}
+                            <option value="{{ il_adi }}" {% if user.il == il_adi %}selected{% endif %}>{{ il_adi }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="ilce" class="form-label">İlçe</label>
+                        <input type="text" class="form-control" id="ilce" name="ilce" maxlength="100"
+                               value="{{ user.ilce or '' }}">
+                    </div>
+                    <div class="col-md-12">
+                        <label for="adres" class="form-label">Adres</label>
+                        <input type="text" class="form-control" id="adres" name="adres" maxlength="255"
+                               value="{{ user.adres or '' }}">
+                    </div>
+                    <div class="col-md-12">
+                        <label for="profil_aciklama" class="form-label">Profil açıklaması</label>
+                        <textarea class="form-control" id="profil_aciklama" name="profil_aciklama" rows="3"
+                                  maxlength="2000">{{ user.profil_aciklama or '' }}</textarea>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4 text-center">
+                        <img src="{{ url_for('static', filename='profile_pics/' + (user.profile_image or 'default.jpg')) }}"
+                             alt="{{ user.username }}" class="rounded-circle mb-2" width="96" height="96"
+                             style="object-fit: cover;">
+                    </div>
+                    <div class="col-md-8">
+                        <label for="profile_image" class="form-label">Profil fotoğrafı değiştir</label>
+                        <input type="file" class="form-control" id="profile_image" name="profile_image" accept="image/*">
+                        {% if user.profile_image and user.profile_image != 'default.jpg' %}
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="remove_profile_image" name="remove_profile_image" value="1">
+                            <label class="form-check-label" for="remove_profile_image">Profil fotoğrafını kaldır</label>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_deactivated" name="is_deactivated" value="1"
+                                   {% if user.is_deactivated %}checked{% endif %}
+                                   {% if not can_deactivate %}disabled{% endif %}>
+                            <label class="form-check-label" for="is_deactivated">Pasif (deaktif)</label>
+                        </div>
+                        {% if editing_self %}
+                        <p class="small text-muted mb-0">Kendi hesabınızı pasifleştiremezsiniz.</p>
+                        {% elif not can_deactivate and user.role == 'superadmin' %}
+                        <p class="small text-muted mb-0">Son aktif süper admin pasifleştirilemez.</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="email_verified" name="email_verified" value="1"
+                                   {% if user.email_verified %}checked{% endif %}>
+                            <label class="form-check-label" for="email_verified">E-posta doğrulanmış</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="telefon_verified" name="telefon_verified" value="1"
+                                   {% if user.telefon_verified %}checked{% endif %}>
+                            <label class="form-check-label" for="telefon_verified">Telefon doğrulanmış</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                    <a href="{{ url_for('admin.admin_user_detail', user_id=user.id) }}" class="btn btn-outline-secondary">İptal</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

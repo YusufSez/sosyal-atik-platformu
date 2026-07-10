@@ -189,35 +189,29 @@ def test_destek_accepts_valid_image(client, app, hardening_users, tmp_path):
 
 def test_ban_itiraz_without_login(client, app, hardening_users):
     resp = client.post(
-        "/ban-itiraz",
+        "/destek",
         data={
-            "username": "hbanned",
+            "ad": "Banlı",
+            "soyad": "Kullanıcı",
             "email": "hbanned@test.com",
+            "telefon": "5551234567",
+            "kategori": "Ban İtirazı",
+            "baslik": "Ban itirazı",
             "mesaj": "Hatalı ban",
         },
         follow_redirects=True,
     )
     assert resp.status_code == 200
     with app.app_context():
-        talep = DestekTalebi.query.filter_by(user_id=hardening_users["banned"]).first()
+        talep = DestekTalebi.query.filter_by(guest_email="hbanned@test.com").first()
         assert talep is not None
-        assert talep.kategori == "BAN_ITIRAZI"
+        assert talep.kategori == "Ban İtirazı"
 
 
-def test_ban_itiraz_rejects_active_user(client, app, hardening_users):
-    resp = client.post(
-        "/ban-itiraz",
-        data={
-            "username": "hmember",
-            "email": "hmember@test.com",
-            "mesaj": "Sahte itiraz",
-        },
-        follow_redirects=True,
-    )
-    text = resp.data.decode("utf-8", errors="ignore")
-    assert "doğrulanamadı" in text.lower() or "askıya" in text.lower()
-    with app.app_context():
-        assert DestekTalebi.query.filter_by(user_id=hardening_users["member"]).count() == 0
+def test_ban_itiraz_legacy_redirect(client):
+    resp = client.get("/ban-itiraz", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "/destek" in resp.headers.get("Location", "")
 
 
 def test_notify_admins_atomic_all_admins(app, hardening_users):
@@ -336,7 +330,7 @@ def test_soft_delete_with_reason(app, hardening_users):
         assert user.ban_reason == "Kural ihlali"
 
 
-def test_login_ban_notice_links_ban_itiraz(client, app, hardening_users):
+def test_login_ban_notice_links_destek(client, app, hardening_users):
     with app.app_context():
         user = db.session.get(User, hardening_users["banned"])
         user.ban_reason = "Test sebep"
@@ -348,4 +342,4 @@ def test_login_ban_notice_links_ban_itiraz(client, app, hardening_users):
         follow_redirects=True,
     )
     text = resp.data.decode("utf-8", errors="ignore")
-    assert "/ban-itiraz" in text
+    assert "/destek" in text

@@ -15,6 +15,9 @@ class User(UserMixin, db.Model):
     il = db.Column(db.String(100))
     ilce = db.Column(db.String(100))
     telefon = db.Column(db.String(20))
+    adres = db.Column(db.String(255), nullable=True)
+    profil_aciklama = db.Column(db.Text, nullable=True)
+    telefon_verified = db.Column(db.Boolean, default=False, nullable=False)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
     is_completed = db.Column(db.Boolean, default=False)
@@ -416,7 +419,11 @@ class DestekTalebi(db.Model):
     __tablename__ = "destek_talebi"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)
+    guest_name = db.Column(db.String(100), nullable=True)
+    guest_surname = db.Column(db.String(100), nullable=True)
+    guest_email = db.Column(db.String(150), nullable=True, index=True)
+    guest_phone = db.Column(db.String(20), nullable=True)
     baslik = db.Column(db.String(200), nullable=False)
     kategori = db.Column(db.String(30), nullable=False, index=True)
     mesaj = db.Column(db.Text, nullable=False)
@@ -425,7 +432,55 @@ class DestekTalebi(db.Model):
     durum = db.Column(db.String(30), nullable=False, default="Bekliyor", index=True)
     admin_not = db.Column(db.Text, nullable=True)
     reviewer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, default=tr_time)
     updated_at = db.Column(db.DateTime, default=tr_time, onupdate=tr_time)
     user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("destek_talepleri", lazy=True))
     reviewer = db.relationship("User", foreign_keys=[reviewer_id], backref=db.backref("incelenen_destekler", lazy=True))
+    durum_gecmisi = db.relationship(
+        "DestekDurumGecmisi",
+        backref="talep",
+        lazy=True,
+        order_by="DestekDurumGecmisi.created_at",
+    )
+
+    @property
+    def is_guest(self) -> bool:
+        return self.user_id is None
+
+    @property
+    def kaynak_tipi(self) -> str:
+        return "Misafir" if self.is_guest else "Kullanıcı"
+
+    @property
+    def gosterim_adi(self) -> str:
+        if self.user:
+            return self.user.display_name
+        parts = [p for p in (self.guest_name, self.guest_surname) if p]
+        return " ".join(parts).strip() or "—"
+
+    @property
+    def gosterim_email(self) -> str:
+        if self.user:
+            return self.user.email or "—"
+        return self.guest_email or "—"
+
+    @property
+    def gosterim_telefon(self) -> str:
+        if self.user:
+            return self.user.telefon or "—"
+        return self.guest_phone or "—"
+
+
+class DestekDurumGecmisi(db.Model):
+    __tablename__ = "destek_durum_gecmisi"
+
+    id = db.Column(db.Integer, primary_key=True)
+    talep_id = db.Column(db.Integer, db.ForeignKey("destek_talebi.id"), nullable=False, index=True)
+    eski_durum = db.Column(db.String(30), nullable=True)
+    yeni_durum = db.Column(db.String(30), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    not_metni = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    admin = db.relationship("User", foreign_keys=[admin_id], backref=db.backref("destek_durum_loglari", lazy=True))

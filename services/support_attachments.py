@@ -25,7 +25,7 @@ def can_access_support_attachment(talep, user) -> bool:
         return False
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if talep.user_id == user.id:
+    if talep.user_id is not None and talep.user_id == user.id:
         return True
     return is_support_admin(user)
 

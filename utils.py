@@ -622,6 +622,30 @@ def ensure_schema():
                 conn.execute(text("UPDATE user SET email_verified = 1"))
             if "email_verified_at" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN email_verified_at DATETIME"))
+            if "ad" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN ad VARCHAR(100)"))
+            if "soyad" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN soyad VARCHAR(100)"))
+            if "adres" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN adres VARCHAR(255)"))
+            if "profil_aciklama" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN profil_aciklama TEXT"))
+            if "telefon_verified" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN telefon_verified BOOLEAN DEFAULT 0"))
+
+    if "destek_talebi" in inspector.get_table_names():
+        destek_cols = {c["name"] for c in inspector.get_columns("destek_talebi")}
+        with db.engine.begin() as conn:
+            for col, ddl in (
+                ("guest_name", "VARCHAR(100)"),
+                ("guest_surname", "VARCHAR(100)"),
+                ("guest_email", "VARCHAR(150)"),
+                ("guest_phone", "VARCHAR(20)"),
+                ("ip_address", "VARCHAR(45)"),
+                ("user_agent", "VARCHAR(500)"),
+            ):
+                if col not in destek_cols:
+                    conn.execute(text(f"ALTER TABLE destek_talebi ADD COLUMN {col} {ddl}"))
 
     if "comment" in inspector.get_table_names():
         comment_cols = {c["name"] for c in inspector.get_columns("comment")}

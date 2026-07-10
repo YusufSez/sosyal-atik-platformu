@@ -79,10 +79,19 @@ BAN_DURATION_OPTIONS = {
     "90": 90,
 }
 
-DESTEK_KATEGORI_BAN_ITIRAZI = "BAN_ITIRAZI"
-DESTEK_KATEGORILERI = ("Öneri", "İstek", "Şikayet", "Hata Bildirimi")
+DESTEK_KATEGORI_BAN_ITIRAZI = "BAN_ITIRAZI"  # Eski kayıtlar için geriye dönük
+DESTEK_KATEGORI_BAN_ITIRAZI_LABEL = "Ban İtirazı"
+DESTEK_KATEGORILERI = (
+    "Öneri",
+    "İstek",
+    "Şikayet",
+    "Hata Bildirimi",
+    DESTEK_KATEGORI_BAN_ITIRAZI_LABEL,
+)
 DESTEK_DURUMLARI = ("Bekliyor", "İnceleniyor", "Yanıtlandı", "Kapatıldı")
 RATE_BAN_ITIRAZ = "5 per hour"
+RATE_DESTEK_GUEST = "5 per hour"
+RATE_DESTEK_AUTH = "10 per hour"
 
 # Eski durumlar → yeni (migration + runtime)
 SIKAYET_DURUM_LEGACY_MAP = {

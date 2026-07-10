@@ -4,7 +4,13 @@
 <div class="content-section">
     <div class="page-header mb-4">
         <h3><i class="bi bi-life-preserver"></i> Destek</h3>
-        <small class="text-muted">Öneri, istek, şikayet veya hata bildirimi gönderin</small>
+        <small class="text-muted">
+            {% if is_guest %}
+            Giriş yapmadan destek talebi oluşturabilirsiniz
+            {% else %}
+            Öneri, istek, şikayet veya hata bildirimi gönderin
+            {% endif %}
+        </small>
     </div>
 
     <div class="row g-4">
@@ -13,8 +19,30 @@
                 <div class="card-body p-4">
                     <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        {% if is_guest %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="ad" class="form-label">Ad <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="ad" name="ad" maxlength="100" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="soyad" class="form-label">Soyad <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="soyad" name="soyad" maxlength="100" required>
+                            </div>
+                        </div>
                         <div class="mb-3">
-                            <label for="baslik" class="form-label">Başlık <span class="text-danger">*</span></label>
+                            <label for="email" class="form-label">E-posta <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" maxlength="150" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="telefon" class="form-label">Telefon <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="telefon" name="telefon" maxlength="20" required>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="baslik" class="form-label">{% if is_guest %}Konu{% else %}Başlık{% endif %} <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="baslik" name="baslik" maxlength="200" required>
                         </div>
                         <div class="mb-3">
@@ -22,7 +50,7 @@
                             <select class="form-select" id="kategori" name="kategori" required>
                                 <option value="">Seçiniz</option>
                                 {% for k in kategoriler %}
-                                <option value="{{ k }}">{{ k }}</option>
+                                <option value="{{ k }}" {% if selected_kategori == k %}selected{% endif %}>{{ k }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -31,15 +59,22 @@
                             <textarea class="form-control" id="mesaj" name="mesaj" rows="6" maxlength="5000" required></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="ek_resim" class="form-label">Ek resim (opsiyonel)</label>
+                            <label for="ek_resim" class="form-label">Ek görsel (opsiyonel)</label>
                             <input type="file" class="form-control" id="ek_resim" name="ek_resim" accept="image/*">
                         </div>
+
+                        {% if is_guest %}
+                        {% from "_turnstile.html" import turnstile_widget %}
+                        {{ turnstile_widget() }}
+                        {% endif %}
+
                         <button type="submit" class="btn btn-primary">Gönder</button>
                     </form>
                 </div>
             </div>
         </div>
         <div class="col-lg-5">
+            {% if not is_guest %}
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Taleplerim</h5>
@@ -49,8 +84,30 @@
                     </a>
                 </div>
             </div>
+            {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Hesabınız askıya alındı mı?</h5>
+                    <p class="text-muted small">
+                        Kategori olarak <strong>Ban İtirazı</strong> seçerek itirazınızı iletebilirsiniz.
+                        Giriş yapmanız gerekmez.
+                    </p>
+                    <p class="text-muted small mb-0">
+                        Zaten üye misiniz?
+                        <a href="{{ url_for('auth.giris') }}">Giriş yapın</a>
+                    </p>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{% if is_guest %}
+{% from "_turnstile.html" import turnstile_script %}
+{{ turnstile_script() }}
+{% endif %}
 {% endblock %}

@@ -7,9 +7,16 @@
             <h3><i class="bi bi-person-badge"></i> Kullanıcı Detayı</h3>
             <small class="text-muted">Salt okunur profil özeti</small>
         </div>
-        <a href="{{ url_for('admin.admin_users') }}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kullanıcı Listesi
-        </a>
+        <div class="d-flex gap-2">
+            {% if can_edit %}
+            <a href="{{ url_for('admin.admin_user_edit', user_id=user.id) }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-pencil"></i> Kullanıcıyı Düzenle
+            </a>
+            {% endif %}
+            <a href="{{ url_for('admin.admin_users') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Kullanıcı Listesi
+            </a>
+        </div>
     </div>
 
     <div class="row g-4">
@@ -36,8 +43,12 @@
                     <div class="col-md-6"><strong>Ad Soyad:</strong> {{ user.display_name }}</div>
                     <div class="col-md-6"><strong>Kullanıcı adı:</strong> {{ user.username }}</div>
                     <div class="col-md-6"><strong>E-posta:</strong> {{ user.email }}</div>
-                    <div class="col-md-6"><strong>Telefon:</strong> {{ user.telefon or '—' }}</div>
+                    <div class="col-md-6"><strong>Telefon:</strong> {{ user.telefon or '—' }}{% if user.telefon_verified %} <span class="badge bg-success">Doğrulandı</span>{% endif %}</div>
                     <div class="col-md-6"><strong>Şehir:</strong> {{ user.il or '—' }}{% if user.ilce %}, {{ user.ilce }}{% endif %}</div>
+                    <div class="col-md-12"><strong>Adres:</strong> {{ user.adres or '—' }}</div>
+                    {% if user.profil_aciklama %}
+                    <div class="col-md-12"><strong>Profil açıklaması:</strong> {{ user.profil_aciklama }}</div>
+                    {% endif %}
                     <div class="col-md-6"><strong>Kayıt:</strong> {{ user.terms_accepted_at|format_dt if user.terms_accepted_at else '—' }}</div>
                     <div class="col-md-6"><strong>Son giriş:</strong> {{ user.last_login_at|format_dt if user.last_login_at else '—' }}</div>
                     <div class="col-md-6"><strong>Son görülme:</strong> {{ user.last_seen|format_dt if user.last_seen else '—' }}</div>

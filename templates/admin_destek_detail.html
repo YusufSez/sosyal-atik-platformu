@@ -13,10 +13,33 @@
     <div class="row g-4">
         <div class="col-lg-7">
             <div class="card mb-3">
-                <div class="card-header fw-semibold">{{ talep.baslik }}</div>
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span>{{ talep.baslik }}</span>
+                    {% if talep.is_guest %}
+                    <span class="badge bg-info text-dark">Misafir</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Kullanıcı</span>
+                    {% endif %}
+                </div>
                 <div class="card-body">
-                    <p class="mb-2"><strong>Kategori:</strong> {{ talep.kategori }}</p>
-                    <p class="mb-2"><strong>Kullanıcı:</strong> {{ talep.user.username if talep.user else '—' }}</p>
+                    <p class="mb-2"><strong>Kategori:</strong> {{ kategori_etiketi(talep.kategori) }}</p>
+                    <p class="mb-2"><strong>Ad Soyad:</strong> {{ talep.gosterim_adi }}</p>
+                    <p class="mb-2"><strong>E-posta:</strong> {{ talep.gosterim_email }}</p>
+                    <p class="mb-2"><strong>Telefon:</strong> {{ talep.gosterim_telefon }}</p>
+                    {% if talep.user %}
+                    <p class="mb-2">
+                        <strong>Hesap:</strong>
+                        <a href="{{ url_for('admin.admin_user_detail', user_id=talep.user.id) }}">{{ talep.user.username }}</a>
+                    </p>
+                    {% elif matched_user %}
+                    <p class="mb-2">
+                        <strong>Kayıtlı kullanıcı eşleşmesi:</strong>
+                        <a href="{{ url_for('admin.admin_user_detail', user_id=matched_user.id) }}">{{ matched_user.username }}</a>
+                        <span class="text-muted small">({{ matched_user.email }})</span>
+                    </p>
+                    {% endif %}
+                    <p class="mb-2"><strong>IP:</strong> {{ talep.ip_address or '—' }}</p>
+                    <p class="mb-3"><strong>User-Agent:</strong> <span class="small text-muted">{{ talep.user_agent or '—' }}</span></p>
                     <p class="mb-0" style="white-space: pre-wrap;">{{ talep.mesaj }}</p>
                     {% if talep.ek_resim %}
                     <div class="mt-3">
@@ -29,6 +52,36 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if talep.durum_gecmisi %}
+            <div class="card">
+                <div class="card-header fw-semibold">Durum geçmişi</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Eski</th>
+                                <th>Yeni</th>
+                                <th>Admin</th>
+                                <th>Not</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for g in talep.durum_gecmisi %}
+                            <tr>
+                                <td>{{ g.created_at|format_dt if g.created_at else '—' }}</td>
+                                <td>{{ g.eski_durum or '—' }}</td>
+                                <td>{{ g.yeni_durum }}</td>
+                                <td>{{ g.admin.username if g.admin else '—' }}</td>
+                                <td class="small">{{ g.not_metni or '—' }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
         </div>
         <div class="col-lg-5">
             <div class="card">
