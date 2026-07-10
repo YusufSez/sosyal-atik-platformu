@@ -1,12 +1,11 @@
 from flask import Blueprint, abort, jsonify, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
+from app_bootstrap.health import database_health_response
 from services.ilan_moderation import public_ilan_base_filter
-from sqlalchemy import text
 from sqlalchemy.orm import selectinload
 
 from content.kurumsal import KURUMSAL_SAYFALAR, SITE_HARITASI_GRUPLARI
-from extensions import db
 from models import Atik, Kaynak, User
 from services.impact import platform_ozeti
 from services.recommendations import kullanici_onerileri
@@ -59,11 +58,7 @@ def favicon():
 
 @main_bp.route("/health")
 def health():
-    try:
-        db.session.execute(text("SELECT 1"))
-        return jsonify(status="ok", database="up"), 200
-    except Exception:
-        return jsonify(status="degraded", database="down"), 503
+    return database_health_response()
 
 
 @main_bp.route("/kurumsal/<slug>")
