@@ -1,15 +1,21 @@
 """Periyodik bakım görevleri (idempotent, çoklu worker güvenli)."""
 
 import os
+import tempfile
 from pathlib import Path
 
 from utils import utc_now
 
+_MAINTENANCE_LOCK_NAME = "atikport.maintenance.lock"
+
 
 def _maintenance_lock_path(app) -> Path:
-    data_dir = Path(app.root_path) / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir / ".maintenance.lock"
+    """Çoklu worker kilidi — yazılabilir temp dizininde (read-only /app uyumlu)."""
+    safe_name = (getattr(app, "import_name", None) or "atikport").replace("/", "_")
+    lock_name = _MAINTENANCE_LOCK_NAME
+    if safe_name != "atikport":
+        lock_name = f"{safe_name}.maintenance.lock"
+    return Path(tempfile.gettempdir()) / lock_name
 
 
 def _acquire_lock(lock_path: Path) -> bool:
@@ -18,6 +24,8 @@ def _acquire_lock(lock_path: Path) -> bool:
         os.close(fd)
         return True
     except FileExistsError:
+        return False
+    except OSError:
         return False
 
 
