@@ -70,6 +70,8 @@ def is_super_admin(user) -> bool:
     role = getattr(user, "role", None)
     if role == "superadmin":
         return True
+    if role == "admin":
+        return False
 
     # Yeni akış: SUPERADMIN_EMAIL'i kullan.
     # Eğer tanımlı değilse geriye dönük uyumluluk için ADMIN_EMAIL'e fallback yapılır.
