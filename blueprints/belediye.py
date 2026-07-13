@@ -24,8 +24,12 @@ belediye_bp = Blueprint("belediye", __name__, url_prefix="/belediye")
 
 
 def _filters_from_request():
+    """İstek filtreleri; belediye kullanıcısında il boşsa hesap iline kilitlenir."""
+    il = request.args.get("il") or None
+    if not il and current_user.is_authenticated:
+        il = (getattr(current_user, "il", None) or "").strip() or None
     return {
-        "il": request.args.get("il") or None,
+        "il": il,
         "ilce": request.args.get("ilce") or None,
         "mahalle": request.args.get("mahalle") or None,
     }
@@ -87,10 +91,27 @@ def heatmap():
     filters = _filters_from_request()
     yogunluk = request.args.get("yogunluk") or "atik"
     noktalar = heat_map_points(**filters, yogunluk=yogunluk)
+    map_center = {"lat": 39.0, "lng": 35.0, "zoom": 6}
+    try:
+        from services.municipality_analytics import _demo_dashboard_active
+        from services import demo_provider
+
+        if _demo_dashboard_active(**filters):
+            map_center = demo_provider.get_city(filters["il"])["map_center"]
+        elif noktalar:
+            map_center = {
+                "lat": noktalar[0][0],
+                "lng": noktalar[0][1],
+                "zoom": 11,
+            }
+    except Exception:
+        if noktalar:
+            map_center = {"lat": noktalar[0][0], "lng": noktalar[0][1], "zoom": 11}
     return render_template(
         "belediye/heatmap.html",
         title="Isı Haritası",
         noktalar=noktalar,
+        map_center=map_center,
         secili_yogunluk=yogunluk,
         **_geo_context(),
     )

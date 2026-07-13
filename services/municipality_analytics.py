@@ -154,26 +154,27 @@ def municipality_dashboard(il=None, ilce=None, mahalle=None) -> dict:
 
 
 def _demo_dashboard_active(il=None, ilce=None, mahalle=None) -> bool:
-    from services.demo_manager import is_dashboard_data_sufficient, should_use_demo
+    """Demo Manager kararı — heatmap/ops/mahalle/kategori ortak kapı."""
+    from services.demo_manager import (
+        is_dashboard_data_sufficient,
+        is_demo_mode,
+        should_use_demo,
+    )
 
-    # Ops/heatmap için: demo modu veya (özellik + yetersiz veri)
-    # Gerçek dashboard özetini hızlı kontrol etmeden master flag / özellik kullan.
-    from services.demo_manager import is_demo_mode, use_demo_dashboard
+    if is_demo_mode():
+        return True
 
-    if is_demo_mode() or use_demo_dashboard():
-        # özellik açıkken yeterli gerçek veri varsa demo kullanma
-        if is_demo_mode():
-            return True
-        probe = {
-            "toplam_aktif_ilan": _aktif_query(Kaynak, _geo_filters(il, ilce, mahalle)).count()
-            + _aktif_query(Atik, _geo_filters(il, ilce, mahalle)).count(),
-            "etki_adet": 0,
-        }
-        return should_use_demo(
-            "dashboard",
-            real_data_sufficient=is_dashboard_data_sufficient(probe),
-        )
-    return False
+    geo = _geo_filters(il, ilce, mahalle)
+    probe = {
+        "toplam_aktif_ilan": (
+            _aktif_query(Kaynak, geo).count() + _aktif_query(Atik, geo).count()
+        ),
+        "etki_adet": 0,
+    }
+    return should_use_demo(
+        "dashboard",
+        real_data_sufficient=is_dashboard_data_sufficient(probe),
+    )
 
 
 def _ortalama_teslim_suresi_gun(geo) -> float | None:
@@ -201,6 +202,11 @@ def _ortalama_teslim_suresi_gun(geo) -> float | None:
 
 def geography_options(il=None, ilce=None) -> dict:
     """Basamaklı İl → İlçe → Mahalle seçenekleri."""
+    if _demo_dashboard_active(il, ilce, None):
+        from services import demo_provider
+
+        return demo_provider.geography_options(il=il, ilce=ilce)
+
     iller = [
         r[0]
         for r in db.session.query(User.il)
@@ -348,6 +354,11 @@ def heat_map_points(il=None, ilce=None, mahalle=None, yogunluk="atik") -> list:
 
 def kategori_analizi(il=None, ilce=None, mahalle=None) -> dict:
     """Belediye kategori gruplarına göre sayım (grafik için)."""
+    if _demo_dashboard_active(il, ilce, mahalle):
+        from services import demo_provider
+
+        return demo_provider.kategori_analizi(il=il)
+
     geo = _geo_filters(il, ilce, mahalle)
     counts = {g: 0 for g in MUNICIPALITY_CATEGORY_GROUPS}
 

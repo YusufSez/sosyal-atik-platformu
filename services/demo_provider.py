@@ -125,28 +125,52 @@ def _build_monthly_history(seed: dict, *, months: int = 12, now: datetime | None
     return rows
 
 
-def _build_heatmap(city: str, *, count: int = 36) -> list[list[float]]:
+def _build_heatmap(city: str, *, count: int = 42) -> list[list[float]]:
+    """Şehir merkezi yoğun, kırsal düşük — gerçekçi heat noktaları (rastgele değil)."""
     geo = _CITY_GEO[city]
     hotspots = geo["hotspots"]
+    center_lat, center_lng = geo["center"]
     points: list[list[float]] = []
-    # sabit ızgara ofsetleri — random yok
-    offsets = [
-        (0.0, 0.0), (0.004, 0.002), (-0.003, 0.005), (0.006, -0.004),
-        (-0.005, -0.003), (0.002, 0.007), (-0.007, 0.001), (0.008, 0.003),
-        (-0.002, -0.006), (0.005, 0.005), (-0.004, 0.004), (0.003, -0.007),
+    # Merkez etrafında sıkı halka
+    center_offsets = [
+        (0.0, 0.0, 1.0),
+        (0.003, 0.002, 0.95),
+        (-0.002, 0.004, 0.92),
+        (0.004, -0.003, 0.90),
+        (-0.005, -0.002, 0.88),
+        (0.006, 0.005, 0.85),
+        (-0.004, 0.006, 0.84),
+        (0.002, -0.006, 0.82),
+        (0.007, -0.001, 0.80),
+        (-0.006, 0.003, 0.78),
+        (0.001, 0.008, 0.76),
+        (-0.008, -0.004, 0.72),
+    ]
+    for ox, oy, intensity in center_offsets:
+        points.append([
+            round(center_lat + ox, 5),
+            round(center_lng + oy, 5),
+            round(intensity, 3),
+        ])
+    # Temalı hotspot'lar (sanayi / üniversite / AVM) — orta yoğunluk
+    ring = [
+        (0.0, 0.0), (0.005, 0.003), (-0.004, 0.006), (0.007, -0.005),
+        (-0.006, -0.003), (0.003, 0.008), (-0.008, 0.002), (0.009, 0.004),
     ]
     i = 0
     while len(points) < count:
-        name, lat, lng, intensity = hotspots[i % len(hotspots)]
-        ox, oy = offsets[i % len(offsets)]
-        ring = (i // len(hotspots)) % 3
+        _name, lat, lng, intensity = hotspots[i % len(hotspots)]
+        ox, oy = ring[i % len(ring)]
+        # Merkeze uzaklık arttıkça yoğunluk düşer
+        dist = abs(lat - center_lat) + abs(lng - center_lng)
+        rural_penalty = 0.55 if dist > 0.15 else (0.75 if dist > 0.08 else 1.0)
         points.append([
-            round(lat + ox * (1 + ring * 0.4), 5),
-            round(lng + oy * (1 + ring * 0.4), 5),
-            round(min(1.0, intensity * (1.0 - ring * 0.12)), 3),
+            round(lat + ox * 0.6, 5),
+            round(lng + oy * 0.6, 5),
+            round(min(1.0, intensity * rural_penalty * (0.95 - (i % 5) * 0.04)), 3),
         ])
         i += 1
-    return points
+    return points[:count]
 
 
 def _build_activities(city: str, districts: dict, *, limit: int = 120) -> list[dict]:
@@ -338,7 +362,9 @@ def _build_city_package(city: str) -> dict:
             ),
             "trend": "yukselis",
         },
-        "heatmap": _build_heatmap(city, count=40 if city in ("İstanbul", "Ankara", "İzmir") else 28),
+        "heatmap": _build_heatmap(
+            city, count=48 if city in ("İstanbul", "Ankara", "İzmir") else 36
+        ),
         "map_center": {
             "lat": geo["center"][0],
             "lng": geo["center"][1],
@@ -459,14 +485,82 @@ def mahalle_rows(*, il=None, ilce=None, mahalle=None) -> list[dict]:
     return deepcopy(pkg["district_stats"])
 
 
+def geography_options(*, il=None, ilce=None) -> dict:
+    """MASTER_DATASET ilçe / mahalle listesi."""
+    city = _norm_city(il)
+    pkg = get_city(city)
+    districts = pkg["districts"]
+    ilceler = list(districts.keys())
+    mahalleler = []
+    if ilce and ilce in districts:
+        mahalleler = list(districts[ilce])
+    return {
+        "iller": list_cities(),
+        "ilceler": ilceler,
+        "mahalleler": mahalleler,
+    }
+
+
+def kategori_analizi(*, il=None) -> dict:
+    """Belediye kategori grafik şeması — MASTER waste_categories."""
+    from constants import MUNICIPALITY_CATEGORY_GROUPS
+
+    pkg = get_city(il)
+    raw = pkg["waste_categories"]
+    # MASTER "Bitkisel yağ" → UI grubu "Bitkisel Yağ"
+    alias = {"Bitkisel yağ": "Bitkisel Yağ", "Elektronik": "Elektronik"}
+    counts = {g: 0 for g in MUNICIPALITY_CATEGORY_GROUPS}
+    total_listings = pkg["dashboard"]["toplam_aktif_ilan"]
+    for name, pct in raw.items():
+        key = alias.get(name, name)
+        if key not in counts:
+            key = "Diğer"
+        counts[key] = counts.get(key, 0) + int(round(total_listings * pct / 100.0))
+    labels = list(MUNICIPALITY_CATEGORY_GROUPS)
+    values = [counts[g] for g in labels]
+    return {
+        "labels": labels,
+        "values": values,
+        "adetler": values,
+        "rows": [{"kategori": k, "adet": counts[k]} for k in labels],
+        "toplam": sum(values),
+    }
+
+
 def ops_center(*, il=None, ilce=None, mahalle=None) -> dict:
     pkg = get_city(il)
     ozet = dashboard_kpis(il=il, ilce=ilce, mahalle=mahalle)
+    charts = chart_demo_bundle(il=il)
+    # Trend serisini ops metrikleriyle hizala
+    cards = deepcopy(pkg["ops_cards"])
+    charts["trend"] = {
+        "labels": ["Bugün", "Son 24s ilan", "Son 24s teslim", "Aktif", "Teslim", "Bekleyen"],
+        "values": [
+            cards["bugun_acilan"],
+            cards["son_24_saat"]["ilan"],
+            cards["son_24_saat"]["teslim"],
+            ozet["toplam_aktif_ilan"],
+            ozet["toplam_teslim"],
+            cards["bekleyen_teslimler"],
+        ],
+    }
+    charts["delivery"] = {
+        "labels": ["Teslim", "Aktif", "Bekleyen"],
+        "values": [
+            ozet["toplam_teslim"],
+            ozet["toplam_aktif_ilan"],
+            cards["bekleyen_teslimler"],
+        ],
+    }
     return {
         "ozet": ozet,
-        "cards": deepcopy(pkg["ops_cards"]),
+        "cards": cards,
         "aktiviteler": deepcopy(pkg["activities"][:12]),
         "filtre": ozet["filtre"],
+        "charts": charts,
+        "map_center": deepcopy(pkg["map_center"]),
+        "heatmap": heat_map_points(il=il, ilce=ilce, mahalle=mahalle),
+        "source": "demo",
     }
 
 

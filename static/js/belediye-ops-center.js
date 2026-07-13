@@ -11,6 +11,8 @@
 
   var UI = window.AtikPortUI || null;
   var DEMO = (UI && UI.DEMO) || {};
+  var masterCharts = cfg.charts || null;
+  var fromMaster = !!cfg.demoSource || !!masterCharts;
 
   var updated = document.getElementById("opsLastUpdated");
   if (updated) {
@@ -47,6 +49,31 @@
     });
   }
 
+  function addHeatLayer(map, pts) {
+    if (!pts.length) return false;
+    if (typeof L === "undefined" || !L.heatLayer) return false;
+    L.heatLayer(pts, {
+      radius: 28,
+      blur: 20,
+      maxZoom: 15,
+      minOpacity: 0.35,
+      gradient: {
+        0.2: "#bbf7d0",
+        0.45: "#86efac",
+        0.65: "#22c55e",
+        0.85: "#16a34a",
+        1: "#14532d",
+      },
+    }).addTo(map);
+    map.fitBounds(
+      pts.map(function (p) {
+        return [p[0], p[1]];
+      }),
+      { padding: [30, 30], maxZoom: 13 }
+    );
+    return true;
+  }
+
   function loadHeatMap() {
     var mapEl = document.getElementById("opsHeatMap");
     var emptyEl = document.getElementById("opsHeatMapEmpty");
@@ -68,7 +95,6 @@
         return r.json();
       })
       .then(function (noktalar) {
-        var UI = window.AtikPortUI;
         if (UI && UI.applyChartTheme) UI.applyChartTheme();
         var map = L.map(mapEl).setView(
           [center.lat || 40.77, center.lng || 30.4],
@@ -85,43 +111,22 @@
         ).addTo(map);
 
         var pts = Array.isArray(noktalar) ? noktalar : [];
-        var demoHeat = false;
+        // İstemci tarafında sahte heat üretme — yalnızca sunucu (MASTER/gerçek) verisi
         if (!pts.length) {
-          demoHeat = true;
-          var baseLat = center.lat || 40.77;
-          var baseLng = center.lng || 30.4;
-          pts = [
-            [baseLat, baseLng, 0.9],
-            [baseLat + 0.02, baseLng + 0.01, 0.7],
-            [baseLat - 0.015, baseLng + 0.02, 0.55],
-            [baseLat + 0.01, baseLng - 0.02, 0.8],
-            [baseLat - 0.02, baseLng - 0.01, 0.45],
-            [baseLat + 0.025, baseLng - 0.015, 0.6],
-          ];
+          mapEl.classList.add("d-none");
+          if (emptyEl) emptyEl.classList.remove("d-none");
+          return;
         }
         if (emptyEl) emptyEl.classList.add("d-none");
         mapEl.classList.remove("d-none");
-        if (pts.length && L.heatLayer) {
-          L.heatLayer(pts, {
-            radius: 24,
-            blur: 18,
-            maxZoom: 14,
-            gradient: {
-              0.2: "#bbf7d0",
-              0.45: "#86efac",
-              0.65: "#22c55e",
-              0.85: "#16a34a",
-              1: "#14532d",
-            },
-          }).addTo(map);
-          map.fitBounds(
-            pts.map(function (p) {
-              return [p[0], p[1]];
-            }),
-            { padding: [30, 30], maxZoom: 13 }
-          );
-          if (demoHeat && UI && UI.markDemo) UI.markDemo(mapEl, true);
+        var ok = addHeatLayer(map, pts);
+        if (!ok && emptyEl) {
+          mapEl.classList.add("d-none");
+          emptyEl.classList.remove("d-none");
+          emptyEl.textContent =
+            "Isı katmanı yüklenemedi. Sayfayı yenileyin veya leaflet-heat eklentisini kontrol edin.";
         }
+        if (fromMaster && UI && UI.markDemo) UI.markDemo(mapEl, true);
         setTimeout(function () {
           map.invalidateSize();
         }, 120);
@@ -133,7 +138,13 @@
   }
 
   function buildCategoryData() {
-    var DEMO = (UI && UI.DEMO) || {};
+    if (masterCharts && masterCharts.category) {
+      return {
+        labels: masterCharts.category.labels || [],
+        values: masterCharts.category.values || [],
+        demo: fromMaster,
+      };
+    }
     var counts = {};
     (cfg.activities || []).forEach(function (a) {
       var k = (a && a.kategori) || "Diğer";
@@ -145,14 +156,8 @@
     var labels = Object.keys(counts);
     if (!labels.length || !(UI && UI.sum(Object.values(counts)))) {
       return {
-        labels: (DEMO.category && DEMO.category.labels) || [
-          "Plastik",
-          "Cam",
-          "Metal",
-          "Organik",
-          "Elektronik",
-        ],
-        values: (DEMO.category && DEMO.category.values) || [28, 18, 15, 22, 17],
+        labels: (DEMO.category && DEMO.category.labels) || [],
+        values: (DEMO.category && DEMO.category.values) || [],
         demo: true,
       };
     }
@@ -210,33 +215,51 @@
 
     var trendCanvas = document.getElementById("opsTrendChart");
     if (trendCanvas) {
-      var trendVals = [
-        m.bugun || 0,
-        m.ilan24 || 0,
-        m.teslim24 || 0,
-        m.aktif || 0,
-        m.teslim || 0,
-        m.bekleyen || 0,
-      ];
-      var trendDemo = !(UI && UI.hasNumericSeries(trendVals));
-      if (trendDemo) {
-        trendVals = (DEMO.trend && DEMO.trend.values) || [12, 15, 11, 18, 16, 9];
+      var trendLabels;
+      var trendVals;
+      var trendDemo = false;
+      if (masterCharts && masterCharts.trend) {
+        trendLabels = masterCharts.trend.labels;
+        trendVals = masterCharts.trend.values;
+        trendDemo = fromMaster;
+      } else {
+        trendVals = [
+          m.bugun || 0,
+          m.ilan24 || 0,
+          m.teslim24 || 0,
+          m.aktif || 0,
+          m.teslim || 0,
+          m.bekleyen || 0,
+        ];
+        trendDemo = !(UI && UI.hasNumericSeries(trendVals));
+        if (trendDemo) {
+          trendVals = (DEMO.trend && DEMO.trend.values) || [12, 15, 11, 18, 16, 9];
+          trendLabels =
+            (DEMO.trend && DEMO.trend.labels) || [
+              "Pzt",
+              "Sal",
+              "Çar",
+              "Per",
+              "Cum",
+              "Cmt",
+              "Paz",
+            ];
+        } else {
+          trendLabels = [
+            "Bugün",
+            "Son 24s ilan",
+            "Son 24s teslim",
+            "Aktif",
+            "Teslim",
+            "Bekleyen",
+          ];
+        }
       }
       if (UI) UI.markDemo(trendCanvas, trendDemo);
       new Chart(trendCanvas, {
         type: "line",
         data: {
-          labels: trendDemo
-            ? (DEMO.trend && DEMO.trend.labels) || [
-                "Pzt",
-                "Sal",
-                "Çar",
-                "Per",
-                "Cum",
-                "Cmt",
-                "Paz",
-              ]
-            : ["Bugün", "Son 24s ilan", "Son 24s teslim", "Aktif", "Teslim", "Bekleyen"],
+          labels: trendLabels,
           datasets: [
             {
               label: "Operasyon hacmi",
@@ -263,24 +286,31 @@
       var teslim = Number(m.teslim || 0);
       var aktif = Number(m.aktif || 0);
       var bekleyen = Number(m.bekleyen || 0);
-      var demo = teslim + aktif + bekleyen <= 0;
-      var data = demo
-        ? (DEMO.delivery && DEMO.delivery.values) || [62, 24, 14]
-        : [teslim, aktif, bekleyen];
+      var demo = false;
+      var data;
+      if (masterCharts && masterCharts.delivery) {
+        data = masterCharts.delivery.values;
+        demo = fromMaster;
+      } else {
+        demo = teslim + aktif + bekleyen <= 0;
+        data = demo
+          ? (DEMO.delivery && DEMO.delivery.values) || [62, 24, 14]
+          : [teslim, aktif, bekleyen];
+      }
       if (UI) UI.markDemo(deliveryCanvas, demo);
       var denom = data[0] + data[1];
       var rate = denom > 0 ? Math.round((1000 * data[0]) / denom) / 10 : 0;
       if (caption) {
         caption.textContent = demo
-          ? "Örnek teslim oranı görünümü · gerçek veri birikince güncellenir"
+          ? "MASTER_DATASET teslim görünümü · Demo Modu"
           : "Teslim oranı %" +
             rate +
             " · " +
-            teslim +
+            data[0] +
             " teslim / " +
-            (aktif + teslim) +
+            (data[1] + data[0]) +
             " toplam · bekleyen " +
-            bekleyen;
+            data[2];
       }
       new Chart(deliveryCanvas, {
         type: "doughnut",

@@ -38,7 +38,8 @@
 {{ leaflet_assets(heat=true) }}
 <script type="application/json" id="belediye-heatmap-config">{{ {
   'isi_noktalari': noktalar,
-  'yogunluk': secili_yogunluk
+  'yogunluk': secili_yogunluk,
+  'mapCenter': map_center
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='js/belediye-heatmap.js') }}"></script>
 {% endblock %}

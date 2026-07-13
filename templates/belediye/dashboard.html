@@ -372,11 +372,11 @@
     'ilce': secili_ilce or '',
     'mahalle': secili_mahalle or ''
   },
-  'mapCenter': {
+  'mapCenter': (ops.map_center if ops.get('map_center') else {
     'lat': current_user.latitude if current_user and current_user.latitude else 40.77,
     'lng': current_user.longitude if current_user and current_user.longitude else 30.40,
     'zoom': 11
-  },
+  }),
   'metrics': {
     'bugun': c.bugun_acilan,
     'ilan24': c.son_24_saat.ilan,
@@ -386,7 +386,9 @@
     'bekleyen': c.bekleyen_teslimler
   },
   'activities': ops.aktiviteler,
-  'kritik': (c.kritik_kategori.kategori if c.kritik_kategori else None)
+  'kritik': (c.kritik_kategori.kategori if c.kritik_kategori else None),
+  'charts': ops.get('charts'),
+  'demoSource': ops.get('source') == 'demo'
 }|tojson }}</script>
 <script type="application/json" id="prediction-panel-config">{{ {
   'apiUrl': url_for('belediye.api_predictions'),

@@ -106,3 +106,39 @@ def test_dashboard_kpis_city_specific(app):
         assert sak["toplam_aktif_ilan"] == 3200
         assert ist["toplam_aktif_ilan"] == 18400
         assert sak["co2e_kg"] != ist["co2e_kg"]
+
+
+def test_heatmap_and_geography_from_master(app):
+    from services.demo_manager import DEMO_MODE_KEY, save_demo_settings
+    from services.municipality_analytics import geography_options, heat_map_points, kategori_analizi
+    from auth_utils import hash_password
+    from extensions import db
+    from models import User
+
+    with app.app_context():
+        admin = User(
+            username="geo_admin",
+            email="geo_admin@test.com",
+            password=hash_password("TestPass1"),
+            is_completed=True,
+            email_verified=True,
+            role="admin",
+            is_admin=True,
+        )
+        db.session.add(admin)
+        db.session.commit()
+        save_demo_settings({DEMO_MODE_KEY: True}, admin_id=admin.id, log_changes=False)
+
+        geo = geography_options(il="Sakarya")
+        assert "Adapazarı" in geo["ilceler"]
+        assert "Serdivan" in geo["ilceler"]
+        geo2 = geography_options(il="Sakarya", ilce="Serdivan")
+        assert "Kemalpaşa" in geo2["mahalleler"]
+
+        pts = heat_map_points(il="Sakarya")
+        assert 20 <= len(pts) <= 50
+        assert all(len(p) == 3 for p in pts)
+
+        kat = kategori_analizi(il="Sakarya")
+        assert kat["toplam"] > 0
+        assert "Plastik" in kat["labels"]
