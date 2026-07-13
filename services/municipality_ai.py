@@ -320,7 +320,7 @@ def generate_municipality_insights(il=None, ilce=None, mahalle=None) -> dict:
     fallback = _advanced_rule_cards(ctx)
 
     if use_demo_ai():
-        demo = demo_provider.municipality_ai_insights(dashboard)
+        demo = demo_provider.municipality_ai_insights(dashboard, il=il)
         return {
             "source": demo["source"],
             "insights": demo["insights"],

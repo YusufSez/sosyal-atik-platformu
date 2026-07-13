@@ -411,8 +411,15 @@ def ministry_action_items(risk: dict, comparisons: dict, weekly: dict, monthly: 
 
 def build_decision_support_center(*, now=None) -> dict:
     """Ulusal Karar Destek Merkezi dashboard paketi."""
+    from services.demo_manager import should_use_demo
+    from services import demo_provider
+
     now = now or utc_now()
     kpi = ministry_kpi()
+    kpi_ok = bool((kpi or {}).get("toplam_ilan") or (kpi or {}).get("etki_adet"))
+    if should_use_demo("dashboard", real_data_sufficient=kpi_ok):
+        return demo_provider.decision_support_center()
+
     weekly = period_snapshot("weekly", now=now)
     monthly = period_snapshot("monthly", now=now)
     shifts = category_shifts(days=30, now=now)

@@ -3,27 +3,28 @@
  * Backend / API değiştirmez.
  */
 (function (global) {
+  /* MASTER_DATASET (Sakarya + ulusal) ile hizalı istemci yedekleri */
   var DEMO = {
     category: {
-      labels: ["Plastik", "Cam", "Metal", "Organik", "Elektronik"],
-      values: [28, 18, 15, 22, 17],
+      labels: ["Plastik", "Elektronik", "Cam", "Metal", "Organik", "Bitkisel yağ", "Diğer"],
+      values: [29, 18, 16, 13, 12, 7, 5],
     },
     trend: {
       labels: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"],
-      values: [12, 15, 11, 18, 16, 9, 14],
+      values: [12, 15, 14, 18, 17, 11, 16],
     },
-    delivery: { labels: ["Teslim", "Aktif", "Bekleyen"], values: [62, 24, 14] },
+    delivery: { labels: ["Teslim", "Aktif", "Bekleyen"], values: [82, 10, 8] },
     radar: {
       labels: ["Geri dönüşüm", "Teslim", "Katılım", "Kaynak", "Karbon", "Süre", "AI"],
-      values: [72, 68, 55, 61, 58, 64, 50],
+      values: [72, 78, 68, 71, 66, 75, 69],
     },
     history: {
       labels: ["Oca", "Şub", "Mar", "Nis", "May", "Haz"],
-      values: [54, 58, 61, 63, 67, 70],
+      values: [68, 69.1, 70.2, 71.3, 72.4, 74],
     },
     bars: {
-      labels: ["İl A", "İl B", "İl C", "İl D", "İl E"],
-      values: [88, 81, 76, 71, 65],
+      labels: ["İzmir", "İstanbul", "Ankara", "Eskişehir", "Bursa"],
+      values: [90, 88, 84, 83, 81],
     },
   };
 

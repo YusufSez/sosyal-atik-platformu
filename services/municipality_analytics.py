@@ -147,11 +147,33 @@ def municipality_dashboard(il=None, ilce=None, mahalle=None) -> dict:
         "dashboard",
         real_data_sufficient=is_dashboard_data_sufficient(data),
     ):
-        demo = demo_provider.dashboard_kpis(
+        return demo_provider.dashboard_kpis(
             il=_norm(il), ilce=_norm(ilce), mahalle=_norm(mahalle)
         )
-        return demo
     return data
+
+
+def _demo_dashboard_active(il=None, ilce=None, mahalle=None) -> bool:
+    from services.demo_manager import is_dashboard_data_sufficient, should_use_demo
+
+    # Ops/heatmap için: demo modu veya (özellik + yetersiz veri)
+    # Gerçek dashboard özetini hızlı kontrol etmeden master flag / özellik kullan.
+    from services.demo_manager import is_demo_mode, use_demo_dashboard
+
+    if is_demo_mode() or use_demo_dashboard():
+        # özellik açıkken yeterli gerçek veri varsa demo kullanma
+        if is_demo_mode():
+            return True
+        probe = {
+            "toplam_aktif_ilan": _aktif_query(Kaynak, _geo_filters(il, ilce, mahalle)).count()
+            + _aktif_query(Atik, _geo_filters(il, ilce, mahalle)).count(),
+            "etki_adet": 0,
+        }
+        return should_use_demo(
+            "dashboard",
+            real_data_sufficient=is_dashboard_data_sufficient(probe),
+        )
+    return False
 
 
 def _ortalama_teslim_suresi_gun(geo) -> float | None:
@@ -219,6 +241,11 @@ def geography_options(il=None, ilce=None) -> dict:
 
 def mahalle_analizi(il=None, ilce=None, mahalle=None) -> list[dict]:
     """Mahalle/ilçe bazında ilan, atık kg, kaynak adet, kullanıcı yoğunluğu."""
+    if _demo_dashboard_active(il, ilce, mahalle):
+        from services import demo_provider
+
+        return demo_provider.mahalle_rows(il=il, ilce=ilce, mahalle=mahalle)
+
     from sqlalchemy import case
 
     geo = _geo_filters(il, ilce, mahalle)
@@ -281,6 +308,13 @@ def mahalle_analizi(il=None, ilce=None, mahalle=None) -> list[dict]:
 
 def heat_map_points(il=None, ilce=None, mahalle=None, yogunluk="atik") -> list:
     """Leaflet heat: [lat, lng, intensity]. yogunluk: atik|kaynak|teslim."""
+    if _demo_dashboard_active(il, ilce, mahalle):
+        from services import demo_provider
+
+        return demo_provider.heat_map_points(
+            il=il, ilce=ilce, mahalle=mahalle, yogunluk=yogunluk
+        )
+
     geo = _geo_filters(il, ilce, mahalle)
     mode = (yogunluk or "atik").strip().lower()
     noktalar = []
@@ -555,6 +589,11 @@ def municipality_ops_center(il=None, ilce=None, mahalle=None) -> dict:
     Belediye Operasyon Merkezi — kartlar, aktiviteler, risk özeti.
     municipality_dashboard alanlarını bozmadan genişletir.
     """
+    if _demo_dashboard_active(il, ilce, mahalle):
+        from services import demo_provider
+
+        return demo_provider.ops_center(il=il, ilce=ilce, mahalle=mahalle)
+
     geo = _geo_filters(il, ilce, mahalle)
     ozet = municipality_dashboard(il=il, ilce=ilce, mahalle=mahalle)
     now = utc_now()

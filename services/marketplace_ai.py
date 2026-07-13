@@ -98,7 +98,7 @@ def generate_match_report(
         "marketplace",
         real_data_sufficient=is_marketplace_data_sufficient(matches),
     ):
-        matches = demo_provider.marketplace_matches(limit=limit)
+        matches = demo_provider.marketplace_matches(limit=limit, il=getattr(listing, "il", None))
         explanation = (
             f"“{listing.baslik}” için demo kurum eşleşmeleri gösteriliyor "
             f"(en uygun: {matches[0]['ad']}, skor {matches[0]['eslesme_skoru']}/100)."

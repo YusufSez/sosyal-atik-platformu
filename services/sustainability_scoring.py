@@ -618,7 +618,7 @@ def sustainability_dashboard(
     radar = radar_chart_data(current)
     cats = category_scores(current)
 
-    return {
+    result = {
         "current": current,
         "my_rank": my_rank,
         "leaderboard": leaders,
@@ -634,3 +634,14 @@ def sustainability_dashboard(
         "similar_municipalities": similar,
         "rankings": ranks,
     }
+    from services.demo_manager import is_sustainability_data_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "sustainability",
+        real_data_sufficient=is_sustainability_data_sufficient(current),
+    ):
+        return demo_provider.sustainability_dashboard_overlay(
+            il=current.get("il") or il, ilce=current.get("ilce") or ilce
+        )
+    return result

@@ -242,6 +242,7 @@ def test_dashboard_uses_demo_when_mode_on(app):
             is_admin=True,
         )
         save_demo_settings({DEMO_MODE_KEY: True}, admin_id=admin.id, log_changes=False)
-        data = municipality_dashboard()
-        assert data["toplam_aktif_ilan"] == 48
-        assert data["gunluk_kullanici"] == 86
+        data = municipality_dashboard(il="Sakarya")
+        assert data["toplam_aktif_ilan"] == 3200
+        assert data["teslim_orani"] == 82.0
+        assert data["co2e_kg"] == 25000.0
