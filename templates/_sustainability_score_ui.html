@@ -1,0 +1,568 @@
+{# Ortak Sustainability Scoring UI — PDF görünümüne yakın karar paneli #}
+{% set cur = dash.current %}
+{% set ranks = dash.rankings or {} %}
+{% set report = ai_report or {} %}
+{% set score_pct = (cur.puan or 0)|float %}
+{% if score_pct > 100 %}{% set score_pct = 100 %}{% endif %}
+{% if score_pct < 0 %}{% set score_pct = 0 %}{% endif %}
+
+{% macro cat_icon(key) -%}
+  {%- if key == 'geri_donusum' -%}bi-recycle
+  {%- elif key == 'teslim' -%}bi-box-seam
+  {%- elif key == 'katilim' -%}bi-people
+  {%- elif key == 'kaynak_paylasimi' -%}bi-share
+  {%- elif key == 'karbon' -%}bi-cloud
+  {%- elif key == 'teslim_suresi' -%}bi-clock-history
+  {%- elif key == 'ai_dogruluk' -%}bi-robot
+  {%- else -%}bi-bar-chart
+  {%- endif -%}
+{%- endmacro %}
+
+<div class="ss-dash belediye-ops-center">
+  {# —— Başlık —— #}
+  <div class="ops-hero mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="ops-kicker mb-1">AtıkPort · Sustainability</p>
+        <h2 class="ops-title mb-1">Sustainability Scoring Engine</h2>
+        <div class="ops-updated small">
+          {% if cur.belediye_adi %}{{ cur.belediye_adi }}
+          {% else %}{{ cur.il or 'Türkiye' }}{% if cur.ilce %} / {{ cur.ilce }}{% endif %}
+          {% endif %}
+        </div>
+      </div>
+      <a class="btn btn-sm btn-success" href="{{ pdf_url }}">
+        <i class="bi bi-file-earmark-pdf me-1"></i>PDF Rapor
+      </a>
+    </div>
+  </div>
+
+  {# —— 1. Belediye skoru —— #}
+  <h6 class="ops-section-title">Belediye skoru</h6>
+  <div class="ops-panel ss-score-panel mb-4">
+    <div class="ops-panel-body">
+      <div class="row g-4 align-items-center">
+        <div class="col-lg-5 text-center">
+          <div class="ss-ring mx-auto" style="--pct: {{ score_pct }};" role="img"
+               aria-label="Skor {{ cur.puan }}, not {{ cur.grade }}">
+            <div class="ss-ring-inner">
+              <div class="ss-grade">{{ cur.grade }}</div>
+              <div class="ss-score">{{ cur.puan }}</div>
+              <div class="ss-score-caption">/ 100</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="row g-3 ss-rank-row">
+            <div class="col-sm-6">
+              <div class="ss-rank-card h-100">
+                <div class="ss-rank-label">Türkiye sıralaması</div>
+                {% if ranks.turkey and ranks.turkey.sira %}
+                <div class="ss-rank-value">#{{ ranks.turkey.sira }}</div>
+                <div class="ss-rank-sub">{{ ranks.turkey.toplam }} belediye içinde</div>
+                {% elif dash.my_rank %}
+                <div class="ss-rank-value">#{{ dash.my_rank }}</div>
+                <div class="ss-rank-sub">Türkiye genelinde</div>
+                {% else %}
+                <div class="ss-rank-value">—</div>
+                <div class="ss-rank-sub">Sıra hesaplanamadı</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="ss-rank-card h-100">
+                <div class="ss-rank-label">İl sıralaması</div>
+                {% if ranks.il_belediye and ranks.il_belediye.sira %}
+                <div class="ss-rank-value">#{{ ranks.il_belediye.sira }}</div>
+                <div class="ss-rank-sub">{{ ranks.il_belediye.toplam }} birim · {{ dash.focus_il or cur.il or 'il' }}</div>
+                {% else %}
+                <div class="ss-rank-value">—</div>
+                <div class="ss-rank-sub">{% if dash.focus_il %}{{ dash.focus_il }}{% else %}İl kapsamı yok{% endif %}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% if dash.history and dash.history.change_pct is not none %}
+            <div class="col-sm-6">
+              <div class="ss-rank-card h-100">
+                <div class="ss-rank-label">6 ay değişim</div>
+                <div class="ss-rank-value {% if dash.history.change_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ '%+.1f'|format(dash.history.change_pct) }}%
+                </div>
+                <div class="ss-rank-sub">{{ dash.history.trend or 'Trend' }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if dash.comparison and dash.comparison.turkey_avg is not none %}
+            <div class="col-sm-6">
+              <div class="ss-rank-card h-100">
+                <div class="ss-rank-label">Türkiye ortalaması</div>
+                <div class="ss-rank-value">{{ dash.comparison.turkey_avg }}</div>
+                <div class="ss-rank-sub">Dilim %{{ dash.comparison.percentile }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% if dash.comparison and dash.comparison.message %}
+          <p class="ss-compare-msg mb-0 mt-3">{{ dash.comparison.message }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# —— 2. Radar Chart (merkez, büyük) —— #}
+  <h6 class="ops-section-title">Radar Chart</h6>
+  <div class="ops-panel ss-radar-panel mb-4">
+    <div class="ops-panel-head">
+      <span><i class="bi bi-radar me-2"></i>Kategori radar görünümü</span>
+    </div>
+    <div class="ops-panel-body ss-radar-body">
+      <div class="ss-radar-wrap">
+        <canvas id="sustainabilityRadarChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# —— 3. Kategori puanları —— #}
+  <h6 class="ops-section-title">Kategori puanları</h6>
+  <div class="row g-3 mb-4 ss-equal-cards">
+    {% for c in dash.category_scores or cur.criteria %}
+    <div class="col-md-6 col-xl-4">
+      <div class="ss-cat-card h-100">
+        <div class="d-flex align-items-start gap-3">
+          <div class="ss-cat-icon"><i class="bi {{ cat_icon(c.key) }}"></i></div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
+              <div class="ss-cat-label">{{ c.label }}</div>
+              <div class="ss-cat-pct">%{{ c.score }}</div>
+            </div>
+            <div class="progress ss-progress">
+              <div class="progress-bar
+                {% if c.score >= 70 %}bg-success
+                {% elif c.score >= 40 %}bg-warning
+                {% else %}bg-secondary{% endif %}"
+                   style="width: {{ c.score }}%"
+                   role="progressbar"
+                   aria-valuenow="{{ c.score }}"
+                   aria-valuemin="0"
+                   aria-valuemax="100"></div>
+            </div>
+            <div class="ss-cat-meta mt-1">
+              Ağırlık %{{ c.weight }}
+              {% if c.missing_data %}<span class="badge bg-light text-muted border ms-1">veri sınırlı</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12"><div class="ops-panel"><div class="ops-panel-body text-muted">Kategori verisi yok</div></div></div>
+    {% endfor %}
+  </div>
+
+  {# —— 4. Geçmiş değişim —— #}
+  <h6 class="ops-section-title">Geçmiş değişim</h6>
+  <div class="ops-panel mb-4">
+    <div class="ops-panel-head">
+      <span><i class="bi bi-graph-up me-2"></i>6 aylık grafik</span>
+      {% if dash.history and dash.history.change_pct is not none %}
+      <span class="badge {% if dash.history.change_pct >= 0 %}text-bg-success{% else %}text-bg-danger{% endif %}">
+        {{ '%+.1f'|format(dash.history.change_pct) }}%
+      </span>
+      {% endif %}
+    </div>
+    <div class="ops-panel-body">
+      <div class="ss-history-wrap">
+        <canvas id="sustainabilityHistoryChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {# —— 5. Benzer belediyeler —— #}
+  {% if dash.similar_municipalities %}
+  <h6 class="ops-section-title">Benzer belediyeler</h6>
+  <div class="row g-3 mb-4 ss-equal-cards">
+    {% for s in dash.similar_municipalities %}
+    <div class="col-sm-6 col-xl">
+      <div class="ss-similar-card h-100">
+        <div class="ss-similar-name">{{ s.belediye_adi }}</div>
+        <div class="ss-similar-geo">{{ s.il }}{% if s.ilce %} / {{ s.ilce }}{% endif %}</div>
+        <div class="mt-auto pt-3 d-flex flex-wrap align-items-center gap-2">
+          <span class="badge text-bg-success">{{ s.puan }} · {{ s.grade }}</span>
+          <span class="small text-muted">
+            {% if s.puan_farki >= 0 %}+{% endif %}{{ s.puan_farki }}
+            {% if s.ayni_il %} · aynı il{% endif %}
+          </span>
+        </div>
+        {% if s.sira %}<div class="small text-muted mt-1">TR sıra #{{ s.sira }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# —— 6. AI Değerlendirmesi —— #}
+  <h6 class="ops-section-title">AI Değerlendirmesi</h6>
+  <div class="ops-panel mb-4">
+    <div class="ops-panel-head">
+      <span><i class="bi bi-robot me-2"></i>AI Değerlendirmesi</span>
+      <span class="badge text-bg-secondary">{{ report.source or suggestion_source or 'rules' }}</span>
+    </div>
+    <div class="ops-panel-body">
+      {% if report.summary %}
+      <p class="ss-ai-summary mb-4">{{ report.summary }}</p>
+      {% endif %}
+
+      <div class="ss-ai-group-label text-success"><i class="bi bi-check-circle me-1"></i>3 Güçlü yön</div>
+      <div class="row g-3 mb-4 ss-equal-cards">
+        {% for item in report.strengths or [] %}
+        <div class="col-md-4">
+          <article class="ss-ai-card ss-ai-strength h-100">
+            <div class="ss-ai-card-kicker">Güçlü yön {{ loop.index }}</div>
+            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+          </article>
+        </div>
+        {% else %}
+        <div class="col-12"><p class="text-muted mb-0">—</p></div>
+        {% endfor %}
+      </div>
+
+      <div class="ss-ai-group-label text-warning"><i class="bi bi-arrow-up-right-circle me-1"></i>3 Gelişim alanı</div>
+      <div class="row g-3 mb-4 ss-equal-cards">
+        {% for item in report.improvements or [] %}
+        <div class="col-md-4">
+          <article class="ss-ai-card ss-ai-improve h-100">
+            <div class="ss-ai-card-kicker">Gelişim alanı {{ loop.index }}</div>
+            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+          </article>
+        </div>
+        {% else %}
+        <div class="col-12"><p class="text-muted mb-0">—</p></div>
+        {% endfor %}
+      </div>
+
+      <div class="ss-ai-group-label text-primary"><i class="bi bi-lightbulb me-1"></i>3 Öneri</div>
+      <div class="row g-3 mb-4 ss-equal-cards">
+        {% for item in report.recommendations or [] %}
+        <div class="col-md-4">
+          <article class="ss-ai-card ss-ai-reco h-100">
+            <div class="ss-ai-card-kicker">Öneri {{ loop.index }}</div>
+            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+          </article>
+        </div>
+        {% else %}
+        <div class="col-12"><p class="text-muted mb-0">—</p></div>
+        {% endfor %}
+      </div>
+
+      <div class="ss-ai-group-label text-success"><i class="bi bi-trophy me-1"></i>Beklenen kazanım</div>
+      <article class="ss-ai-card ss-ai-gain">
+        <div class="ss-ai-card-kicker">Beklenen kazanım</div>
+        <p class="ss-ai-card-text mb-0">{{ report.expected_gains or '—' }}</p>
+      </article>
+    </div>
+  </div>
+
+  {# Detay sıralama (PDF eki tarzı) #}
+  <div class="row g-3 mb-2">
+    <div class="col-lg-6">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span>Türkiye sıralaması</span></div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead><tr><th>#</th><th>Belediye</th><th>İl</th><th class="text-end">Puan</th><th>Not</th></tr></thead>
+            <tbody>
+              {% for row in dash.turkey_ranking[:15] %}
+              <tr {% if dash.current.belediye_id and row.belediye_id == dash.current.belediye_id %}class="table-success"{% endif %}>
+                <td>{{ row.sira }}</td>
+                <td>{{ row.belediye_adi }}</td>
+                <td>{{ row.il }}</td>
+                <td class="text-end">{{ row.puan }}</td>
+                <td><span class="badge bg-teal text-dark border">{{ row.grade }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-muted text-center py-3">Belediye skoru yok</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span>İl sıralaması</span></div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead><tr><th>#</th><th>İl</th><th class="text-end">Puan</th><th>Not</th><th class="text-end">Belediye</th></tr></thead>
+            <tbody>
+              {% for row in dash.province_ranking %}
+              <tr {% if dash.focus_il and row.il == dash.focus_il %}class="table-success"{% endif %}>
+                <td>{{ row.sira }}</td>
+                <td>{{ row.il }}</td>
+                <td class="text-end">{{ row.puan }}</td>
+                <td>{{ row.grade }}</td>
+                <td class="text-end">{{ row.belediye_sayisi }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-muted text-center py-3">İl skoru yok</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.belediye-ops-center {
+  --ops-ink: #0f3d36;
+  --ops-accent: #0f766e;
+  --ops-soft: #e7f5f2;
+  --ops-line: rgba(15, 61, 54, 0.12);
+}
+[data-bs-theme="dark"] .belediye-ops-center {
+  --ops-ink: #e8f5f2;
+  --ops-accent: #2dd4bf;
+  --ops-soft: rgba(45, 212, 191, 0.1);
+  --ops-line: rgba(232, 245, 242, 0.14);
+}
+.ops-hero {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(45, 212, 191, 0.22), transparent 42%),
+    linear-gradient(135deg, var(--ops-soft), transparent 65%);
+  border: 1px solid var(--ops-line);
+  border-radius: 1.25rem;
+  padding: 1.15rem 1.35rem;
+}
+.ops-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ops-accent);
+}
+.ops-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ops-ink);
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  margin: 0;
+}
+.ops-updated { color: var(--bs-secondary-color); }
+.ops-section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.65rem;
+}
+.ops-panel {
+  border: 1px solid var(--ops-line);
+  border-radius: 1rem;
+  background: var(--bs-body-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.ops-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--ops-line);
+  font-weight: 700;
+  color: var(--ops-ink);
+}
+.ops-panel-body { padding: 1.15rem 1.25rem; flex: 1 1 auto; }
+
+.ss-ring {
+  --pct: 0;
+  width: min(220px, 70vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, var(--bs-body-bg) 72%, transparent 73% 100%),
+    conic-gradient(#0f766e calc(var(--pct) * 1%), #d1fae5 0);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 36px rgba(15, 118, 110, 0.18);
+}
+.ss-ring-inner {
+  width: 72%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bs-body-bg);
+}
+.ss-grade {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f766e;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.ss-score {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: var(--ops-ink);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.ss-score-caption {
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+  font-weight: 600;
+}
+
+.ss-rank-card {
+  border: 1px solid var(--ops-line);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  background: var(--ops-soft);
+  min-height: 7rem;
+  display: flex;
+  flex-direction: column;
+}
+.ss-rank-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+.ss-rank-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--ops-ink);
+  line-height: 1.1;
+}
+.ss-rank-sub { font-size: 0.8rem; color: var(--bs-secondary-color); margin-top: auto; }
+.ss-compare-msg {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0f766e;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 118, 110, 0.06);
+  border: 1px solid rgba(15, 118, 110, 0.12);
+}
+
+.ss-radar-body { padding-top: 0.5rem; padding-bottom: 1.5rem; }
+.ss-radar-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 360px;
+  position: relative;
+}
+.ss-radar-wrap canvas { width: 100% !important; height: auto !important; max-height: 480px; }
+.ss-history-wrap { min-height: 260px; position: relative; }
+.ss-history-wrap canvas { width: 100% !important; max-height: 300px; }
+
+.ss-equal-cards > [class*="col-"] > * { height: 100%; }
+.ss-cat-card {
+  border: 1px solid var(--ops-line);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: var(--bs-body-bg);
+  min-height: 7.5rem;
+}
+.ss-cat-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.75rem;
+  background: #ccfbf1;
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.ss-cat-label { font-weight: 700; color: var(--ops-ink); font-size: 0.92rem; }
+.ss-cat-pct { font-weight: 800; color: #0f766e; font-size: 1.05rem; white-space: nowrap; }
+.ss-progress { height: 0.55rem; border-radius: 999px; background: #e2e8f0; }
+.ss-progress .progress-bar { border-radius: 999px; }
+.ss-cat-meta { font-size: 0.75rem; color: var(--bs-secondary-color); }
+
+.ss-similar-card {
+  border: 1px solid var(--ops-line);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  background: linear-gradient(160deg, #f0fdfa 0%, #fff 70%);
+  display: flex;
+  flex-direction: column;
+  min-height: 9rem;
+}
+.ss-similar-name { font-weight: 700; color: var(--ops-ink); }
+.ss-similar-geo { font-size: 0.82rem; color: var(--bs-secondary-color); }
+
+.ss-ai-summary {
+  font-size: 0.95rem;
+  color: #134e4a;
+  line-height: 1.5;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 118, 110, 0.05);
+  border: 1px solid rgba(15, 118, 110, 0.1);
+}
+.ss-ai-group-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.65rem;
+}
+.ss-ai-card {
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  border-radius: 0.9rem;
+  padding: 1rem 1.05rem;
+  min-height: 8.5rem;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.ss-ai-strength { background: linear-gradient(160deg, #ecfdf5 0%, #fff 65%); border-color: rgba(16, 185, 129, 0.2); }
+.ss-ai-improve { background: linear-gradient(160deg, #fffbeb 0%, #fff 65%); border-color: rgba(245, 158, 11, 0.22); }
+.ss-ai-reco { background: linear-gradient(160deg, #eff6ff 0%, #fff 65%); border-color: rgba(59, 130, 246, 0.2); }
+.ss-ai-gain {
+  background: linear-gradient(160deg, #f0fdfa 0%, #ecfeff 100%);
+  border-color: rgba(15, 118, 110, 0.22);
+  min-height: auto;
+}
+.ss-ai-card-kicker {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.45rem;
+}
+.ss-ai-card-text {
+  font-size: 0.9rem;
+  color: #134e4a;
+  line-height: 1.45;
+  flex: 1 1 auto;
+}
+.badge.bg-teal { background: #ccfbf1 !important; }
+
+@media (max-width: 767.98px) {
+  .ss-radar-wrap { min-height: 280px; }
+  .ss-score { font-size: 2.1rem; }
+  .ss-grade { font-size: 1.4rem; }
+}
+</style>
+
+<script type="application/json" id="sustainability-chart-config">{{ {
+  'radar': dash.radar or {},
+  'history': dash.history or {}
+}|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/sustainability-charts.js') }}"></script>
