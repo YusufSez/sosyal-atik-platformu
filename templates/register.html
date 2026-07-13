@@ -25,10 +25,12 @@
                 <div class="mb-3 mt-3">
                     <label for="username" class="form-label fw-medium">Kullanıcı Adı</label>
                     <input type="text" id="username" name="username" class="form-control" required
-                           maxlength="30" autocomplete="username" pattern="[\\w]+"
+                           minlength="3" maxlength="30" autocomplete="username"
+                           pattern="[A-Za-z0-9_.]{3,30}"
+                           title="Kullanıcı adı 3-30 karakter olmalı ve yalnızca harf, rakam, _ veya . içerebilir."
                            aria-describedby="usernameHelp">
                     <div id="usernameHelp" class="form-text">
-                        Girişte kullanabileceğiniz benzersiz kullanıcı adıdır.
+                        3–30 karakter; harf, rakam, _ veya . (boşluk ve Türkçe karakter yok).
                     </div>
                 </div>
                 <div class="mb-3">

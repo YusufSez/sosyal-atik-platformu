@@ -35,6 +35,13 @@ from utils import (
 
 auth_bp = Blueprint("auth", __name__)
 
+# Frontend register.html `pattern` ile birebir aynı
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.]{3,30}$")
+USERNAME_INVALID_MSG = (
+    "Kullanıcı adı 3-30 karakter olmalı ve yalnızca harf, rakam, _ veya . içerebilir."
+)
+USERNAME_TAKEN_MSG = "Bu kullanıcı adı zaten kullanılıyor."
+
 
 def _find_user_by_login(identifier: str):
     """Girilen değer e-posta (@ içeriyorsa) veya kullanıcı adı olarak aranır."""
@@ -45,6 +52,14 @@ def _find_user_by_login(identifier: str):
         email = identifier.lower()
         return User.query.filter(db.func.lower(User.email) == email).first()
     return User.query.filter(db.func.lower(User.username) == identifier.lower()).first()
+
+
+def _username_taken(username: str) -> bool:
+    """Case-insensitive kullanıcı adı çakışması."""
+    return (
+        User.query.filter(db.func.lower(User.username) == username.lower()).first()
+        is not None
+    )
 
 
 @auth_bp.route("/kayit", methods=["GET", "POST"])
@@ -61,7 +76,8 @@ def kayit():
 
         ad = sanitize_input(request.form.get("ad"), max_length=100)
         soyad = sanitize_input(request.form.get("soyad"), max_length=100)
-        username = sanitize_input(request.form.get("username"), max_length=30)
+        # max_length ile sessizce kesme — uzunluk USERNAME_RE ile reddedilir
+        username = sanitize_input((request.form.get("username") or "").strip()).strip()
         email = sanitize_input(request.form.get("email"), max_length=150).lower().strip()
         password = request.form.get("password")
         password_tekrar = request.form.get("password_tekrar")
@@ -79,14 +95,8 @@ def kayit():
             flash("Soyad yalnızca harf ve boşluk içerebilir.", "danger")
             return redirect(url_for("auth.kayit"))
 
-        if len(username) < 3:
-            flash("Kullanıcı adı en az 3 karakter olmalıdır.", "danger")
-            return redirect(url_for("auth.kayit"))
-        if not re.match(r"^[\w]+$", username):
-            flash(
-                "Kullanıcı adı yalnızca harf, rakam ve alt çizgi içerebilir (boşluk kullanmayın).",
-                "danger",
-            )
+        if not USERNAME_RE.fullmatch(username):
+            flash(USERNAME_INVALID_MSG, "danger")
             return redirect(url_for("auth.kayit"))
         if not re.match(r"^[\w.+-]+@[\w-]+\.[\w.-]+$", email):
             flash("Geçerli bir e-posta adresi giriniz.", "danger")
@@ -108,8 +118,8 @@ def kayit():
         if User.query.filter_by(email=email).first():
             flash("Bu e-posta zaten kayıtlı!", "danger")
             return redirect(url_for("auth.kayit"))
-        if User.query.filter_by(username=username).first():
-            flash("Bu kullanıcı adı zaten alınmış!", "danger")
+        if _username_taken(username):
+            flash(USERNAME_TAKEN_MSG, "danger")
             return redirect(url_for("auth.kayit"))
 
         new_user = User(
