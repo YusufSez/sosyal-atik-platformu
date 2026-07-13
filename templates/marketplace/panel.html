@@ -1,149 +1,228 @@
 {% extends "layout.html" %}
 {% block content %}
+{% set origin_lat = current_user.latitude %}
+{% set origin_lng = current_user.longitude %}
+{% if (origin_lat is none or origin_lng is none) and mine %}
+  {% set origin_lat = mine[0].latitude %}
+  {% set origin_lng = mine[0].longitude %}
+{% endif %}
+{% set origin_lat = origin_lat if origin_lat is not none else 39.0 %}
+{% set origin_lng = origin_lng if origin_lng is not none else 35.0 %}
+
 <div class="content-section fade-in mp-b2b">
   {% include "marketplace/_nav.html" %}
 
-  <div class="mp-b2b-hero mb-4">
+  <div class="mp-b2b-hero mb-3">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
       <div>
         <p class="mp-b2b-kicker mb-1">Kurumsal Kaynak Pazarı</p>
         <h2 class="mp-b2b-title mb-2">B2B Kaynak Platformu</h2>
         <p class="mp-b2b-lead mb-0">
-          Teklif · rezervasyon · anlaşma · teslim · puanlama · mesajlaşma · AI eşleştirme
+          Filtrele · eşleştir · yakındaki kurumlar · AI skor · işlem geçmişi
         </p>
       </div>
-      <a href="{{ url_for('marketplace.create') }}" class="btn btn-success btn-lg">
+      <a href="{{ url_for('marketplace.create') }}" class="btn btn-success">
         <i class="bi bi-plus-lg me-1"></i>Kaynak Yayınla
       </a>
     </div>
   </div>
 
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-      <div class="mp-stat">
-        <div class="mp-stat-value">{{ published|length }}</div>
-        <div class="mp-stat-label">Açık ilan</div>
+  <div class="mp-filter-bar mb-4" id="mpFilters">
+    <div class="mp-filter-label">Filtreler</div>
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="mpFilterKategori">Kategori</label>
+        <select id="mpFilterKategori" class="form-select form-select-sm">
+          <option value="">Tümü</option>
+          {% for k in kategoriler %}
+          <option value="{{ k }}">{{ k }}</option>
+          {% endfor %}
+        </select>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="mp-stat">
-        <div class="mp-stat-value">{{ suppliers_preview|length }}+</div>
-        <div class="mp-stat-label">Tedarikçi</div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="mpFilterMesafe">Mesafe</label>
+        <select id="mpFilterMesafe" class="form-select form-select-sm">
+          <option value="">Tümü</option>
+          <option value="10">≤ 10 km</option>
+          <option value="25">≤ 25 km</option>
+          <option value="50" selected>≤ 50 km</option>
+          <option value="100">≤ 100 km</option>
+        </select>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="mp-stat">
-        <div class="mp-stat-value">{{ price_ozet.toplam_teslim }}</div>
-        <div class="mp-stat-label">Teslim</div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="mpFilterMalzeme">Malzeme</label>
+        <select id="mpFilterMalzeme" class="form-select form-select-sm">
+          <option value="">Tümü</option>
+        </select>
       </div>
-    </div>
-    <div class="col-6 col-md-3">
-      <div class="mp-stat">
-        <div class="mp-stat-value">{{ price_ozet.kategori_sayisi }}</div>
-        <div class="mp-stat-label">Kategori</div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1" for="mpFilterDurum">Durum</label>
+        <select id="mpFilterDurum" class="form-select form-select-sm">
+          <option value="">Tümü</option>
+          <option value="yayinda" selected>Yayında</option>
+          <option value="rezerve">Rezerve</option>
+          <option value="anlasildi">Anlaşıldı</option>
+          <option value="teslim">Teslim</option>
+        </select>
       </div>
     </div>
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-md-4">
-      <a class="mp-quick-link" href="{{ url_for('marketplace.talep_havuzu') }}">
-        <span class="mp-quick-title">Talep Havuzu</span>
-        <span class="mp-quick-sub">{{ pool_preview|length }} aktif talep</span>
-      </a>
+    <div class="col-lg-8">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mp-section-title mb-0">Kaynak kartları</h6>
+        <span class="small text-muted" id="mpCardCount">—</span>
+      </div>
+      <div class="row g-3" id="mpListingCards">
+        <div class="col-12"><div class="mp-empty text-muted">Yükleniyor…</div></div>
+      </div>
     </div>
-    <div class="col-md-4">
-      <a class="mp-quick-link" href="{{ url_for('marketplace.eslesmeler') }}">
-        <span class="mp-quick-title">En uygun eşleşmeler</span>
-        <span class="mp-quick-sub">AI skorlu eşleştirme</span>
-      </a>
-    </div>
-    <div class="col-md-4">
-      <a class="mp-quick-link" href="{{ url_for('marketplace.ai_aciklama') }}">
-        <span class="mp-quick-title">AI açıklaması</span>
-        <span class="mp-quick-sub">Gemini / kural motoru</span>
-      </a>
+
+    <div class="col-lg-4">
+      <aside class="mp-ai-panel" id="mpAiPanel">
+        <div class="mp-ai-panel-head">
+          <span><i class="bi bi-robot me-2"></i>AI neden eşleşti?</span>
+          <span class="badge text-bg-secondary" id="mpAiSource">—</span>
+        </div>
+        <p class="mp-ai-explain" id="mpAiExplain">Bir kaynak kartı seçin; eşleşme gerekçesi burada açılır.</p>
+
+        <div class="mp-ai-metric">
+          <div class="mp-ai-metric-top">
+            <span>Kategori uyumu</span>
+            <strong id="mpAiKatVal">—</strong>
+          </div>
+          <div class="mp-bar"><i id="mpAiKatBar" style="width:0%"></i></div>
+        </div>
+        <div class="mp-ai-metric">
+          <div class="mp-ai-metric-top">
+            <span>Mesafe</span>
+            <strong id="mpAiMesVal">—</strong>
+          </div>
+          <div class="mp-bar"><i id="mpAiMesBar" style="width:0%"></i></div>
+        </div>
+        <div class="mp-ai-metric">
+          <div class="mp-ai-metric-top">
+            <span>Geçmiş puan</span>
+            <strong id="mpAiPuanVal">—</strong>
+          </div>
+          <div class="mp-bar"><i id="mpAiPuanBar" style="width:0%"></i></div>
+        </div>
+        <div class="mp-ai-metric">
+          <div class="mp-ai-metric-top">
+            <span>Aktivite</span>
+            <strong id="mpAiAktVal">—</strong>
+          </div>
+          <div class="mp-bar"><i id="mpAiAktBar" style="width:0%"></i></div>
+        </div>
+
+        <div class="mp-ai-reasons" id="mpAiReasons"></div>
+        <a href="{{ url_for('marketplace.eslesmeler') }}" class="btn btn-sm btn-outline-success w-100 mt-3" id="mpAiDeepLink">
+          Tüm eşleşmeler →
+        </a>
+      </aside>
     </div>
   </div>
 
-  <div class="mp-map-shell mb-4">
+  <div class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="mp-map-shell">
+        <div class="mp-section-head">
+          <h5 class="mb-0">Harita</h5>
+          <a href="{{ url_for('marketplace.yakin_kurumlar') }}" class="small">Yakın kurumlar →</a>
+        </div>
+        <div id="marketplaceMap" class="map-container map-container-tall"></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="mp-nearby-panel h-100">
+        <div class="mp-section-head">
+          <h5 class="mb-0">Yakındaki kurumlar</h5>
+        </div>
+        <div class="mp-nearby-body" id="mpNearbyList">
+          <p class="text-muted small mb-0">Kart seçince yakındaki kurumlar listelenir.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mp-timeline-shell">
     <div class="mp-section-head">
-      <h5 class="mb-0">Canlı harita</h5>
-      <a href="{{ url_for('marketplace.yakin_kurumlar') }}" class="small">Yakın kurumlar →</a>
+      <h5 class="mb-0">İşlem geçmişi</h5>
+      <a href="{{ url_for('marketplace.gecmis') }}" class="small">Tümü →</a>
     </div>
-    <div id="marketplaceMap" class="map-container map-container-tall"></div>
-  </div>
-
-  <div class="row g-4">
-    <div class="col-lg-7">
-      <div class="mp-section-head">
-        <h5 class="mb-0">Açık ilanlar</h5>
-        <a href="{{ url_for('marketplace.talep_havuzu') }}" class="small">Tümü →</a>
-      </div>
-      {% for item in published[:8] %}
-      <article class="mp-listing-row">
-        <div>
-          <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}" class="mp-listing-title">
-            {{ item.baslik }}
-          </a>
-          <div class="small text-muted">{{ item.kategori }} · {{ item.il or '—' }} / {{ item.ilce or '—' }}</div>
-        </div>
-        <span class="badge text-bg-success">{{ item.durum }}</span>
-      </article>
-      {% else %}
-      <p class="text-muted">Henüz açık kurumsal ilan yok.</p>
-      {% endfor %}
-    </div>
-
-    <div class="col-lg-5">
-      <div class="mp-side-block mb-3">
-        <h6>İlanlarım</h6>
-        <ul class="list-unstyled mb-0">
-          {% for item in mine[:6] %}
-          <li class="d-flex justify-content-between py-1">
-            <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}">{{ item.baslik }}</a>
-            <span class="badge text-bg-secondary">{{ item.durum }}</span>
-          </li>
-          {% else %}
-          <li class="text-muted">Henüz ilan yok.</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="mp-side-block mb-3">
-        <h6>Tekliflerim</h6>
-        <ul class="list-unstyled mb-0">
-          {% for o in offers[:6] %}
-          <li class="d-flex justify-content-between py-1">
-            <a href="{{ url_for('marketplace.detail', listing_id=o.listing_id) }}">#{{ o.listing_id }}</a>
-            <span class="badge text-bg-info">{{ o.durum }}</span>
-          </li>
-          {% else %}
-          <li class="text-muted">Teklif yok.</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="mp-side-block">
-        <div class="d-flex justify-content-between">
-          <h6>Son işlemler</h6>
-          <a href="{{ url_for('marketplace.gecmis') }}" class="small">Geçmiş →</a>
-        </div>
-        <ul class="list-unstyled mb-0">
-          {% for e in history[:8] %}
-          <li class="small py-1">
+    <div class="mp-timeline" id="mpTimeline">
+      {% for e in history[:12] %}
+      <div class="mp-timeline-item">
+        <div class="mp-timeline-dot"></div>
+        <div class="mp-timeline-card">
+          <div class="d-flex flex-wrap justify-content-between gap-2">
             <span class="badge text-bg-light border">{{ e.action }}</span>
-            {{ e.detail or '' }}
-          </li>
-          {% else %}
-          <li class="text-muted">Kayıt yok.</li>
-          {% endfor %}
-        </ul>
+            <small class="text-muted">{{ e.created_at }}</small>
+          </div>
+          <div class="mp-timeline-detail">{{ e.detail or 'İşlem kaydı' }}</div>
+          <div class="small text-muted">İlan #{{ e.listing_id }}{% if e.offer_id %} · Teklif #{{ e.offer_id }}{% endif %}</div>
+        </div>
       </div>
+      {% else %}
+      <p class="text-muted px-3 py-3 mb-0">Henüz işlem kaydı yok.</p>
+      {% endfor %}
     </div>
   </div>
 </div>
 
+{% set listing_rows = [] %}
+<script type="application/json" id="marketplace-listings-data">[
+{%- for item in published -%}
+  {
+    "id": {{ item.id }},
+    "baslik": {{ item.baslik|tojson }},
+    "kategori": {{ item.kategori|tojson }},
+    "birim": {{ (item.birim or 'adet')|tojson }},
+    "miktar": {% if item.miktar is not none %}{{ item.miktar }}{% else %}null{% endif %},
+    "durum": {{ item.durum|tojson }},
+    "il": {{ (item.il or '')|tojson }},
+    "ilce": {{ (item.ilce or '')|tojson }},
+    "lat": {{ item.latitude }},
+    "lng": {{ item.longitude }},
+    "firma": {{ (
+      ((item.publisher.ad or '') ~ ' ' ~ (item.publisher.soyad or ''))|trim
+      if item.publisher and (item.publisher.ad or item.publisher.soyad)
+      else (item.publisher.username if item.publisher else 'Firma')
+    )|tojson }}
+  }{% if not loop.last or mine %},{% endif %}
+{%- endfor -%}
+{%- for item in mine -%}
+  {
+    "id": {{ item.id }},
+    "baslik": {{ item.baslik|tojson }},
+    "kategori": {{ item.kategori|tojson }},
+    "birim": {{ (item.birim or 'adet')|tojson }},
+    "miktar": {% if item.miktar is not none %}{{ item.miktar }}{% else %}null{% endif %},
+    "durum": {{ item.durum|tojson }},
+    "il": {{ (item.il or '')|tojson }},
+    "ilce": {{ (item.ilce or '')|tojson }},
+    "lat": {{ item.latitude }},
+    "lng": {{ item.longitude }},
+    "firma": {{ (
+      ((item.publisher.ad or '') ~ ' ' ~ (item.publisher.soyad or ''))|trim
+      if item.publisher and (item.publisher.ad or item.publisher.soyad)
+      else (item.publisher.username if item.publisher else 'Firma')
+    )|tojson }}
+  }{% if not loop.last %},{% endif %}
+{%- endfor -%}
+]</script>
+<script type="application/json" id="marketplace-panel-config">{{ {
+  'origin': {'lat': origin_lat, 'lng': origin_lng},
+  'matchesUrlTpl': url_for('marketplace.api_matches', listing_id=999001),
+  'nearbyUrlTpl': url_for('marketplace.api_nearby', listing_id=999001),
+  'eslesmelerUrl': url_for('marketplace.eslesmeler'),
+  'detailUrlTpl': url_for('marketplace.detail', listing_id=999001)
+}|tojson }}</script>
+<script type="application/json" id="marketplace-map-config">{{ {'points': map_points}|tojson }}</script>
+
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=false) }}
-<script type="application/json" id="marketplace-map-config">{{ {'points': map_points}|tojson }}</script>
 <script src="{{ url_for('static', filename='js/marketplace-map.js') }}"></script>
+<script src="{{ url_for('static', filename='js/marketplace-panel.js') }}"></script>
 {% endblock %}
