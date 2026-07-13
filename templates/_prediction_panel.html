@@ -1,67 +1,302 @@
-<div class="card shadow-sm mb-4" id="predictionPanel">
-  <div class="card-header fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span><i class="bi bi-graph-up-arrow me-2"></i>AI Prediction Engine</span>
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      <label class="small text-muted mb-0">Analiz penceresi</label>
-      <select id="predictionLookback" class="form-select form-select-sm" style="width:auto">
-        <option value="12" selected>Son 12 ay</option>
-        <option value="24">Son 24 ay</option>
-        <option value="36">Son 36 ay</option>
-      </select>
+<div class="pred-dash belediye-ops-center mb-4" id="predictionPanel">
+  <div class="ops-hero mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="ops-kicker mb-1">AtıkPort · Prediction</p>
+        <h2 class="ops-title mb-1">AI Prediction Engine</h2>
+        <div class="ops-updated small">Geçmiş · tahmin · güven bandı · risk · AI yorum</div>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <label class="small text-muted mb-0" for="predictionLookback">Analiz penceresi</label>
+        <select id="predictionLookback" class="form-select form-select-sm" style="width:auto">
+          <option value="12" selected>Son 12 ay</option>
+          <option value="24">Son 24 ay</option>
+          <option value="36">Son 36 ay</option>
+        </select>
+      </div>
     </div>
   </div>
-  <div class="card-body">
-    <p class="small text-muted mb-3">
-      Atık · kategori artışı · teslim · katılım · CO₂ · 7 gün / 30 gün / 90 gün / 6 ay / 12 ay ·
-      güven aralığı · trend · risk · AI yorumu
-    </p>
 
-    <div class="d-flex flex-wrap gap-2 mb-3" id="predictionHorizonTabs" role="tablist">
-      <button type="button" class="btn btn-sm btn-success" data-horizon="7">7 gün</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-horizon="30">30 gün</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-horizon="90">90 gün</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-horizon="180">6 ay</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-horizon="365">12 ay</button>
+  <h6 class="ops-section-title">Tahmin ufku</h6>
+  <div class="pred-tabs mb-4" id="predictionHorizonTabs" role="tablist" aria-label="Tahmin ufku">
+    <button type="button" class="pred-tab is-active" data-horizon="7" role="tab" aria-selected="true">7 gün</button>
+    <button type="button" class="pred-tab" data-horizon="30" role="tab" aria-selected="false">30 gün</button>
+    <button type="button" class="pred-tab" data-horizon="90" role="tab" aria-selected="false">90 gün</button>
+    <button type="button" class="pred-tab" data-horizon="180" role="tab" aria-selected="false">6 ay</button>
+    <button type="button" class="pred-tab" data-horizon="365" role="tab" aria-selected="false">12 ay</button>
+  </div>
+
+  <h6 class="ops-section-title">Tahmin kartları</h6>
+  <div class="row g-3 mb-4 pred-equal" id="predictionMetricCards">
+    <div class="col-12"><div class="pred-metric-card text-muted">Yükleniyor…</div></div>
+  </div>
+
+  {# Masaüstü için gizli tablo — erişilebilirlik / test uyumu #}
+  <div class="visually-hidden" aria-hidden="true">
+    <table id="predictionMetricsTable">
+      <tbody id="predictionMetricsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="row g-3 align-items-stretch">
+    <div class="col-lg-8">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head">
+          <span><i class="bi bi-graph-up me-2"></i>Geçmiş · Tahmin · Confidence band</span>
+          <span class="badge text-bg-light border" id="predictionChartHorizonBadge">7 gün</span>
+        </div>
+        <div class="ops-panel-body">
+          <div class="pred-chart-wrap">
+            <canvas id="predictionHistoryChart"></canvas>
+          </div>
+          <div class="pred-chart-legend small text-muted mt-2">
+            <span class="pred-leg"><i class="pred-leg-line"></i> Geçmiş</span>
+            <span class="pred-leg"><i class="pred-leg-dash"></i> Tahmin</span>
+            <span class="pred-leg"><i class="pred-leg-band"></i> Confidence band</span>
+          </div>
+        </div>
+      </div>
+      {# Gizli ikinci canvas — eski API uyumu #}
+      <canvas id="predictionForecastChart" class="d-none" height="1" width="1"></canvas>
     </div>
 
-    <div class="table-responsive mb-3 d-none d-md-block">
-      <table class="table table-sm align-middle mb-0" id="predictionMetricsTable">
-        <thead>
-          <tr>
-            <th>Metrik</th>
-            <th>Tahmin</th>
-            <th>Güven</th>
-            <th>Aralık</th>
-            <th>Trend</th>
-            <th>Risk</th>
-            <th>AI yorumu</th>
-          </tr>
-        </thead>
-        <tbody id="predictionMetricsBody">
-          <tr><td colspan="7" class="text-muted">Yükleniyor…</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="row g-3 mb-3 d-md-none" id="predictionMetricCards"></div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
-        <canvas id="predictionHistoryChart" height="220"></canvas>
+    <div class="col-lg-4">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head">
+          <span><i class="bi bi-robot me-2"></i>AI Tahmin Yorumu</span>
+          <span class="badge text-bg-secondary" id="predictionNarrativeSource">—</span>
+        </div>
+        <div class="ops-panel-body pred-ai-stack" id="predictionAiCards">
+          <article class="pred-ai-card">
+            <div class="pred-ai-kicker">Durum</div>
+            <p class="pred-ai-text mb-0 text-muted" id="predAiDurum">Yükleniyor…</p>
+          </article>
+          <article class="pred-ai-card pred-ai-risk">
+            <div class="pred-ai-kicker">Risk</div>
+            <p class="pred-ai-text mb-0 text-muted" id="predAiRisk">—</p>
+          </article>
+          <article class="pred-ai-card pred-ai-change">
+            <div class="pred-ai-kicker">Beklenen değişim</div>
+            <p class="pred-ai-text mb-0 text-muted" id="predAiChange">—</p>
+          </article>
+          <article class="pred-ai-card pred-ai-reco">
+            <div class="pred-ai-kicker">Öneri</div>
+            <p class="pred-ai-text mb-0 text-muted" id="predAiOneri">—</p>
+          </article>
+        </div>
+        <ul class="visually-hidden" id="predictionNarratives" aria-hidden="true"></ul>
       </div>
-      <div class="col-12 col-lg-6">
-        <canvas id="predictionForecastChart" height="220"></canvas>
-      </div>
-    </div>
-
-    <div class="border rounded p-3 bg-light-subtle">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <strong>AI Özet</strong>
-        <span class="badge bg-secondary" id="predictionNarrativeSource">—</span>
-      </div>
-      <ul class="mb-0 ps-3" id="predictionNarratives">
-        <li class="text-muted">Yükleniyor…</li>
-      </ul>
     </div>
   </div>
 </div>
+
+<style>
+.pred-dash.belediye-ops-center {
+  --ops-ink: #0f3d36;
+  --ops-accent: #0f766e;
+  --ops-soft: #e7f5f2;
+  --ops-line: rgba(15, 61, 54, 0.12);
+}
+[data-bs-theme="dark"] .pred-dash.belediye-ops-center {
+  --ops-ink: #e8f5f2;
+  --ops-accent: #2dd4bf;
+  --ops-soft: rgba(45, 212, 191, 0.1);
+  --ops-line: rgba(232, 245, 242, 0.14);
+}
+.pred-dash .ops-hero {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(45, 212, 191, 0.22), transparent 42%),
+    linear-gradient(135deg, var(--ops-soft), transparent 65%);
+  border: 1px solid var(--ops-line);
+  border-radius: 1.25rem;
+  padding: 1.15rem 1.35rem;
+}
+.pred-dash .ops-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ops-accent);
+}
+.pred-dash .ops-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ops-ink);
+  font-size: clamp(1.25rem, 2.2vw, 1.65rem);
+  margin: 0;
+}
+.pred-dash .ops-updated { color: var(--bs-secondary-color); }
+.pred-dash .ops-section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.65rem;
+}
+.pred-dash .ops-panel {
+  border: 1px solid var(--ops-line);
+  border-radius: 1rem;
+  background: var(--bs-body-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pred-dash .ops-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--ops-line);
+  font-weight: 700;
+  color: var(--ops-ink);
+}
+.pred-dash .ops-panel-body { padding: 1rem 1.1rem; flex: 1 1 auto; }
+
+.pred-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border: 1px solid var(--ops-line);
+  border-radius: 999px;
+  background: var(--ops-soft);
+}
+.pred-tab {
+  border: 0;
+  background: transparent;
+  color: var(--ops-ink);
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.pred-tab:hover { background: rgba(15, 118, 110, 0.1); }
+.pred-tab.is-active {
+  background: #0f766e;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+}
+
+.pred-equal > [class*="col-"] > * { height: 100%; }
+.pred-metric-card {
+  border: 1px solid var(--ops-line);
+  border-radius: 1rem;
+  padding: 1rem 1.05rem;
+  background: var(--bs-body-bg);
+  min-height: 9.5rem;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pred-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(15, 61, 54, 0.08);
+}
+.pred-metric-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.pred-metric-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #64748b;
+}
+.pred-metric-icon {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.pred-metric-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--ops-ink);
+  line-height: 1.2;
+  margin-bottom: 0.65rem;
+}
+.pred-metric-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: auto;
+  align-items: center;
+}
+.pred-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.pred-trend.up { color: #15803d; }
+.pred-trend.down { color: #b91c1c; }
+.pred-trend.flat { color: #64748b; }
+.pred-conf {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.08);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.pred-chart-wrap { position: relative; min-height: 320px; }
+.pred-chart-wrap canvas { width: 100% !important; max-height: 360px; }
+.pred-chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; }
+.pred-leg { display: inline-flex; align-items: center; gap: 0.4rem; }
+.pred-leg-line, .pred-leg-dash, .pred-leg-band {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0.2rem;
+  border-radius: 2px;
+}
+.pred-leg-line { background: #0f766e; }
+.pred-leg-dash {
+  background: repeating-linear-gradient(90deg, #0369a1 0 6px, transparent 6px 10px);
+  height: 0.22rem;
+}
+.pred-leg-band { background: rgba(15, 118, 110, 0.25); height: 0.7rem; border-radius: 3px; }
+
+.pred-ai-stack { display: flex; flex-direction: column; gap: 0.75rem; }
+.pred-ai-card {
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(160deg, #f0fdfa 0%, #fff 70%);
+  min-height: 5.2rem;
+}
+.pred-ai-risk { background: linear-gradient(160deg, #fff7ed 0%, #fff 70%); border-color: rgba(245, 158, 11, 0.22); }
+.pred-ai-change { background: linear-gradient(160deg, #eff6ff 0%, #fff 70%); border-color: rgba(59, 130, 246, 0.2); }
+.pred-ai-reco { background: linear-gradient(160deg, #ecfdf5 0%, #fff 70%); border-color: rgba(16, 185, 129, 0.22); }
+.pred-ai-kicker {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+.pred-ai-text {
+  font-size: 0.88rem;
+  color: #134e4a;
+  line-height: 1.45;
+}
+
+@media (max-width: 991.98px) {
+  .pred-tabs { border-radius: 1rem; }
+  .pred-chart-wrap { min-height: 260px; }
+}
+</style>
