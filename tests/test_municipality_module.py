@@ -18,6 +18,7 @@ from services.municipality_analytics import (
     kategori_analizi,
     mahalle_analizi,
     municipality_dashboard,
+    municipality_ops_center,
     normalize_municipality_category,
 )
 from utils import utc_now
@@ -165,8 +166,10 @@ def test_municipality_dashboard_allowed_for_municipality_role(client, municipali
     resp = client.get("/belediye/dashboard")
     assert resp.status_code == 200
     text = resp.data.decode("utf-8", errors="ignore")
-    assert "Belediye Yönetim Paneli" in text
-    assert "Bugünkü İlan" in text
+    assert "Operasyon Merkezi" in text or "Belediye" in text
+    assert "Bugün açılan ilanlar" in text
+    assert "AI Belediye Asistanı" in text
+    assert "Son aktiviteler" in text
 
 
 def test_municipality_dashboard_allowed_for_admin(client, municipality_data):
@@ -207,6 +210,26 @@ def test_dashboard_metrics(app, municipality_data):
         assert ozet["aktif_kurum"] >= 1
         assert ozet["gunluk_kullanici"] >= 1
         assert ozet["bugun_ilan"] >= 2
+
+
+def test_ops_center_cards(app, municipality_data):
+    with app.app_context():
+        ops = municipality_ops_center(il="Sakarya")
+        assert "ozet" in ops
+        cards = ops["cards"]
+        for key in (
+            "bugun_acilan",
+            "bekleyen_teslimler",
+            "son_24_saat",
+            "en_yogun_mahalle",
+            "riskli_bolgeler",
+            "kritik_kategori",
+            "vatandas_katilimi",
+            "ai_uyarilari",
+        ):
+            assert key in cards
+        assert isinstance(ops["aktiviteler"], list)
+        assert cards["bugun_acilan"] == ops["ozet"]["bugun_ilan"]
 
 
 def test_mahalle_analizi_cascade(app, municipality_data):

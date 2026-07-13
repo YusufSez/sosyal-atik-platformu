@@ -13,6 +13,7 @@ from services.municipality_analytics import (
     kategori_analizi,
     mahalle_analizi,
     municipality_dashboard,
+    municipality_ops_center,
 )
 from services.sustainability_ai import generate_sustainability_suggestions
 from services.sustainability_pdf import export_sustainability_pdf
@@ -52,11 +53,15 @@ def _geo_context(**extra):
 @municipality_required
 def dashboard():
     filters = _filters_from_request()
-    ozet = municipality_dashboard(**filters)
+    ops = municipality_ops_center(**filters)
+    ozet = ops["ozet"]
+    with_ai = generate_municipality_insights(**filters)
     return render_template(
         "belediye/dashboard.html",
-        title="Belediye Dashboard",
+        title="Belediye Operasyon Merkezi",
         ozet=ozet,
+        ops=ops,
+        insights=with_ai.get("insights") or [],
         **_geo_context(),
     )
 

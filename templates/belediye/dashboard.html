@@ -1,61 +1,202 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="content-section fade-in">
+<div class="content-section fade-in belediye-ops">
   <div class="page-header mb-3">
-    <h3 class="fw-bold"><i class="bi bi-building-gear me-2"></i>Belediye Yönetim Paneli</h3>
-    <small class="text-muted">Bölgesel paylaşım, geri kazanım ve operasyon metrikleri</small>
+    <h3 class="fw-bold"><i class="bi bi-broadcast-pin me-2"></i>Belediye Operasyon Merkezi</h3>
+    <small class="text-muted">Canlı operasyon kartları · aktivite akışı · AI asistan</small>
   </div>
   {% include "belediye/_nav.html" %}
   {% include "belediye/_filters.html" %}
 
-  <div class="row g-3 mb-2">
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.bugun_ilan }}</h5><small class="text-muted">Bugünkü İlan</small>
+  {% set c = ops.cards %}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-plus-circle me-1"></i>Bugün açılan ilanlar</div>
+        <h4 class="mb-0 mt-1">{{ c.bugun_acilan }}</h4>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.toplam_aktif_ilan }}</h5><small class="text-muted">Toplam Aktif İlan</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-hourglass-split me-1"></i>Bekleyen teslimler</div>
+        <h4 class="mb-0 mt-1">{{ c.bekleyen_teslimler }}</h4>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.toplam_teslim }}</h5><small class="text-muted">Toplam Teslim</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-clock-history me-1"></i>Son 24 saat</div>
+        <h4 class="mb-0 mt-1">{{ c.son_24_saat.ilan }} <small class="fs-6 text-muted">ilan</small></h4>
+        <small class="text-muted">{{ c.son_24_saat.teslim }} teslim</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ "%.1f"|format(ozet.geri_kazanilan_atik_kg) }} kg</h5>
-        <small class="text-muted">Geri Kazanılan Atık</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-geo-alt me-1"></i>En yoğun mahalle</div>
+        {% if c.en_yogun_mahalle %}
+        <h5 class="mb-0 mt-1 text-truncate">{{ c.en_yogun_mahalle.bolge }}</h5>
+        <small class="text-muted">{{ c.en_yogun_mahalle.ilan_sayisi }} ilan</small>
+        {% else %}
+        <h5 class="mb-0 mt-1 text-muted">—</h5>
+        {% endif %}
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.geri_kazanilan_kaynak_adet }}</h5>
-        <small class="text-muted">Geri Kazanılan Kaynak</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-exclamation-triangle me-1"></i>Riskli bölgeler</div>
+        {% if c.riskli_bolgeler %}
+        <h5 class="mb-0 mt-1 text-truncate">{{ c.riskli_bolgeler[0].bolge }}</h5>
+        <small class="text-muted">{{ c.riskli_bolgeler|length }} bölge izleniyor</small>
+        {% else %}
+        <h5 class="mb-0 mt-1 text-muted">Risk yok</h5>
+        {% endif %}
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.gunluk_kullanici }}</h5><small class="text-muted">Günlük Kullanıcı</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-tags me-1"></i>Kritik kategori</div>
+        {% if c.kritik_kategori %}
+        <h5 class="mb-0 mt-1">{{ c.kritik_kategori.kategori }}</h5>
+        <small class="text-muted">
+          {% if c.kritik_kategori.degisim_yuzde %}
+          %{% if c.kritik_kategori.degisim_yuzde > 0 %}+{% endif %}{{ "%.0f"|format(c.kritik_kategori.degisim_yuzde) }}
+          {% else %}hacim öne çıkıyor{% endif %}
+        </small>
+        {% else %}
+        <h5 class="mb-0 mt-1 text-muted">—</h5>
+        {% endif %}
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ ozet.aktif_kurum }}</h5><small class="text-muted">Aktif Kurum</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-people me-1"></i>Vatandaş katılımı</div>
+        <h4 class="mb-0 mt-1">%{{ c.vatandas_katilimi.oran }}</h4>
+        <small class="text-muted">{{ c.vatandas_katilimi.gunluk }} / {{ c.vatandas_katilimi.toplam }} aktif</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{% if ozet.ortalama_teslim_gun is not none %}{{ ozet.ortalama_teslim_gun }} gün{% else %}—{% endif %}</h5>
-        <small class="text-muted">Ort. Teslim Süresi</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100 border-warning-subtle"><div class="card-body py-3">
+        <div class="ops-card-label"><i class="bi bi-robot me-1"></i>AI uyarıları</div>
+        <h4 class="mb-0 mt-1">{{ c.ai_uyarilari }}</h4>
+        <small class="text-muted">{{ c.yuksek_risk_ilan }} yüksek riskli ilan</small>
       </div></div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-activity me-2"></i>Son aktiviteler</span>
+          <span class="badge bg-light text-dark border">canlı</span>
+        </div>
+        <ul class="list-group list-group-flush ops-activity-list">
+          {% for a in ops.aktiviteler %}
+          <li class="list-group-item d-flex gap-3 align-items-start">
+            <span class="ops-activity-icon
+              {% if a.tip == 'teslim' %}bg-success-subtle text-success
+              {% elif a.tip == 'yuksek_risk' %}bg-danger-subtle text-danger
+              {% elif a.tip == 'yogunluk' %}bg-warning-subtle text-warning
+              {% else %}bg-primary-subtle text-primary{% endif %}">
+              {% if a.tip == 'teslim' %}<i class="bi bi-check2-circle"></i>
+              {% elif a.tip == 'yuksek_risk' %}<i class="bi bi-shield-exclamation"></i>
+              {% elif a.tip == 'yogunluk' %}<i class="bi bi-graph-up-arrow"></i>
+              {% else %}<i class="bi bi-file-earmark-plus"></i>{% endif %}
+            </span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="fw-semibold text-truncate">{{ a.baslik }}</div>
+              <small class="text-muted">
+                {% if a.tip == 'yeni_ilan' %}yeni ilan
+                {% elif a.tip == 'teslim' %}teslim
+                {% elif a.tip == 'yuksek_risk' %}yüksek risk
+                {% else %}yoğunluk artışı{% endif %}
+                {% if a.kategori %} · {{ a.kategori }}{% endif %}
+                {% if a.meta %} · {{ a.meta }}{% endif %}
+              </small>
+            </div>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted text-center py-4">Henüz aktivite kaydı yok.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm h-100 belediye-ai-panel border-0">
+        <div class="card-header fw-bold bg-transparent border-0 pt-3 pb-0">
+          🤖 AI Belediye Asistanı
+        </div>
+        <div class="card-body">
+          {% if insights %}
+            {% for tip in insights %}
+            <p class="belediye-ai-line mb-3{% if loop.last %} mb-0{% endif %}">{{ tip }}</p>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted mb-0">Şu an gösterilecek uyarı bulunmuyor.</p>
+          {% endif %}
+          <div class="mt-3">
+            <a class="btn btn-sm btn-outline-success"
+               href="{{ url_for('belediye.ai_asistan', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
+              Tüm analizler
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-header fw-bold small">Özet metrikler</div>
+        <div class="card-body py-2">
+          <div class="d-flex justify-content-between small py-1 border-bottom">
+            <span class="text-muted">Aktif ilan</span><strong>{{ ozet.toplam_aktif_ilan }}</strong>
+          </div>
+          <div class="d-flex justify-content-between small py-1 border-bottom">
+            <span class="text-muted">Toplam teslim</span><strong>{{ ozet.toplam_teslim }}</strong>
+          </div>
+          <div class="d-flex justify-content-between small py-1 border-bottom">
+            <span class="text-muted">Geri kazanılan atık</span><strong>{{ "%.1f"|format(ozet.geri_kazanilan_atik_kg) }} kg</strong>
+          </div>
+          <div class="d-flex justify-content-between small py-1">
+            <span class="text-muted">Ort. teslim süresi</span>
+            <strong>{% if ozet.ortalama_teslim_gun is not none %}{{ ozet.ortalama_teslim_gun }} gün{% else %}—{% endif %}</strong>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   {% include "_prediction_panel.html" %}
 </div>
+
+<style>
+.ops-card-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.ops-activity-list { max-height: 420px; overflow-y: auto; }
+.ops-activity-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.belediye-ai-panel {
+  background: linear-gradient(145deg, #ecfdf5 0%, #ffffff 55%, #f0fdfa 100%);
+  border: 1px solid rgba(15, 118, 110, 0.12) !important;
+}
+.belediye-ai-panel .card-header { color: #0f766e; }
+.belediye-ai-line {
+  color: #134e4a;
+  line-height: 1.5;
+  font-size: 0.95rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid #5eead4;
+}
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script type="application/json" id="prediction-panel-config">{{ {

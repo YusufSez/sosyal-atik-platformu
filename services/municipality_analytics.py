@@ -396,3 +396,202 @@ def weekly_category_deltas(il=None) -> list[dict]:
 def district_density_summary(il=None) -> list[dict]:
     """İlçe bazlı ilan yoğunluğu (AI bağlamı)."""
     return mahalle_analizi(il=il)[:10]
+
+
+def _count_since(model, geo, since, *, durum=None):
+    q = model.query.filter(model.tarih >= since)
+    if durum:
+        q = q.filter(model.ilan_durumu == durum)
+    return _join_user_filter(q, model, geo).count()
+
+
+def _rezerve_query(model, geo):
+    q = model.query.filter_by(ilan_durumu="Rezerve")
+    return _join_user_filter(q, model, geo)
+
+
+def _high_risk_query(model, geo, threshold: int = 60):
+    q = model.query.filter(
+        model.ai_risk_score.isnot(None),
+        model.ai_risk_score >= threshold,
+    )
+    return _join_user_filter(q, model, geo)
+
+
+def municipality_ops_center(il=None, ilce=None, mahalle=None) -> dict:
+    """
+    Belediye Operasyon Merkezi — kartlar, aktiviteler, risk özeti.
+    municipality_dashboard alanlarını bozmadan genişletir.
+    """
+    geo = _geo_filters(il, ilce, mahalle)
+    ozet = municipality_dashboard(il=il, ilce=ilce, mahalle=mahalle)
+    now = utc_now()
+    day0 = _day_start()
+    since_24h = now - timedelta(hours=24)
+
+    bugun_acilan = ozet["bugun_ilan"]
+    bekleyen = _rezerve_query(Kaynak, geo).count() + _rezerve_query(Atik, geo).count()
+    son_24_ilan = (
+        _count_since(Kaynak, geo, since_24h) + _count_since(Atik, geo, since_24h)
+    )
+    son_24_teslim = (
+        _count_since(Kaynak, geo, since_24h, durum="Teslim Edildi")
+        + _count_since(Atik, geo, since_24h, durum="Teslim Edildi")
+    )
+
+    bolgeler = mahalle_analizi(il=il, ilce=ilce, mahalle=mahalle)
+    en_yogun = bolgeler[0] if bolgeler else None
+
+    # Riskli bölgeler: yüksek ilan yoğunluğu veya riskli ilan içeren üst dilimler
+    riskli = []
+    for row in bolgeler[:5]:
+        if row["ilan_sayisi"] >= 3 or (en_yogun and row["bolge"] == en_yogun["bolge"]):
+            riskli.append({
+                "bolge": row["bolge"],
+                "ilan_sayisi": row["ilan_sayisi"],
+                "seviye": "yüksek" if row["ilan_sayisi"] >= max(5, (en_yogun or {}).get("ilan_sayisi", 0)) else "orta",
+            })
+    if not riskli and en_yogun:
+        riskli = [{"bolge": en_yogun["bolge"], "ilan_sayisi": en_yogun["ilan_sayisi"], "seviye": "orta"}]
+
+    # Kritik kategori: haftalık en yüksek artış veya en yüksek hacim
+    deltas = weekly_category_deltas(il=il)
+    kritik = None
+    if deltas:
+        by_growth = sorted(deltas, key=lambda d: -(d.get("degisim_yuzde") or 0))
+        candidate = by_growth[0]
+        if (candidate.get("degisim_yuzde") or 0) > 0 and (
+            (candidate.get("bu_hafta") or 0) + (candidate.get("onceki_hafta") or 0) > 0
+        ):
+            kritik = {
+                "kategori": candidate["kategori"],
+                "degisim_yuzde": candidate["degisim_yuzde"],
+                "bu_hafta": candidate["bu_hafta"],
+            }
+        else:
+            by_vol = sorted(deltas, key=lambda d: -(d.get("bu_hafta") or 0))
+            if by_vol[0].get("bu_hafta"):
+                kritik = {
+                    "kategori": by_vol[0]["kategori"],
+                    "degisim_yuzde": by_vol[0]["degisim_yuzde"],
+                    "bu_hafta": by_vol[0]["bu_hafta"],
+                }
+
+    high_risk = _high_risk_query(Kaynak, geo).count() + _high_risk_query(Atik, geo).count()
+    ai_uyari = high_risk
+    if kritik and (kritik.get("degisim_yuzde") or 0) >= 20:
+        ai_uyari += 1
+    if en_yogun and en_yogun.get("ilan_sayisi", 0) >= 5:
+        ai_uyari += 1
+
+    # Vatandaş katılımı: günlük aktif / bölge kullanıcıları
+    user_q = User.query.filter(
+        User.role.notin_(("admin", "superadmin", "ministry")),
+        User.is_deactivated.is_(False),
+    )
+    if geo:
+        user_q = user_q.filter(*geo)
+    toplam_vatandas = user_q.count()
+    katilim_pct = (
+        round(100.0 * ozet["gunluk_kullanici"] / toplam_vatandas, 1)
+        if toplam_vatandas
+        else 0.0
+    )
+
+    cards = {
+        "bugun_acilan": bugun_acilan,
+        "bekleyen_teslimler": bekleyen,
+        "son_24_saat": {"ilan": son_24_ilan, "teslim": son_24_teslim},
+        "en_yogun_mahalle": en_yogun,
+        "riskli_bolgeler": riskli[:3],
+        "kritik_kategori": kritik,
+        "vatandas_katilimi": {
+            "gunluk": ozet["gunluk_kullanici"],
+            "toplam": toplam_vatandas,
+            "oran": katilim_pct,
+        },
+        "ai_uyarilari": ai_uyari,
+        "yuksek_risk_ilan": high_risk,
+    }
+
+    aktiviteler = _recent_activities(geo, bolgeler, kritik, limit=12)
+
+    return {
+        "ozet": ozet,
+        "cards": cards,
+        "aktiviteler": aktiviteler,
+        "filtre": ozet.get("filtre") or {},
+    }
+
+
+def _recent_activities(geo, bolgeler, kritik, limit: int = 12) -> list[dict]:
+    """Son aktiviteler: yeni ilan, teslim, yüksek risk, yoğunluk artışı."""
+    items = []
+    now = utc_now()
+
+    for model, tur in ((Kaynak, "kaynak"), (Atik, "atik")):
+        q = model.query
+        if geo:
+            q = q.join(User, model.user_id == User.id).filter(*geo)
+        q = q.order_by(model.tarih.desc()).limit(8)
+        for row in q.all():
+            if row.ilan_durumu == "Teslim Edildi":
+                tip = "teslim"
+                baslik = f"Teslim: {row.baslik}"
+            else:
+                tip = "yeni_ilan"
+                baslik = f"Yeni ilan: {row.baslik}"
+            items.append({
+                "tip": tip,
+                "baslik": baslik,
+                "kategori": row.kategori,
+                "tur": tur,
+                "zaman": row.tarih,
+                "meta": row.ilan_durumu,
+            })
+            if row.ai_risk_score is not None and row.ai_risk_score >= 60:
+                items.append({
+                    "tip": "yuksek_risk",
+                    "baslik": f"Yüksek risk ({row.ai_risk_score}): {row.baslik}",
+                    "kategori": row.kategori,
+                    "tur": tur,
+                    "zaman": row.tarih,
+                    "meta": f"risk={row.ai_risk_score}",
+                })
+
+    if bolgeler:
+        top = bolgeler[0]
+        items.append({
+            "tip": "yogunluk",
+            "baslik": f"Yoğunluk artışı: {top['bolge']}",
+            "kategori": None,
+            "tur": "bolge",
+            "zaman": now,
+            "meta": f"{top['ilan_sayisi']} ilan",
+        })
+    if kritik and (kritik.get("degisim_yuzde") or 0) >= 15:
+        items.append({
+            "tip": "yogunluk",
+            "baslik": f"Kritik kategori: {kritik['kategori']} (%{kritik['degisim_yuzde']:.0f})",
+            "kategori": kritik["kategori"],
+            "tur": "kategori",
+            "zaman": now,
+            "meta": f"bu hafta {kritik.get('bu_hafta', 0)}",
+        })
+
+    # Zamanına göre sırala (None en sona)
+    def _key(a):
+        z = a.get("zaman")
+        return z or now.replace(year=1970)
+
+    items.sort(key=_key, reverse=True)
+    # Aynı başlığı tekrarsız tut
+    seen = set()
+    unique = []
+    for a in items:
+        key = (a["tip"], a["baslik"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(a)
+    return unique[:limit]
