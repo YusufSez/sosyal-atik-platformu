@@ -13,9 +13,12 @@ kurum_bp = Blueprint("kurum", __name__)
 
 
 def kurum_erisimi():
-    return current_user.is_authenticated and (
-        getattr(current_user, "is_kurum", False) or getattr(current_user, "is_admin", False)
-    )
+    if not current_user.is_authenticated:
+        return False
+    if getattr(current_user, "is_kurum", False) or getattr(current_user, "is_admin", False):
+        return True
+    role = getattr(current_user, "role", None)
+    return role == "institution"
 
 
 @kurum_bp.route("/kurum/analiz")

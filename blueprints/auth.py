@@ -22,6 +22,7 @@ from services.email_tokens import (
     verify_email_token,
     verify_reset_token,
 )
+from services.portal_redirect import post_login_url
 from services.user_moderation import is_user_banned
 from utils import (
     delete_profile_picture,
@@ -189,7 +190,7 @@ def profil_tamamla():
 @limiter.limit(RATE_LOGIN, methods=["POST"])
 def giris():
     if current_user.is_authenticated:
-        return redirect(url_for("main.anasayfa"))
+        return redirect(post_login_url(current_user))
 
     if request.method == "POST":
         captcha_err = captcha_hatasi()
@@ -235,7 +236,7 @@ def giris():
         user.last_login_at = utc_now()
         db.session.commit()
         flash("Giriş başarılı! Hoş geldiniz, " + user.username + "!", "success")
-        return redirect(url_for("main.anasayfa"))
+        return redirect(post_login_url(user))
 
     return render_template("login.html", title="Giriş Yap", ban_notice=session.pop("ban_notice", None))
 
