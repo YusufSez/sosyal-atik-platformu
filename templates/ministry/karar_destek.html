@@ -282,9 +282,10 @@
 <script type="application/json" id="ds-center-config">{{ {
   'participation': center.participation_trends,
   'category': center.category_shifts.chart,
-  'compare': center.municipality_comparisons.chart
+  'compare': center.municipality_comparisons.chart,
+  'demoSource': center.get('source') == 'demo'
 }|tojson }}</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chart.js/4.4.1/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/decision-support.js') }}"></script>
 <style>

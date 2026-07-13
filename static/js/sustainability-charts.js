@@ -10,22 +10,39 @@
 
   var UI = window.AtikPortUI || null;
   if (UI && UI.applyChartTheme) UI.applyChartTheme();
-  var DEMO = (UI && UI.DEMO) || {};
+  var demoSource = !!cfg.demoSource;
   var radar = cfg.radar || {};
   var history = cfg.history || {};
   var accent = "#0f766e";
+
+  function seriesFilled(labels, values) {
+    return (
+      Array.isArray(labels) &&
+      labels.length > 0 &&
+      Array.isArray(values) &&
+      values.length > 0 &&
+      values.some(function (v) {
+        return v != null && v !== "" && !isNaN(Number(v));
+      })
+    );
+  }
 
   var radarCanvas = document.getElementById("sustainabilityRadarChart");
   if (radarCanvas) {
     var labels = radar.labels || [];
     var values = radar.values || [];
-    var demo = !labels.length || !(UI && UI.hasNumericSeries(values));
-    if (demo) {
-      labels = (DEMO.radar && DEMO.radar.labels) || labels;
-      values = (DEMO.radar && DEMO.radar.values) || values;
-      if (UI) UI.markDemo(radarCanvas, true);
-    }
-    if (labels.length) {
+    var hasRadar = seriesFilled(labels, values);
+    if (!hasRadar) {
+      if (!demoSource && UI) {
+        UI.mountEmpty(radarCanvas.parentElement, {
+          icon: "bi-radar",
+          title: "Bu metrik için yeterli veri oluşmamıştır.",
+          desc: "Radar görünümü kategori puanları oluşunca açılır.",
+        });
+        radarCanvas.classList.add("d-none");
+      }
+    } else {
+      if (UI) UI.markDemo(radarCanvas, demoSource);
       new Chart(radarCanvas, {
         type: "radar",
         data: {
@@ -55,27 +72,25 @@
           plugins: { legend: { display: false } },
         },
       });
-    } else if (UI) {
-      UI.mountEmpty(radarCanvas.parentElement, {
-        icon: "bi-radar",
-        title: "Bu metrik için yeterli veri oluşmamıştır.",
-        desc: "Radar görünümü kategori puanları oluşunca açılır.",
-      });
-      radarCanvas.classList.add("d-none");
     }
   }
 
   var histCanvas = document.getElementById("sustainabilityHistoryChart");
   if (histCanvas) {
     var hLabels = history.labels || [];
-    var hValues = history.puanlar || [];
-    var hDemo = !hLabels.length || !(UI && UI.hasNumericSeries(hValues));
-    if (hDemo) {
-      hLabels = (DEMO.history && DEMO.history.labels) || hLabels;
-      hValues = (DEMO.history && DEMO.history.values) || hValues;
-      if (UI) UI.markDemo(histCanvas, true);
-    }
-    if (hLabels.length) {
+    // Alias: puanlar (sustainability) | values (chart_demo_bundle)
+    var hValues = history.puanlar || history.values || [];
+    var hasHist = seriesFilled(hLabels, hValues);
+    if (!hasHist) {
+      if (!demoSource && UI) {
+        UI.mountEmpty(histCanvas.parentElement, {
+          icon: "bi-graph-up",
+          title: "Bu metrik için yeterli veri oluşmamıştır.",
+        });
+        histCanvas.classList.add("d-none");
+      }
+    } else {
+      if (UI) UI.markDemo(histCanvas, demoSource);
       new Chart(histCanvas, {
         type: "line",
         data: {
@@ -100,7 +115,7 @@
           plugins: {
             legend: { display: false },
             title: {
-              display: !hDemo && (!!history.change_pct || history.change_pct === 0),
+              display: !!history.change_pct || history.change_pct === 0,
               text:
                 "Trend: " +
                 (history.trend || "—") +
@@ -109,12 +124,6 @@
           },
         },
       });
-    } else if (UI) {
-      UI.mountEmpty(histCanvas.parentElement, {
-        icon: "bi-graph-up",
-        title: "Bu metrik için yeterli veri oluşmamıştır.",
-      });
-      histCanvas.classList.add("d-none");
     }
   }
 })();

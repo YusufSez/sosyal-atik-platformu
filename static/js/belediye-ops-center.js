@@ -20,7 +20,8 @@
       charts.trend ||
       charts.monthly_trend ||
       charts.teslim_history ||
-      charts.delivery_history)
+      charts.delivery_history ||
+      charts.radar)
   );
 
   function normalizeSeries(raw) {
@@ -471,6 +472,45 @@
             caption.textContent = "Teslim payı ≈ %" + pct;
           }
         }
+      }
+    }
+
+    // Radar — charts.radar (MASTER)
+    var radar = normalizeSeries(charts.radar);
+    var radarCanvas = document.getElementById("opsRadarChart");
+    if (radarCanvas) {
+      markChartEmpty(radarCanvas, !!(radar && radar.labels.length));
+      if (radar && radar.labels.length) {
+        if (UI) UI.markDemo(radarCanvas, !!demoSource);
+        new Chart(radarCanvas, {
+          type: "radar",
+          data: {
+            labels: radar.labels,
+            datasets: [
+              {
+                label: "Operasyon skoru",
+                data: radar.values,
+                borderColor: accent,
+                backgroundColor: "rgba(15, 118, 110, 0.18)",
+                pointBackgroundColor: accent,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+              r: {
+                min: 0,
+                max: 100,
+                ticks: { stepSize: 20, backdrop: false },
+                pointLabels: { font: { size: 11 } },
+              },
+            },
+            plugins: { legend: { display: false } },
+          },
+        });
       }
     }
   }

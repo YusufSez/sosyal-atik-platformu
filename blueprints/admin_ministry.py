@@ -101,6 +101,16 @@ def dashboard():
         tarih=filters["tarih"],
         belediye_tipi=filters["belediye_tipi"],
     )
+    prediction = None
+    if center.get("source") == "demo":
+        from services.prediction_ai import generate_prediction_report
+
+        prediction = generate_prediction_report(
+            lookback_months=12,
+            il=filters["il"],
+            ilce=filters["ilce"],
+            include_all_lookbacks=True,
+        )
     return render_template(
         "ministry/dashboard.html",
         title="Ulusal Yönetim Merkezi",
@@ -108,6 +118,7 @@ def dashboard():
         rankings=center["province_rankings"],
         map_data=center["map_data"],
         center=center,
+        prediction=prediction,
         **_page_context(),
     )
 

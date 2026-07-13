@@ -183,6 +183,8 @@ def test_ops_and_ministry_http_demo(client, app):
     assert (charts.get("category") or charts.get("waste_categories") or {}).get("labels")
     assert (charts.get("monthly_trend") or charts.get("trend") or {}).get("values")
     assert (charts.get("delivery_history") or charts.get("teslim_history") or {}).get("values")
+    assert (charts.get("radar") or {}).get("labels")
+    assert b"opsRadarChart" in dash.data
     pcfg = json.loads(
         re.search(r'id="prediction-panel-config">(.*?)</script>', html, re.S).group(1)
     )

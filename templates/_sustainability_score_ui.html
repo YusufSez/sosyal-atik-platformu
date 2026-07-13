@@ -562,8 +562,9 @@
 
 <script type="application/json" id="sustainability-chart-config">{{ {
   'radar': dash.radar or {},
-  'history': dash.history or {}
+  'history': dash.history or {},
+  'demoSource': (dash.get('source') == 'demo') if dash is defined else false
 }|tojson }}</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chart.js/4.4.1/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sustainability-charts.js') }}"></script>

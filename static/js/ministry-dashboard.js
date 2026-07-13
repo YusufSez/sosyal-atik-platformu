@@ -100,18 +100,22 @@
     var values = (rows || []).map(function (r) {
       return r.puan;
     });
-    var demo = !labels.length;
-    if (demo) {
-      labels = ((UI && UI.DEMO && UI.DEMO.bars && UI.DEMO.bars.labels) || []).slice();
-      values = ((UI && UI.DEMO && UI.DEMO.bars && UI.DEMO.bars.values) || []).slice();
-      if (!labels.length) {
-        if (UI) UI.markDemo(canvas, true);
-        return;
-      }
-      if (UI) UI.markDemo(canvas, true);
-    } else if (config.demoSource && UI) {
-      UI.markDemo(canvas, true);
+    // MASTER charts.bars — sunucu boş satır gelirse
+    if (!labels.length && config.charts && config.charts.bars) {
+      labels = (config.charts.bars.labels || []).slice();
+      values = (config.charts.bars.values || []).slice();
     }
+    if (!labels.length) {
+      // Demo açıkken empty-state yok; live'da boş bırak
+      if (!config.demoSource && UI && UI.wrapChartOrEmpty) {
+        UI.wrapChartOrEmpty(canvas, false, {
+          title: "Bu metrik için yeterli veri oluşmamıştır.",
+          compact: true,
+        });
+      }
+      return;
+    }
+    if (config.demoSource && UI) UI.markDemo(canvas, true);
     new Chart(canvas, {
       type: "bar",
       data: {

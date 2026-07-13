@@ -1092,6 +1092,7 @@ def sustainability_dashboard_overlay(*, il=None, ilce=None) -> dict:
         },
         "improving": [r for r in board if r["puan"] < 75][:5],
         "at_risk": [r for r in reversed(board) if r["puan"] < 70][:5],
+        "source": "demo",
     }
 
 
@@ -2302,6 +2303,7 @@ def chart_demo_bundle(*, il=None) -> dict:
                 _MONTH_LABELS_TR[int(a.split("-")[1]) - 1] for a in hist["labels"]
             ],
             "values": hist["puanlar"],
+            "puanlar": hist["puanlar"],
         },
         "bars": {
             "labels": [r["il"] for r in board[:5]],

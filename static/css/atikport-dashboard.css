@@ -193,14 +193,18 @@ html[data-bs-theme="dark"] .ds-hero {
 .ds-stat,
 .pred-metric-card,
 .ss-cat-card {
-  min-height: 9rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  min-height: 9.5rem !important;
+  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
   gap: 0.35rem;
   position: relative;
   overflow: hidden;
-  padding-left: 1.35rem !important;
+  padding: 1rem 0.85rem 1rem 1.15rem !important;
+  width: 100%;
 }
 
 .ops-kpi:hover,
@@ -264,7 +268,7 @@ html[data-bs-theme="dark"] .ds-hero {
   padding: 1.15rem 1.25rem !important;
 }
 
-/* KPI typography stack: icon → label → value → alt */
+/* KPI typography stack: icon → label → value → alt (ortalı) */
 .ops-kpi-icon,
 .pred-metric-icon,
 .ss-cat-icon {
@@ -273,7 +277,11 @@ html[data-bs-theme="dark"] .ds-hero {
   border-radius: 0.8rem !important;
   font-size: 1.15rem !important;
   flex-shrink: 0;
-  margin-bottom: 0.1rem;
+  margin: 0 auto 0.15rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  order: 0;
 }
 .ops-kpi-label,
 .pred-metric-label,
@@ -290,30 +298,40 @@ html[data-bs-theme="dark"] .ds-hero {
   text-overflow: ellipsis;
   max-width: 100%;
   order: 1;
+  text-align: center !important;
+  width: 100%;
 }
 .ops-kpi-sub,
 .pred-resource-sub {
   font-size: 0.78rem !important;
   color: var(--ap-muted) !important;
   order: 3;
-  margin-top: auto;
+  margin-top: 0.15rem !important;
+  text-align: center !important;
+  width: 100%;
 }
 .ops-kpi-value,
 .ds-stat-value,
 .pred-metric-value,
 .ss-rank-value,
 .ss-score {
-  font-size: clamp(1.55rem, 2.2vw, 2rem) !important;
+  font-size: clamp(1.35rem, 2vw, 1.75rem) !important;
   font-weight: 800 !important;
   letter-spacing: -0.03em !important;
   color: var(--ap-ink) !important;
-  line-height: 1.1 !important;
+  line-height: 1.2 !important;
   order: 2;
   margin-top: 0.1rem;
+  text-align: center !important;
+  width: 100%;
+  max-width: 100%;
 }
 .ops-kpi-body {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
   flex: 1;
   width: 100%;
   min-width: 0;

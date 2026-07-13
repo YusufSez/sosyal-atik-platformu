@@ -9,37 +9,37 @@
   }
   var UI = window.AtikPortUI || null;
   if (UI && UI.applyChartTheme) UI.applyChartTheme();
-  var DEMO = (UI && UI.DEMO) || {};
+  var demoSource = !!cfg.demoSource;
   var accent = "#0f766e";
   var amber = "#b45309";
 
-  function renderOrDemo(canvas, hasData, build) {
+  function drawOrSkip(canvas, hasData, build) {
     if (!canvas) return;
-    if (hasData) {
-      if (UI) UI.markDemo(canvas, false);
-      build(false);
+    if (!hasData) {
+      if (demoSource) return; // Demo'da empty-state yok; sunucu dolu gelmeli
+      if (UI && UI.wrapChartOrEmpty) {
+        UI.wrapChartOrEmpty(canvas, false, {
+          title: "Bu metrik için yeterli veri oluşmamıştır.",
+          compact: true,
+        });
+      }
       return;
     }
-    if (UI) UI.markDemo(canvas, true);
-    build(true);
+    if (UI) UI.markDemo(canvas, demoSource);
+    build();
   }
 
   var part = cfg.participation || {};
   var partCanvas = document.getElementById("dsParticipationChart");
-  renderOrDemo(partCanvas, (part.labels || []).length > 0, function (demo) {
-    if (!partCanvas) return;
+  drawOrSkip(partCanvas, (part.labels || []).length > 0, function () {
     new Chart(partCanvas, {
       type: "line",
       data: {
-        labels: demo
-          ? (DEMO.history && DEMO.history.labels) || ["Oca", "Şub", "Mar", "Nis", "May", "Haz"]
-          : part.labels,
+        labels: part.labels,
         datasets: [
           {
             label: "Aktif vatandaş",
-            data: demo
-              ? (DEMO.history && DEMO.history.values) || [54, 58, 61, 63, 67, 70]
-              : part.aktif || [],
+            data: part.aktif || [],
             borderColor: accent,
             backgroundColor: "rgba(15,118,110,.12)",
             fill: true,
@@ -47,7 +47,7 @@
           },
           {
             label: "İlan",
-            data: demo ? [40, 44, 42, 48, 51, 55] : part.ilanlar || [],
+            data: part.ilanlar || [],
             borderColor: amber,
             tension: 0.3,
           },
@@ -63,23 +63,20 @@
 
   var cat = cfg.category || {};
   var catCanvas = document.getElementById("dsCategoryChart");
-  renderOrDemo(catCanvas, (cat.labels || []).length > 0, function (demo) {
-    if (!catCanvas) return;
+  drawOrSkip(catCanvas, (cat.labels || []).length > 0, function () {
     new Chart(catCanvas, {
       type: "bar",
       data: {
-        labels: demo ? (DEMO.category && DEMO.category.labels) || [] : cat.labels,
+        labels: cat.labels,
         datasets: [
           {
             label: "Önceki dönem",
-            data: demo ? [20, 14, 12, 18, 10] : cat.previous || [],
+            data: cat.previous || [],
             backgroundColor: "rgba(148,163,184,.7)",
           },
           {
             label: "Son dönem",
-            data: demo
-              ? (DEMO.category && DEMO.category.values) || []
-              : cat.current || [],
+            data: cat.current || [],
             backgroundColor: accent,
           },
         ],
@@ -94,16 +91,15 @@
 
   var cmp = cfg.compare || {};
   var cmpCanvas = document.getElementById("dsCompareChart");
-  renderOrDemo(cmpCanvas, (cmp.labels || []).length > 0, function (demo) {
-    if (!cmpCanvas) return;
+  drawOrSkip(cmpCanvas, (cmp.labels || []).length > 0, function () {
     new Chart(cmpCanvas, {
       type: "bar",
       data: {
-        labels: demo ? (DEMO.bars && DEMO.bars.labels) || [] : cmp.labels,
+        labels: cmp.labels,
         datasets: [
           {
             label: "Performans puanı",
-            data: demo ? (DEMO.bars && DEMO.bars.values) || [] : cmp.puanlar || [],
+            data: cmp.puanlar || [],
             backgroundColor: accent,
           },
         ],
