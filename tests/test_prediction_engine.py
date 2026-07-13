@@ -13,6 +13,7 @@ from services.prediction_ai import generate_prediction_report
 from services.prediction_engine import (
     FORECAST_HORIZONS_DAYS,
     LOOKBACK_MONTHS,
+    METRIC_KEYS,
     _linear_regression,
     _predict_next_value,
     run_multi_lookback_forecast,
@@ -144,16 +145,26 @@ def test_statistical_forecast_structure(app, prediction_data):
         assert result["lookback_months"] == 12
         assert result["engine"] == "ols-trend"
         assert len(result["history"]) == 12
+        assert set(result["horizons_days"]) == {7, 30, 90, 180, 365}
         for days in FORECAST_HORIZONS_DAYS:
             block = result["forecasts"][str(days)]
-            assert "atik_miktari" in block
-            assert "kaynak_paylasimi" in block
-            assert "teslim_orani" in block
-            assert "en_yogun_kategori" in block
-            assert block["atik_miktari"]["predicted"] >= 0
+            for key in METRIC_KEYS:
+                assert key in block
+                m = block[key]
+                assert m["predicted"] is not None
+                assert "confidence_pct" in m
+                assert "confidence_interval" in m
+                assert m["trend"] in ("yukselis", "dusus", "stabil")
+                assert m["risk"] in ("dusuk", "orta", "yuksek")
             assert 0 <= block["teslim_orani"]["predicted"] <= 100
+            assert 0 <= block["katilim"]["predicted"] <= 100
+            assert block["atik_miktari"]["predicted"] >= 0
+            assert block["co2"]["predicted"] >= 0
         assert "labels" in result["chart"]
         assert "forecast_atik" in result["chart"]
+        assert "forecast_co2" in result["chart"]
+        assert "forecast_katilim" in result["chart"]
+        assert len(result["chart"]["horizon_labels"]) == 5
 
 
 def test_multi_lookback(app, prediction_data):
@@ -162,13 +173,13 @@ def test_multi_lookback(app, prediction_data):
         for m in LOOKBACK_MONTHS:
             assert str(m) in multi["lookbacks"]
         assert multi["primary"]["lookback_months"] == 12
+        assert multi["horizons_days"] == list(FORECAST_HORIZONS_DAYS)
 
 
 def test_forecast_detects_growth_trend(app, prediction_data):
     with app.app_context():
         result = run_statistical_forecast(12, il="Sakarya", now=FIXED_NOW)
         kaynak_30 = result["forecasts"]["30"]["kaynak_paylasimi"]
-        # Artan seride change_pct pozitif veya predicted > 0 olmalı
         assert kaynak_30["predicted"] > 0
         assert kaynak_30["change_pct"] >= 0
 
@@ -176,8 +187,8 @@ def test_forecast_detects_growth_trend(app, prediction_data):
 def test_top_category_prediction(app, prediction_data):
     with app.app_context():
         result = run_statistical_forecast(12, il="Sakarya", now=FIXED_NOW)
-        kat = result["forecasts"]["30"]["en_yogun_kategori"]
-        assert kat["en_yogun_kategori"] in (
+        kat = result["forecasts"]["30"]["kategori_artisi"]
+        assert kat["kategori"] in (
             "Elektronik",
             "Plastik",
             "Diğer",
@@ -186,6 +197,9 @@ def test_top_category_prediction(app, prediction_data):
             "Organik",
             "Bitkisel Yağ",
         )
+        assert "confidence_pct" in kat
+        alias = result["forecasts"]["30"]["en_yogun_kategori"]
+        assert alias["en_yogun_kategori"]
 
 
 # --- AI narratives ---
@@ -200,7 +214,10 @@ def test_prediction_report_rule_based(app, prediction_data):
                 )
         assert report["narrative_source"] == "rules"
         assert len(report["narratives"]) >= 1
-        assert any("beklenmektedir" in n or "öngörülmektedir" in n for n in report["narratives"])
+        primary = report["primary"]
+        sample = primary["forecasts"]["30"]["atik_miktari"]
+        assert sample["ai_yorum"]
+        assert "güven" in sample["ai_yorum"].lower() or "Güven" in sample["ai_yorum"] or "%" in sample["ai_yorum"]
         assert "primary" in report
         assert "lookbacks" in report
 
@@ -217,7 +234,12 @@ def test_belediye_predictions_api(client, prediction_data):
     data = resp.get_json()
     assert "narratives" in data
     assert "primary" in data
-    assert data["primary"]["forecasts"]["30"]["atik_miktari"]["predicted"] >= 0
+    f30 = data["primary"]["forecasts"]["30"]
+    assert f30["atik_miktari"]["predicted"] >= 0
+    assert "katilim" in f30
+    assert "co2" in f30
+    assert "180" in data["primary"]["forecasts"]
+    assert "365" in data["primary"]["forecasts"]
 
 
 def test_minister_predictions_api(client, prediction_data):
