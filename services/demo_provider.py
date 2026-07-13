@@ -1004,8 +1004,9 @@ def decision_support_center() -> dict:
     """Ulusal karar destek — MASTER_DATASET agregasyonu."""
     board = national_leaderboard()
     now = utc_now()
-    total_ilan = sum(MASTER_DATASET[c]["dashboard"]["toplam_aktif_ilan"] for c in MASTER_DATASET)
-    total_co2 = sum(MASTER_DATASET[c]["co2_ton"] for c in MASTER_DATASET)
+    nat = ministry_kpi()
+    total_ilan = nat["toplam_ilan"]
+    total_co2 = nat["co2_tasarrufu_kg"] / 1000.0
     cats = {k: 0.0 for k in CATEGORY_KEYS}
     for city, pkg in MASTER_DATASET.items():
         w = pkg["dashboard"]["toplam_aktif_ilan"]
@@ -1025,17 +1026,25 @@ def decision_support_center() -> dict:
     return {
         "generated_at": now.isoformat(),
         "kpi": {
-            "aktif_belediye": len(MASTER_DATASET),
+            "aktif_belediye": nat["aktif_belediye"],
             "toplam_ilan": total_ilan,
             "co2_ton": round(total_co2, 1),
             "ortalama_puan": round(sum(r["puan"] for r in board) / len(board), 1),
         },
         "weekly_report": {
-            "metrics": {"ilan": int(total_ilan * 0.02), "atik_kg": 12000, "co2e_kg": total_co2 * 20},
+            "metrics": {
+                "ilan": int(total_ilan * 0.02),
+                "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.08, 1),
+                "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.08, 1),
+            },
             "change_pct": {"ilan": 6.2, "atik_kg": 4.1, "co2e_kg": 5.5},
         },
         "monthly_report": {
-            "metrics": {"ilan": int(total_ilan * 0.08), "atik_kg": 52000, "co2e_kg": total_co2 * 80},
+            "metrics": {
+                "ilan": int(total_ilan * 0.08),
+                "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.25, 1),
+                "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.25, 1),
+            },
             "change_pct": {"ilan": 8.4, "atik_kg": 5.2, "co2e_kg": 7.1},
         },
         "risk_analysis": {
@@ -1086,6 +1095,245 @@ def decision_support_center() -> dict:
             "source": "demo",
         },
         "ai_source": "demo",
+    }
+
+
+def ministry_kpi(*, il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
+    """Türkiye özeti — 15 il MASTER agregasyonu."""
+    cities = [_norm_city(il)] if il else list(MASTER_DATASET.keys())
+    total_ilan = 0
+    total_geri = 0.0
+    total_co2 = 0.0
+    total_energy = 0.0
+    total_water_ton = 0.0
+    total_pop = 0
+    weighted_katilim = 0.0
+    etki = 0
+    for city in cities:
+        if city not in MASTER_DATASET:
+            continue
+        pkg = MASTER_DATASET[city]
+        d = pkg["dashboard"]
+        total_ilan += d["toplam_aktif_ilan"]
+        total_geri += d["geri_kazanilan_atik_kg"]
+        total_co2 += pkg["co2_ton"] * 1000.0
+        total_energy += pkg["energy_kwh"]
+        total_water_ton += pkg["water_ton"]
+        pop = pkg["population"]
+        total_pop += pop
+        weighted_katilim += pop * d["vatandas_katilim_orani"]
+        etki += d["etki_adet"]
+    katilim = round(weighted_katilim / total_pop, 1) if total_pop else 0.0
+    return {
+        "toplam_ilan": total_ilan,
+        "toplam_geri_kazanim_kg": round(total_geri, 1),
+        "co2_tasarrufu_kg": round(total_co2, 1),
+        "enerji_tasarrufu_kwh": round(total_energy, 1),
+        "su_tasarrufu_litre": round(total_water_ton * 1000.0, 1),
+        "aktif_belediye": len(cities),
+        "aktif_kurum": len(MARKETPLACE_ORGS),
+        "vatandas_sayisi": int(total_pop * (katilim / 100.0)),
+        "vatandas_katilim_orani": katilim,
+        "etki_adet": etki,
+        "filtre": {
+            "il": il,
+            "ilce": ilce,
+            "belediye_id": belediye_id,
+            "kurum_id": kurum_id,
+        },
+    }
+
+
+def province_statistics(*, il=None) -> list[dict]:
+    """MASTER illerinin puanlı sıralaması."""
+    rows = []
+    cities = [_norm_city(il)] if il else list_cities()
+    for city in cities:
+        pkg = MASTER_DATASET[city]
+        d = pkg["dashboard"]
+        sus = pkg["sustainability"]
+        rows.append({
+            "il": city,
+            "ilan": d["toplam_aktif_ilan"],
+            "atik_kg": round(d["geri_kazanilan_atik_kg"], 2),
+            "co2e_kg": round(pkg["co2_ton"] * 1000.0, 2),
+            "su_litre": round(pkg["water_ton"] * 1000.0, 2),
+            "enerji_kwh": float(pkg["energy_kwh"]),
+            "kullanici": int(pkg["population"] * d["vatandas_katilim_orani"] / 100 / 50),
+            "puan": float(sus["puan"]),
+        })
+    return sorted(rows, key=lambda r: -r["puan"])
+
+
+def top_bottom_provinces(limit: int = 10) -> dict:
+    rows = province_statistics()
+    return {
+        "en_basarili": rows[:limit],
+        "en_dusuk": list(reversed(rows[-limit:])) if rows else [],
+    }
+
+
+def ministry_map_data(*, il=None, ilce=None) -> dict:
+    """
+    15 MASTER il renkli; diğer 81-15 JS tarafında gri kalır.
+    Heat: tüm MASTER şehir heatmap noktalarının birleşimi.
+    """
+    cities = [_norm_city(il)] if il else list(MASTER_DATASET.keys())
+    heat: list[list[float]] = []
+    centers = []
+    il_yogunluk = []
+    for city in cities:
+        pkg = MASTER_DATASET[city]
+        puan = float(pkg["sustainability"]["puan"])
+        intensity = puan / 100.0
+        for p in pkg["heatmap"]:
+            heat.append([p[0], p[1], p[2]])
+        # İl merkez vurgusu
+        lat, lng = pkg["center"]
+        heat.append([lat, lng, max(0.35, intensity * 1.4)])
+        renk = "yesil" if puan >= 70 else "sari" if puan >= 40 else "kirmizi"
+        centers.append({
+            "il": city,
+            "lat": lat,
+            "lng": lng,
+            "intensity": intensity,
+            "kullanici": int(pkg["population"] * 0.001),
+            "puan": puan,
+            "renk": renk,
+            "performans": (
+                "Yüksek" if puan >= 70 else "Orta" if puan >= 40 else "Düşük"
+            ),
+        })
+        il_yogunluk.append({
+            "il": city,
+            "intensity": intensity,
+            "ilan": pkg["dashboard"]["toplam_aktif_ilan"],
+            "co2e_kg": round(pkg["co2_ton"] * 1000.0, 2),
+        })
+    return {
+        "heat": heat,
+        "il_yogunluk": il_yogunluk,
+        "il_merkezleri": centers,
+    }
+
+
+def _municipality_board() -> list[dict]:
+    rows = []
+    for city in list_cities():
+        pkg = MASTER_DATASET[city]
+        puan = float(pkg["sustainability"]["puan"])
+        gelisim = float(pkg["sustainability_history"].get("change_pct") or 0)
+        teslim = float(pkg["dashboard"]["teslim_orani"])
+        renk = "yesil" if puan >= 70 else "sari" if puan >= 40 else "kirmizi"
+        rows.append({
+            "id": -2000 - len(rows),
+            "ad": f"{city} Belediyesi",
+            "il": city,
+            "ilce": None,
+            "tip": "merkez",
+            "ilan": pkg["dashboard"]["toplam_aktif_ilan"],
+            "teslim": pkg["dashboard"]["toplam_teslim"],
+            "teslim_orani": teslim,
+            "puan": puan,
+            "gelisim_yuzde": gelisim,
+            "renk": renk,
+        })
+    return rows
+
+
+def ministry_ai_summary() -> list[str]:
+    board = _municipality_board()
+    provinces = province_statistics()
+    kpi = ministry_kpi()
+    tips = [
+        f"Ulusal özet: {kpi['toplam_ilan']} ilan · "
+        f"CO₂ {kpi['co2_tasarrufu_kg']/1000:.0f} ton · "
+        f"enerji {kpi['enerji_tasarrufu_kwh']/1000:.0f} bin kWh · "
+        f"su {kpi['su_tasarrufu_litre']/1000:.0f} ton eşdeğeri.",
+        f"Katılım oranı ortalama %{kpi['vatandas_katilim_orani']}; "
+        f"{kpi['aktif_belediye']} il senaryosu aktif.",
+    ]
+    if provinces:
+        tips.append(
+            f"En başarılı il: {provinces[0]['il']} "
+            f"(sürdürülebilirlik {provinces[0]['puan']})."
+        )
+        low = provinces[-1]
+        tips.append(
+            f"Öncelikli izleme: {low['il']} "
+            f"(skor {low['puan']}) — teslim ve katılım güçlendirilmeli."
+        )
+    growing = sorted(board, key=lambda r: -r["gelisim_yuzde"])
+    if growing:
+        tips.append(
+            f"{growing[0]['ad']} son 6 ayda "
+            f"%{growing[0]['gelisim_yuzde']:.0f} gelişim gösterdi."
+        )
+    # MASTER AI bullets (ulusal)
+    tips.append("Elektronik atık son dönemde ulusal ölçekte artıyor; organik azalıyor.")
+    tips.append("Bitkisel yağ kampanyaları birden fazla ilde yükselişte.")
+    return tips[:6]
+
+
+def ministry_national_center(
+    *,
+    il=None,
+    ilce=None,
+    belediye_id=None,
+    kurum_id=None,
+    kategori=None,
+    tarih=None,
+    belediye_tipi=None,
+) -> dict:
+    """Ulusal Yönetim Merkezi — MASTER_DATASET paket (mevcut şema)."""
+    kpi = ministry_kpi(il=il, ilce=ilce, belediye_id=belediye_id, kurum_id=kurum_id)
+    provinces = province_statistics(il=il)
+    rankings = top_bottom_provinces(10)
+    map_data = ministry_map_data(il=il, ilce=ilce)
+    board = _municipality_board()
+    if il:
+        board = [r for r in board if r["il"] == _norm_city(il)]
+
+    en_basarili = board[:10]
+    gelisim = sorted(
+        [r for r in board if r["gelisim_yuzde"] > 0],
+        key=lambda r: -r["gelisim_yuzde"],
+    )[:10]
+    # Risk = en düşük sürdürülebilirlik skorları (jüri senaryosu)
+    riskli = sorted(board, key=lambda r: r["puan"])[:10]
+
+    return {
+        "kpi": kpi,
+        "map_data": map_data,
+        "province_rankings": rankings,
+        "provinces": provinces,
+        "en_basarili_belediyeler": en_basarili,
+        "gelisim_gosteren": gelisim,
+        "riskli_belediyeler": riskli,
+        "ai_ozeti": ministry_ai_summary(),
+        "filtre": {
+            "il": il,
+            "ilce": ilce,
+            "kategori": kategori,
+            "tarih": tarih,
+            "belediye_tipi": belediye_tipi,
+        },
+        "source": "demo",
+    }
+
+
+def ministry_statistics(*, il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
+    return {
+        "kpi": ministry_kpi(il=il, ilce=ilce, belediye_id=belediye_id, kurum_id=kurum_id),
+        "drilldown": {
+            "iller": list_cities(),
+            "ilceler": list(get_city(il)["districts"].keys()) if il else [],
+            "belediyeler": [],
+            "kurumlar": [o["ad"] for o in MARKETPLACE_ORGS[:20]],
+        },
+        "rankings": top_bottom_provinces(10),
+        "provinces": province_statistics(il=il),
+        "source": "demo",
     }
 
 

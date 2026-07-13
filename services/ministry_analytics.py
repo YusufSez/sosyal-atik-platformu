@@ -65,7 +65,24 @@ def co2e_to_energy_kwh(co2e_kg: float) -> float:
     return round(float(co2e_kg or 0) / CO2E_KG_PER_KWH, 2)
 
 
+def _use_ministry_demo() -> bool:
+    """Demo Manager — ulusal paket için ortak kapı."""
+    from services.demo_manager import is_demo_mode, should_use_demo
+
+    if is_demo_mode():
+        return True
+    n = Kaynak.query.count() + Atik.query.count()
+    return should_use_demo("dashboard", real_data_sufficient=n > 0)
+
+
 def ministry_kpi(il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.ministry_kpi(
+            il=il, ilce=ilce, belediye_id=belediye_id, kurum_id=kurum_id
+        )
+
     geo = _geo_filters(il, ilce, belediye_id, kurum_id)
 
     toplam_ilan = _join_listings(Kaynak, geo).count() + _join_listings(Atik, geo).count()
@@ -190,6 +207,11 @@ def ministry_drilldown_options(il=None, ilce=None, belediye_id=None) -> dict:
 
 def province_statistics(il=None) -> list[dict]:
     """İl bazlı skor ve metrikler (sıralama / grafik)."""
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.province_statistics(il=il)
+
     geo = _geo_filters(il=il) if il else []
     group_col = User.il
 
@@ -266,6 +288,10 @@ def province_statistics(il=None) -> list[dict]:
 
 
 def top_bottom_provinces(limit: int = 10) -> dict:
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.top_bottom_provinces(limit)
     rows = province_statistics()
     return {
         "en_basarili": rows[:limit],
@@ -275,6 +301,11 @@ def top_bottom_provinces(limit: int = 10) -> dict:
 
 def ministry_map_data(il=None, ilce=None) -> dict:
     """Türkiye ısı haritası noktaları + il bazlı yoğunluk."""
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.ministry_map_data(il=il, ilce=ilce)
+
     geo = _geo_filters(il=il, ilce=ilce)
     noktalar = []
 
@@ -352,6 +383,12 @@ def ministry_map_data(il=None, ilce=None) -> dict:
 
 
 def ministry_statistics(il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.ministry_statistics(
+            il=il, ilce=ilce, belediye_id=belediye_id, kurum_id=kurum_id
+        )
     return {
         "kpi": ministry_kpi(il, ilce, belediye_id, kurum_id),
         "drilldown": ministry_drilldown_options(il, ilce, belediye_id),
@@ -511,6 +548,19 @@ def ministry_national_center(
     belediye_tipi=None,
 ) -> dict:
     """Ulusal Yönetim Merkezi — dashboard paketi (API sözleşmesini değiştirmez)."""
+    if _use_ministry_demo():
+        from services import demo_provider
+
+        return demo_provider.ministry_national_center(
+            il=il,
+            ilce=ilce,
+            belediye_id=belediye_id,
+            kurum_id=kurum_id,
+            kategori=kategori,
+            tarih=tarih,
+            belediye_tipi=belediye_tipi,
+        )
+
     kpi = ministry_kpi(il, ilce, belediye_id, kurum_id)
     provinces = province_statistics(il=il)
     rankings = top_bottom_provinces(10)

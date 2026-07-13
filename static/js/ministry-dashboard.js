@@ -94,7 +94,6 @@
     if (!canvas || typeof Chart === "undefined") return;
     var UI = window.AtikPortUI || null;
     if (UI && UI.applyChartTheme) UI.applyChartTheme();
-    var DEMO = (UI && UI.DEMO) || {};
     var labels = (rows || []).map(function (r) {
       return r.il;
     });
@@ -103,10 +102,11 @@
     });
     var demo = !labels.length;
     if (demo) {
-      labels = (DEMO.bars && DEMO.bars.labels) || ["İl A", "İl B", "İl C", "İl D", "İl E"];
-      values = (DEMO.bars && DEMO.bars.values) || [88, 81, 76, 71, 65];
+      // Sunucu boşsa boş bırak — istemci sahte il üretmesin
       if (UI) UI.markDemo(canvas, true);
+      return;
     }
+    if (config.demoSource && UI) UI.markDemo(canvas, true);
     new Chart(canvas, {
       type: "bar",
       data: {

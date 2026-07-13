@@ -513,7 +513,8 @@
   'heat': map_data.heat,
   'il_merkezleri': map_data.il_merkezleri,
   'top': rankings.en_basarili,
-  'bottom': rankings.en_dusuk
+  'bottom': rankings.en_dusuk,
+  'demoSource': (center.get('source') == 'demo') if center is defined else false
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='js/ministry-dashboard.js') }}"></script>
 <script>
