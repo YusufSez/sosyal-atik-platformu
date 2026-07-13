@@ -5,6 +5,10 @@ ROLE_USER = "user"
 ROLE_ADMIN = "admin"
 ROLE_SUPERADMIN = "superadmin"
 ROLE_MUNICIPALITY = "municipality"
+ROLE_MINISTRY = "ministry"
+
+# CO₂e → tahmini enerji tasarrufu (kWh). TR şebeke yoğunluğu ~0.4 kg CO₂e/kWh.
+CO2E_KG_PER_KWH = 0.4
 
 # Belediye kategori analizi paneli (görüntüleme grupları)
 MUNICIPALITY_CATEGORY_GROUPS = (

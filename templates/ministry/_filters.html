@@ -1,0 +1,112 @@
+<form method="GET" class="row g-2 align-items-end mb-3 ministry-filters" id="ministryFilterForm">
+  <div class="col-6 col-md-3 col-lg">
+    <label class="form-label small mb-1">İl</label>
+    <select name="il" id="minFiltreIl" class="form-select form-select-sm">
+      <option value="">Türkiye</option>
+      {% for il in iller %}
+      <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3 col-lg">
+    <label class="form-label small mb-1">İlçe</label>
+    <select name="ilce" id="minFiltreIlce" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for ilce in ilceler %}
+      <option value="{{ ilce }}" {% if secili_ilce == ilce %}selected{% endif %}>{{ ilce }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3 col-lg">
+    <label class="form-label small mb-1">Belediye</label>
+    <select name="belediye_id" id="minFiltreBelediye" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for b in belediyeler %}
+      <option value="{{ b.id }}" {% if secili_belediye_id == b.id|string %}selected{% endif %}>
+        {{ b.ad }}{% if b.ilce %} ({{ b.ilce }}){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3 col-lg">
+    <label class="form-label small mb-1">Kurum</label>
+    <select name="kurum_id" id="minFiltreKurum" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for k in kurumlar %}
+      <option value="{{ k.id }}" {% if secili_kurum_id == k.id|string %}selected{% endif %}>
+        {{ k.ad }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-lg-auto d-flex gap-2">
+    <button type="submit" class="btn btn-sm btn-success">Filtrele</button>
+    <a href="{{ url_for('admin_ministry.dashboard') }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
+  </div>
+</form>
+<script>
+(function () {
+  var il = document.getElementById("minFiltreIl");
+  var ilce = document.getElementById("minFiltreIlce");
+  var bel = document.getElementById("minFiltreBelediye");
+  var kurum = document.getElementById("minFiltreKurum");
+  if (!il) return;
+
+  function fillSimple(el, items, selected) {
+    var first = el.options[0] ? el.options[0].outerHTML : '<option value="">Tümü</option>';
+    el.innerHTML = first;
+    (items || []).forEach(function (v) {
+      var opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      if (selected && selected === v) opt.selected = true;
+      el.appendChild(opt);
+    });
+  }
+
+  function fillEntities(el, items, selected) {
+    var first = el.options[0] ? el.options[0].outerHTML : '<option value="">Tümü</option>';
+    el.innerHTML = first;
+    (items || []).forEach(function (item) {
+      var opt = document.createElement("option");
+      opt.value = item.id;
+      opt.textContent = item.ad + (item.ilce ? " (" + item.ilce + ")" : "");
+      if (selected && String(selected) === String(item.id)) opt.selected = true;
+      el.appendChild(opt);
+    });
+  }
+
+  function loadDrill() {
+    var params = new URLSearchParams();
+    if (il.value) params.set("il", il.value);
+    if (ilce.value) params.set("ilce", ilce.value);
+    if (bel.value) params.set("belediye_id", bel.value);
+    fetch("{{ url_for('admin_ministry.api_drilldown') }}?" + params.toString(), {
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        fillSimple(ilce, data.ilceler || [], ilce.value);
+        fillEntities(bel, data.belediyeler || [], bel.value);
+        fillEntities(kurum, data.kurumlar || [], kurum.value);
+      })
+      .catch(function () {});
+  }
+
+  il.addEventListener("change", function () {
+    ilce.value = "";
+    bel.value = "";
+    kurum.value = "";
+    loadDrill();
+  });
+  ilce.addEventListener("change", function () {
+    bel.value = "";
+    kurum.value = "";
+    loadDrill();
+  });
+  bel.addEventListener("change", function () {
+    kurum.value = "";
+    loadDrill();
+  });
+})();
+</script>

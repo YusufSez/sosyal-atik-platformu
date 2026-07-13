@@ -24,7 +24,7 @@ class User(UserMixin, db.Model):
     is_completed = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     # Authorization role (kept in sync with `is_admin` for backward compatibility).
-    # Values: user, admin, superadmin, municipality
+    # Values: user, admin, superadmin, municipality, ministry
     role = db.Column(db.String(20), nullable=False, default="user", index=True)
     # Ban state (superadmin can ban/unban users).
     is_banned = db.Column(db.Boolean, default=False, nullable=False)

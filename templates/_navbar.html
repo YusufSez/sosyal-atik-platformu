@@ -120,6 +120,9 @@
                         {% if current_user.role == 'municipality' or current_user.is_admin %}
                         <li><a class="dropdown-item" href="{{ url_for('belediye.dashboard') }}"><i class="bi bi-building-gear me-2"></i>Belediye Paneli</a></li>
                         {% endif %}
+                        {% if current_user.role == 'ministry' or current_user.is_admin %}
+                        <li><a class="dropdown-item" href="{{ url_for('admin_ministry.dashboard') }}"><i class="bi bi-globe2 me-2"></i>Bakanlık Paneli</a></li>
+                        {% endif %}
                         {% if current_user.is_admin %}
                         <li><a class="dropdown-item" href="{{ url_for('admin.admin_panel') }}"><i class="bi bi-shield-lock me-2"></i>Admin Panel</a></li>
                         {% endif %}

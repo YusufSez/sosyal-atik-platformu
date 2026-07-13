@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-globe2 me-2"></i>Bakanlık Yönetim Paneli</h3>
+    <small class="text-muted">Türkiye → İl → İlçe → Belediye → Kurum drill-down</small>
+  </div>
+
+  {% include "ministry/_filters.html" %}
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ kpi.toplam_ilan }}</h5><small class="text-muted">Toplam İlan</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.1f"|format(kpi.toplam_geri_kazanim_kg) }} kg</h5>
+        <small class="text-muted">Toplam Geri Kazanım</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.1f"|format(kpi.co2_tasarrufu_kg) }} kg</h5>
+        <small class="text-muted">CO₂ Tasarrufu</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.1f"|format(kpi.enerji_tasarrufu_kwh) }} kWh</h5>
+        <small class="text-muted">Enerji Tasarrufu</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.0f"|format(kpi.su_tasarrufu_litre) }} L</h5>
+        <small class="text-muted">Su Tasarrufu</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ kpi.aktif_belediye }}</h5><small class="text-muted">Aktif Belediye</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ kpi.aktif_kurum }}</h5><small class="text-muted">Aktif Kurum</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>%{{ kpi.vatandas_katilim_orani }}</h5>
+        <small class="text-muted">Vatandaş Katılım</small>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-bold"><i class="bi bi-thermometer-half me-2"></i>Türkiye Isı Haritası (İl Yoğunluğu)</div>
+    <div class="card-body p-0">
+      <div id="ministryIsiHaritasi" class="map-container map-container-tall"></div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold text-success">En Başarılı 10 İl</div>
+        <div class="card-body">
+          <canvas id="ministryTopChart" height="260"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold text-warning">En Düşük 10 İl</div>
+        <div class="card-body">
+          <canvas id="ministryBottomChart" height="260"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets(heat=true) }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="application/json" id="ministry-dashboard-config">{{ {
+  'heat': map_data.heat,
+  'il_merkezleri': map_data.il_merkezleri,
+  'top': rankings.en_basarili,
+  'bottom': rankings.en_dusuk
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/ministry-dashboard.js') }}"></script>
+{% endblock %}

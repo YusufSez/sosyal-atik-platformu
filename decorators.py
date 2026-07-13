@@ -85,6 +85,28 @@ def municipality_required(view):
     return wrapped
 
 
+def is_ministry_user(user) -> bool:
+    """ROLE_MINISTRY veya admin/superadmin bakanlık paneline erişebilir."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    role = getattr(user, "role", None)
+    if role == "ministry":
+        return True
+    if role in ("admin", "superadmin"):
+        return True
+    return bool(getattr(user, "is_admin", False))
+
+
+def ministry_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_ministry_user(current_user):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def is_super_admin(user) -> bool:
     if not user or not user.is_authenticated:
         return False
