@@ -204,3 +204,41 @@ def surdurulebilirlik_pdf():
         as_attachment=True,
         download_name=filename,
     )
+
+
+@admin_ministry_bp.route("/karar-destek")
+@login_required
+@ministry_required
+def karar_destek():
+    """Ulusal Karar Destek Merkezi — AI ulusal analiz dashboard."""
+    from services.decision_support_ai import enrich_decision_support
+
+    center = enrich_decision_support()
+    return render_template(
+        "ministry/karar_destek.html",
+        title="Ulusal Karar Destek Merkezi",
+        center=center,
+        **_page_context(),
+    )
+
+
+@admin_ministry_bp.route("/karar-destek/pdf")
+@login_required
+@ministry_required
+def karar_destek_pdf():
+    """Haftalık / aylık / tam karar destek PDF."""
+    import io
+
+    from services.decision_support_ai import enrich_decision_support
+    from services.decision_support_pdf import export_decision_support_pdf
+
+    report_type = (request.args.get("type") or "full").lower()
+    center = enrich_decision_support()
+    data, filename = export_decision_support_pdf(center, report_type=report_type)
+    mimetype = "application/pdf" if filename.endswith(".pdf") else "text/plain"
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename,
+    )

@@ -1,0 +1,267 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in ds-center">
+  <div class="ds-hero mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="ds-kicker mb-1">AtıkPort · Bakanlık</p>
+        <h2 class="ds-title mb-2">Ulusal Karar Destek Merkezi</h2>
+        <p class="ds-lead mb-0">
+          AI ülke verisini analiz eder · haftalık/aylık rapor · risk · kampanya ·
+          belediye karşılaştırma · kategori · katılım · aksiyon
+        </p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-light btn-sm"
+           href="{{ url_for('admin_ministry.karar_destek_pdf', type='weekly') }}">Haftalık PDF</a>
+        <a class="btn btn-outline-light btn-sm"
+           href="{{ url_for('admin_ministry.karar_destek_pdf', type='monthly') }}">Aylık PDF</a>
+        <a class="btn btn-success btn-sm"
+           href="{{ url_for('admin_ministry.karar_destek_pdf', type='full') }}">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Tam Rapor PDF
+        </a>
+        <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin_ministry.dashboard') }}">Yönetim Merkezi</a>
+      </div>
+    </div>
+  </div>
+
+  {% set kpi = center.kpi %}
+  {% set ai = center.ai or {} %}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="ds-stat"><div class="ds-stat-value">{{ kpi.aktif_belediye }}</div><div class="ds-stat-label">Aktif belediye</div></div></div>
+    <div class="col-6 col-md-3"><div class="ds-stat"><div class="ds-stat-value">{{ kpi.vatandas_katilim_orani }}%</div><div class="ds-stat-label">Katılım</div></div></div>
+    <div class="col-6 col-md-3"><div class="ds-stat"><div class="ds-stat-value">{{ '%.0f'|format(kpi.co2_tasarrufu_kg) }}</div><div class="ds-stat-label">CO₂ kg</div></div></div>
+    <div class="col-6 col-md-3">
+      <div class="ds-stat">
+        <div class="ds-stat-value text-capitalize">{{ center.risk_analysis.level }}</div>
+        <div class="ds-stat-label">Risk seviyesi</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ds-ai-banner mb-4">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+      <strong><i class="bi bi-robot me-1"></i>AI ulusal değerlendirme</strong>
+      <span class="badge text-bg-secondary">{{ center.ai_source or ai.source or 'rules' }}</span>
+    </div>
+    <p class="mb-0">{{ ai.overview }}</p>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head">
+          <h5 class="mb-0">Haftalık rapor</h5>
+          <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='weekly') }}">PDF ↓</a>
+        </div>
+        <div class="ds-panel-body">
+          {% set w = center.weekly_report %}
+          <div class="row g-2 mb-3">
+            <div class="col-4"><div class="ds-mini"><strong>{{ w.metrics.ilan }}</strong><span>İlan</span></div></div>
+            <div class="col-4"><div class="ds-mini"><strong>{{ w.metrics.teslim }}</strong><span>Teslim</span></div></div>
+            <div class="col-4"><div class="ds-mini"><strong>{{ w.metrics.aktif_kullanici }}</strong><span>Aktif</span></div></div>
+          </div>
+          <ul class="small mb-0 ps-3">
+            {% for line in ai.weekly_narrative or [] %}
+            <li class="mb-1">{{ line }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head">
+          <h5 class="mb-0">Aylık rapor</h5>
+          <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='monthly') }}">PDF ↓</a>
+        </div>
+        <div class="ds-panel-body">
+          {% set m = center.monthly_report %}
+          <div class="row g-2 mb-3">
+            <div class="col-4"><div class="ds-mini"><strong>{{ m.metrics.ilan }}</strong><span>İlan</span></div></div>
+            <div class="col-4"><div class="ds-mini"><strong>{{ '%.0f'|format(m.metrics.co2e_kg) }}</strong><span>CO₂</span></div></div>
+            <div class="col-4"><div class="ds-mini"><strong>{{ '%.0f'|format(m.metrics.atik_kg) }}</strong><span>kg</span></div></div>
+          </div>
+          <ul class="small mb-0 ps-3">
+            {% for line in ai.monthly_narrative or [] %}
+            <li class="mb-1">{{ line }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-5">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Risk analizi</h5></div>
+        <div class="ds-panel-body">
+          <div class="mb-2">
+            <span class="badge ds-risk-{{ center.risk_analysis.level }}">{{ center.risk_analysis.level }}</span>
+            <span class="small text-muted ms-1">
+              {{ center.risk_analysis.riskli_belediye_sayisi }} yüksek ·
+              {{ center.risk_analysis.orta_risk_sayisi }} orta
+            </span>
+          </div>
+          <ul class="small ps-3 mb-3">
+            {% for f in center.risk_analysis.findings %}
+            <li class="mb-1">{{ f }}</li>
+            {% endfor %}
+          </ul>
+          {% if center.risk_analysis.riskli_belediyeler %}
+          <div class="small fw-semibold mb-1">Riskli belediyeler</div>
+          <ul class="list-unstyled small mb-0">
+            {% for r in center.risk_analysis.riskli_belediyeler[:5] %}
+            <li class="d-flex justify-content-between py-1 border-bottom">
+              <span>{{ r.belediye_adi }} <span class="text-muted">({{ r.il }})</span></span>
+              <span>{{ r.puan }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Vatandaş katılım eğilimleri</h5></div>
+        <div class="ds-panel-body">
+          <canvas id="dsParticipationChart" height="200"></canvas>
+          <div class="small text-muted mt-2">
+            Trend: {{ center.participation_trends.trend }} ·
+            Değişim %{{ center.participation_trends.change_pct }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Kategori değişimleri</h5></div>
+        <div class="ds-panel-body">
+          <canvas id="dsCategoryChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Belediye karşılaştırmaları</h5></div>
+        <div class="ds-panel-body">
+          <canvas id="dsCompareChart" height="180" class="mb-3"></canvas>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="small fw-semibold text-success mb-1">Üst performans</div>
+              {% for r in center.municipality_comparisons.top[:4] %}
+              <div class="small d-flex justify-content-between"><span>{{ r.belediye_adi }}</span><span>{{ r.puan }}</span></div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <div class="small fw-semibold text-danger mb-1">Düşük performans</div>
+              {% for r in center.municipality_comparisons.bottom[:4] %}
+              <div class="small d-flex justify-content-between"><span>{{ r.belediye_adi }}</span><span>{{ r.puan }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Yeni kampanya önerileri</h5></div>
+        <div class="ds-panel-body">
+          {% for c in center.campaigns %}
+          <article class="ds-card-item mb-3">
+            <div class="d-flex justify-content-between gap-2">
+              <strong>{{ c.title }}</strong>
+              <span class="badge text-bg-warning">{{ c.priority }}</span>
+            </div>
+            <p class="small mb-0 mt-1">{{ c.description }}</p>
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="ds-panel h-100">
+        <div class="ds-panel-head"><h5 class="mb-0">Bakanlık aksiyon önerileri</h5></div>
+        <div class="ds-panel-body">
+          <ol class="mb-0 ps-3">
+            {% for a in center.ministry_actions %}
+            <li class="mb-3">
+              <strong>{{ a.title }}</strong>
+              <span class="badge text-bg-secondary">{{ a.priority }}</span>
+              <div class="small text-muted">{{ a.detail }}</div>
+            </li>
+            {% endfor %}
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="ds-center-config">{{ {
+  'participation': center.participation_trends,
+  'category': center.category_shifts.chart,
+  'compare': center.municipality_comparisons.chart
+}|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/decision-support.js') }}"></script>
+<style>
+.ds-center {
+  --ds-ink: #062f2a;
+  --ds-accent: #0f766e;
+  --ds-soft: #e6f7f3;
+  --ds-line: rgba(6, 47, 42, 0.12);
+}
+[data-bs-theme="dark"] .ds-center {
+  --ds-ink: #e7f8f4;
+  --ds-accent: #2dd4bf;
+  --ds-soft: rgba(45, 212, 191, 0.1);
+  --ds-line: rgba(231, 248, 244, 0.12);
+}
+.ds-hero {
+  background:
+    radial-gradient(circle at 90% 10%, rgba(45, 212, 191, 0.35), transparent 40%),
+    linear-gradient(135deg, #0b3f39 0%, #0f766e 55%, #115e59 100%);
+  color: #f0fdfa;
+  border-radius: 1.4rem;
+  padding: 1.6rem 1.7rem;
+}
+.ds-kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .85; font-weight: 700; }
+.ds-title { font-weight: 800; letter-spacing: -.02em; }
+.ds-lead { max-width: 40rem; opacity: .9; }
+.ds-stat, .ds-panel {
+  border: 1px solid var(--ds-line);
+  border-radius: 1rem;
+  background: var(--bs-body-bg);
+}
+.ds-stat { padding: 1rem; height: 100%; }
+.ds-stat-value { font-size: 1.45rem; font-weight: 800; color: var(--ds-ink); }
+.ds-stat-label { font-size: .8rem; color: var(--bs-secondary-color); }
+.ds-ai-banner {
+  border-radius: 1rem;
+  border: 1px solid rgba(15, 118, 110, .25);
+  background: var(--ds-soft);
+  padding: 1rem 1.15rem;
+}
+.ds-panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .9rem 1.1rem; border-bottom: 1px solid var(--ds-line);
+}
+.ds-panel-body { padding: 1rem 1.1rem; }
+.ds-mini { text-align: center; padding: .55rem; border-radius: .75rem; background: var(--ds-soft); }
+.ds-mini strong { display: block; color: var(--ds-ink); }
+.ds-mini span { font-size: .72rem; color: var(--bs-secondary-color); }
+.ds-card-item { padding-bottom: .75rem; border-bottom: 1px solid var(--ds-line); }
+.ds-risk-dusuk { background: #bbf7d0; color: #14532d; }
+.ds-risk-orta { background: #fde68a; color: #92400e; }
+.ds-risk-yuksek { background: #fecaca; color: #991b1b; }
+</style>
+{% endblock %}

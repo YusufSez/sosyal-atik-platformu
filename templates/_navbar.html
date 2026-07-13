@@ -125,6 +125,7 @@
                         {% endif %}
                         {% if current_user.role == 'ministry' or current_user.is_admin %}
                         <li><a class="dropdown-item" href="{{ url_for('admin_ministry.dashboard') }}"><i class="bi bi-globe2 me-2"></i>Bakanlık Paneli</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin_ministry.karar_destek') }}"><i class="bi bi-diagram-3 me-2"></i>Karar Destek Merkezi</a></li>
                         {% endif %}
                         {% if current_user.is_admin %}
                         <li><a class="dropdown-item" href="{{ url_for('admin.admin_panel') }}"><i class="bi bi-shield-lock me-2"></i>Admin Panel</a></li>
