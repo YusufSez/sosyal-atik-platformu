@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in" style="max-width:640px;margin:0 auto">
+  <div class="page-header mb-3">
+    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">← Marketplace</a>
+    <h3 class="fw-bold mt-1">Kurumsal Kaynak Yayınla</h3>
+  </div>
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label class="form-label">Başlık</label>
+          <input name="baslik" class="form-control" required maxlength="150">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Açıklama</label>
+          <textarea name="aciklama" class="form-control" rows="4" required></textarea>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Kategori</label>
+            <select name="kategori" class="form-select">
+              {% for k in kategoriler %}
+              <option value="{{ k }}">{{ k }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Miktar</label>
+            <input type="number" step="any" name="miktar" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Birim</label>
+            <input name="birim" class="form-control" value="adet">
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">İl</label>
+            <input name="il" class="form-control" value="{{ current_user.il or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">İlçe</label>
+            <input name="ilce" class="form-control" value="{{ current_user.ilce or '' }}">
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Enlem</label>
+            <input name="latitude" class="form-control" value="{{ current_user.latitude or '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Boylam</label>
+            <input name="longitude" class="form-control" value="{{ current_user.longitude or '' }}">
+          </div>
+        </div>
+        <button class="btn btn-success">Yayınla</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

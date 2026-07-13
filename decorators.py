@@ -107,6 +107,30 @@ def ministry_required(view):
     return wrapped
 
 
+def is_marketplace_user(user) -> bool:
+    """ROLE_COMPANY / ROLE_INSTITUTION (veya is_kurum / admin) marketplace erişimi."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    role = getattr(user, "role", None)
+    if role in ("company", "institution"):
+        return True
+    if getattr(user, "is_kurum", False):
+        return True
+    if role in ("admin", "superadmin"):
+        return True
+    return bool(getattr(user, "is_admin", False))
+
+
+def marketplace_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_marketplace_user(current_user):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def is_super_admin(user) -> bool:
     if not user or not user.is_authenticated:
         return False

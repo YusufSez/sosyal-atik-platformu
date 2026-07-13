@@ -24,7 +24,7 @@ class User(UserMixin, db.Model):
     is_completed = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     # Authorization role (kept in sync with `is_admin` for backward compatibility).
-    # Values: user, admin, superadmin, municipality, ministry
+    # Values: user, admin, superadmin, municipality, ministry, company, institution
     role = db.Column(db.String(20), nullable=False, default="user", index=True)
     # Ban state (superadmin can ban/unban users).
     is_banned = db.Column(db.Boolean, default=False, nullable=False)
@@ -485,3 +485,88 @@ class DestekDurumGecmisi(db.Model):
     not_metni = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=tr_time, index=True)
     admin = db.relationship("User", foreign_keys=[admin_id], backref=db.backref("destek_durum_loglari", lazy=True))
+
+
+class MarketplaceListing(db.Model):
+    """Kurumsal Kaynak Pazarı ilanı — mevcut Kaynak modelinden bağımsız."""
+
+    __tablename__ = "marketplace_listing"
+
+    id = db.Column(db.Integer, primary_key=True)
+    publisher_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    baslik = db.Column(db.String(150), nullable=False)
+    aciklama = db.Column(db.Text, nullable=False)
+    kategori = db.Column(db.String(50), nullable=False, default="Diğer")
+    miktar = db.Column(db.Float, nullable=True)
+    birim = db.Column(db.String(30), nullable=True, default="adet")
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    il = db.Column(db.String(100), nullable=True)
+    ilce = db.Column(db.String(100), nullable=True)
+    durum = db.Column(db.String(20), nullable=False, default="yayinda", index=True)
+    accepted_offer_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    updated_at = db.Column(db.DateTime, default=tr_time, onupdate=tr_time)
+
+    publisher = db.relationship(
+        "User",
+        foreign_keys=[publisher_id],
+        backref=db.backref("marketplace_listings", lazy=True),
+    )
+    offers = db.relationship(
+        "MarketplaceOffer",
+        back_populates="listing",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="MarketplaceOffer.created_at.desc()",
+    )
+    events = db.relationship(
+        "MarketplaceEvent",
+        back_populates="listing",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="MarketplaceEvent.created_at.desc()",
+    )
+
+
+class MarketplaceOffer(db.Model):
+    """Kurumsal teklif."""
+
+    __tablename__ = "marketplace_offer"
+
+    id = db.Column(db.Integer, primary_key=True)
+    listing_id = db.Column(
+        db.Integer, db.ForeignKey("marketplace_listing.id"), nullable=False, index=True
+    )
+    offerer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    mesaj = db.Column(db.Text, nullable=True)
+    miktar = db.Column(db.Float, nullable=True)
+    durum = db.Column(db.String(20), nullable=False, default="bekliyor", index=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+    responded_at = db.Column(db.DateTime, nullable=True)
+
+    listing = db.relationship("MarketplaceListing", back_populates="offers")
+    offerer = db.relationship(
+        "User",
+        foreign_keys=[offerer_id],
+        backref=db.backref("marketplace_offers", lazy=True),
+    )
+
+
+class MarketplaceEvent(db.Model):
+    """Marketplace işlem geçmişi."""
+
+    __tablename__ = "marketplace_event"
+
+    id = db.Column(db.Integer, primary_key=True)
+    listing_id = db.Column(
+        db.Integer, db.ForeignKey("marketplace_listing.id"), nullable=False, index=True
+    )
+    actor_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    offer_id = db.Column(db.Integer, db.ForeignKey("marketplace_offer.id"), nullable=True)
+    action = db.Column(db.String(40), nullable=False, index=True)
+    detail = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=tr_time, index=True)
+
+    listing = db.relationship("MarketplaceListing", back_populates="events")
+    actor = db.relationship("User", foreign_keys=[actor_id])

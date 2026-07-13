@@ -114,6 +114,9 @@
                         <li><a class="dropdown-item" href="{{ url_for('auth.profil') }}"><i class="bi bi-person me-2"></i>Profilim</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('api.favorilerim') }}"><i class="bi bi-heart me-2"></i>Favorilerim</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('gamification.rozetlerim') }}"><i class="bi bi-award me-2"></i>Rozetlerim</a></li>
+                        {% if current_user.role in ['company', 'institution'] or current_user.is_kurum or current_user.is_admin %}
+                        <li><a class="dropdown-item" href="{{ url_for('marketplace.panel') }}"><i class="bi bi-shop me-2"></i>Kurumsal Marketplace</a></li>
+                        {% endif %}
                         {% if current_user.is_kurum or current_user.is_admin %}
                         <li><a class="dropdown-item" href="{{ url_for('kurum.analiz_paneli') }}"><i class="bi bi-building me-2"></i>Kurum Analizi</a></li>
                         {% endif %}

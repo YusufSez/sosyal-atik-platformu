@@ -6,6 +6,48 @@ ROLE_ADMIN = "admin"
 ROLE_SUPERADMIN = "superadmin"
 ROLE_MUNICIPALITY = "municipality"
 ROLE_MINISTRY = "ministry"
+ROLE_COMPANY = "company"
+ROLE_INSTITUTION = "institution"
+
+MARKETPLACE_ROLES = (ROLE_COMPANY, ROLE_INSTITUTION)
+
+# Kurumsal kaynak pazarı durumları
+MP_LISTING_YAYINDA = "yayinda"
+MP_LISTING_REZERVE = "rezerve"
+MP_LISTING_ANLASILDI = "anlasildi"
+MP_LISTING_TESLIM = "teslim"
+MP_LISTING_IPTAL = "iptal"
+MP_LISTING_STATUSES = (
+    MP_LISTING_YAYINDA,
+    MP_LISTING_REZERVE,
+    MP_LISTING_ANLASILDI,
+    MP_LISTING_TESLIM,
+    MP_LISTING_IPTAL,
+)
+
+MP_OFFER_BEKLIYOR = "bekliyor"
+MP_OFFER_KABUL = "kabul"
+MP_OFFER_RED = "red"
+MP_OFFER_IPTAL = "iptal"
+MP_OFFER_STATUSES = (
+    MP_OFFER_BEKLIYOR,
+    MP_OFFER_KABUL,
+    MP_OFFER_RED,
+    MP_OFFER_IPTAL,
+)
+
+MP_KATEGORILER = (
+    "Hammadde",
+    "Ambalaj",
+    "Elektronik",
+    "Mobilya",
+    "Tekstil",
+    "Gıda Yan Ürün",
+    "Lojistik Kapasite",
+    "Diğer",
+)
+
+MP_NEARBY_RADIUS_KM = 50
 
 # CO₂e → tahmini enerji tasarrufu (kWh). TR şebeke yoğunluğu ~0.4 kg CO₂e/kWh.
 CO2E_KG_PER_KWH = 0.4

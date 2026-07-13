@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">
+      ← Marketplace
+    </a>
+    <h3 class="fw-bold mt-1">{{ listing.baslik }}</h3>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge bg-primary">{{ listing.kategori }}</span>
+      <span class="badge bg-secondary">{{ listing.durum }}</span>
+      {% if listing.miktar %}
+      <span class="small text-muted">{{ listing.miktar }} {{ listing.birim or '' }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <p class="mb-2">{{ listing.aciklama }}</p>
+          <div class="small text-muted">
+            Yayıncı: {{ listing.publisher.display_name or listing.publisher.username }}
+            · {{ listing.il or '—' }} / {{ listing.ilce or '—' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-success">
+        <i class="bi bi-stars me-1"></i>
+        <strong>AI önerisi:</strong> {{ ai_suggestion.suggestion }}
+        <span class="badge bg-secondary ms-1">{{ ai_suggestion.source }}</span>
+      </div>
+
+      {% if is_owner %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-bold">Gelen Teklifler</div>
+        <ul class="list-group list-group-flush">
+          {% for o in listing.offers %}
+          <li class="list-group-item">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <strong>{{ o.offerer.display_name or o.offerer.username }}</strong>
+                <span class="badge bg-light text-dark border">{{ o.durum }}</span>
+                <div class="small">{{ o.mesaj or '—' }}</div>
+              </div>
+              {% if o.durum == 'bekliyor' and listing.durum == 'yayinda' %}
+              <form method="POST" action="{{ url_for('marketplace.offer_accept', offer_id=o.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-success">Kabul / Rezerve</button>
+              </form>
+              {% endif %}
+            </div>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Henüz teklif yok.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        {% if listing.durum == 'rezerve' %}
+        <form method="POST" action="{{ url_for('marketplace.agreement', listing_id=listing.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-primary">Anlaşmayı Onayla</button>
+        </form>
+        {% endif %}
+        {% if listing.durum == 'anlasildi' %}
+        <form method="POST" action="{{ url_for('marketplace.deliver', listing_id=listing.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-success">Teslim Edildi</button>
+        </form>
+        {% endif %}
+        {% if listing.durum not in ['teslim', 'iptal'] %}
+        <form method="POST" action="{{ url_for('marketplace.listing_cancel', listing_id=listing.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger" onclick="return confirm('İlan iptal edilsin mi?')">İptal</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+        {% if listing.durum == 'yayinda' %}
+          {% if my_pending %}
+          <div class="alert alert-info">Bekleyen teklifiniz var.
+            <form class="d-inline" method="POST" action="{{ url_for('marketplace.offer_cancel', offer_id=my_pending.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-link text-danger">Geri çek</button>
+            </form>
+          </div>
+          {% else %}
+          <div class="card shadow-sm">
+            <div class="card-header fw-bold">Teklif Ver</div>
+            <div class="card-body">
+              <form method="POST" action="{{ url_for('marketplace.offer', listing_id=listing.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-2">
+                  <label class="form-label">Mesaj</label>
+                  <textarea name="mesaj" class="form-control" rows="3" required></textarea>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Talep miktarı (opsiyonel)</label>
+                  <input type="number" step="any" name="miktar" class="form-control">
+                </div>
+                <button class="btn btn-success">Teklif Gönder</button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if listing.durum == 'rezerve' and listing.accepted_offer_id %}
+        {% set acc = listing.offers|selectattr('id', 'equalto', listing.accepted_offer_id)|list %}
+        {% if acc and acc[0].offerer_id == current_user.id %}
+        <form method="POST" action="{{ url_for('marketplace.agreement', listing_id=listing.id) }}" class="mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-primary">Anlaşmayı Onayla</button>
+        </form>
+        {% endif %}
+        {% endif %}
+
+        {% if listing.durum == 'anlasildi' and listing.accepted_offer_id %}
+        {% set acc2 = listing.offers|selectattr('id', 'equalto', listing.accepted_offer_id)|list %}
+        {% if acc2 and acc2[0].offerer_id == current_user.id %}
+        <form method="POST" action="{{ url_for('marketplace.deliver', listing_id=listing.id) }}" class="mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-success">Teslim Onayla</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      {% endif %}
+
+      <h5 class="mt-4">İşlem Geçmişi</h5>
+      <ul class="list-group list-group-flush shadow-sm rounded">
+        {% for e in listing.events %}
+        <li class="list-group-item small">
+          <span class="badge bg-light text-dark border">{{ e.action }}</span>
+          {{ e.detail or '' }}
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">Kayıt yok</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-bold">Yakındaki Kurumlar ({{ nearby|length }})</div>
+        <ul class="list-group list-group-flush">
+          {% for n in nearby[:8] %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>{{ n.ad }} <small class="text-muted">({{ n.role }})</small></span>
+            <span class="small">{{ n.mesafe_km }} km</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Yakın kurum yok</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div id="marketplaceDetailMap" class="map-container rounded shadow-sm" style="min-height:280px"></div>
+    </div>
+  </div>
+</div>
+
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets(heat=false) }}
+<script>
+(function () {
+  if (typeof L === "undefined") return;
+  var map = L.map("marketplaceDetailMap").setView([{{ listing.latitude }}, {{ listing.longitude }}], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+  L.marker([{{ listing.latitude }}, {{ listing.longitude }}]).addTo(map).bindPopup({{ listing.baslik|tojson }});
+  var nearby = {{ nearby|tojson }};
+  nearby.forEach(function (n) {
+    L.circleMarker([n.lat, n.lng], { radius: 7, color: "#0f766e", fillOpacity: 0.7 })
+      .bindPopup(n.ad + " — " + n.mesafe_km + " km")
+      .addTo(map);
+  });
+})();
+</script>
+{% endblock %}
