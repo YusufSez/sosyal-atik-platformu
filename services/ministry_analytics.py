@@ -113,6 +113,7 @@ def ministry_kpi(il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
         "su_tasarrufu_litre": float(su_litre or 0),
         "aktif_belediye": muni_q.count(),
         "aktif_kurum": kurum_q.count(),
+        "vatandas_sayisi": toplam_vatandas,
         "vatandas_katilim_orani": katilim_orani,
         "etki_adet": int(etki_adet or 0),
         "filtre": {
@@ -356,4 +357,202 @@ def ministry_statistics(il=None, ilce=None, belediye_id=None, kurum_id=None) -> 
         "drilldown": ministry_drilldown_options(il, ilce, belediye_id),
         "rankings": top_bottom_provinces(10),
         "provinces": province_statistics(il=il),
+    }
+
+
+def _municipality_tip(user: User) -> str:
+    """Belediye tipi: ilçe belediyesi / merkez."""
+    if getattr(user, "ilce", None):
+        return "ilce"
+    return "merkez"
+
+
+def _period_days(tarih: str | None) -> int | None:
+    mapping = {"7": 7, "30": 30, "90": 90, "yil": 365}
+    if not tarih:
+        return None
+    return mapping.get(str(tarih).strip().lower())
+
+
+def municipality_performance_rows(
+    *,
+    il=None,
+    kategori=None,
+    tarih=None,
+    belediye_tipi=None,
+) -> list[dict]:
+    """Belediye bazlı performans, gelişim ve risk skorları."""
+    from datetime import timedelta
+
+    from utils import utc_now
+
+    il = _norm(il)
+    kategori = _norm(kategori)
+    tip = _norm(belediye_tipi)
+    days = _period_days(tarih)
+    now = utc_now()
+    period = days or 30
+    cur_start = now - timedelta(days=period)
+    prev_start = now - timedelta(days=period * 2)
+
+    q = User.query.filter(User.role == ROLE_MUNICIPALITY)
+    if il:
+        q = q.filter(User.il == il)
+    munis = q.all()
+    if tip in ("ilce", "merkez"):
+        munis = [m for m in munis if _municipality_tip(m) == tip]
+
+    rows = []
+    for m in munis:
+        if not m.il:
+            continue
+        geo = _geo_filters(il=m.il, ilce=m.ilce)
+
+        def count_models(*, start=None, end=None, teslim_only=False):
+            n = 0
+            for model in (Kaynak, Atik):
+                qq = model.query
+                if start is not None:
+                    qq = qq.filter(model.tarih >= start)
+                if end is not None:
+                    qq = qq.filter(model.tarih < end)
+                if teslim_only:
+                    qq = qq.filter(model.ilan_durumu == "Teslim Edildi")
+                if kategori:
+                    qq = qq.filter(func.lower(model.kategori).like(f"%{kategori.casefold()}%"))
+                if geo:
+                    qq = qq.join(User, model.user_id == User.id).filter(*geo)
+                n += qq.count()
+            return n
+
+        ilan = count_models()
+        teslim = count_models(teslim_only=True)
+        cur = count_models(start=cur_start, end=now)
+        prev = count_models(start=prev_start, end=cur_start)
+
+        if prev > 0:
+            gelisim = round(((cur - prev) / prev) * 100.0, 1)
+        else:
+            gelisim = 100.0 if cur > 0 else 0.0
+
+        teslim_orani = round(100.0 * teslim / ilan, 1) if ilan else 0.0
+        puan = min(100.0, round(0.55 * min(ilan * 5, 100) + 0.45 * teslim_orani, 1))
+
+        rows.append({
+            "id": m.id,
+            "ad": m.display_name or m.username,
+            "il": m.il,
+            "ilce": m.ilce,
+            "tip": _municipality_tip(m),
+            "ilan": ilan,
+            "teslim": teslim,
+            "teslim_orani": teslim_orani,
+            "puan": puan,
+            "gelisim_yuzde": gelisim,
+            "renk": (
+                "yesil" if puan >= 70 else "sari" if puan >= 40 else "kirmizi"
+            ),
+        })
+
+    return sorted(rows, key=lambda r: (-r["puan"], r["ad"]))
+
+
+def ministry_ai_summary(kpi: dict, board: list[dict], provinces: list[dict]) -> list[str]:
+    """Ulusal AI özeti — kural tabanlı rapor dili (UI için)."""
+    tips = []
+    if kpi.get("aktif_belediye"):
+        tips.append(
+            f"Türkiye genelinde {kpi['aktif_belediye']} aktif belediye ve "
+            f"{kpi.get('aktif_kurum', 0)} kurum izlenmektedir."
+        )
+    if kpi.get("toplam_geri_kazanim_kg", 0) > 0:
+        tips.append(
+            f"Toplam geri kazanım {kpi['toplam_geri_kazanim_kg']:.1f} kg; "
+            f"CO₂ tasarrufu {kpi.get('co2_tasarrufu_kg', 0):.1f} kg seviyesindedir."
+        )
+    if board:
+        top = board[0]
+        tips.append(
+            f"En yüksek performanslı belediye: {top['ad']} "
+            f"({top.get('il')}, puan {top['puan']})."
+        )
+        risky = [r for r in board if r["renk"] == "kirmizi"]
+        if risky:
+            tips.append(
+                f"{len(risky)} belediye risk bandındadır; öncelikli izleme önerilir."
+            )
+        growing = sorted(board, key=lambda r: -r["gelisim_yuzde"])
+        if growing and growing[0]["gelisim_yuzde"] >= 15:
+            tips.append(
+                f"{growing[0]['ad']} belediyesinde dikkat çekici gelişim "
+                f"(%{growing[0]['gelisim_yuzde']:.0f}) gözlenmiştir."
+            )
+    if provinces:
+        tips.append(
+            f"İl sıralamasında önde: {provinces[0]['il']} "
+            f"(puan {provinces[0]['puan']})."
+        )
+    if kpi.get("vatandas_sayisi"):
+        tips.append(
+            f"Vatandaş sayısı {kpi['vatandas_sayisi']}; "
+            f"katılım oranı %{kpi.get('vatandas_katilim_orani', 0)}."
+        )
+    return tips[:6] or ["Ulusal veri birikimi devam etmektedir."]
+
+
+def ministry_national_center(
+    *,
+    il=None,
+    ilce=None,
+    belediye_id=None,
+    kurum_id=None,
+    kategori=None,
+    tarih=None,
+    belediye_tipi=None,
+) -> dict:
+    """Ulusal Yönetim Merkezi — dashboard paketi (API sözleşmesini değiştirmez)."""
+    kpi = ministry_kpi(il, ilce, belediye_id, kurum_id)
+    provinces = province_statistics(il=il)
+    rankings = top_bottom_provinces(10)
+    map_data = ministry_map_data(il=il, ilce=ilce)
+    board = municipality_performance_rows(
+        il=il, kategori=kategori, tarih=tarih, belediye_tipi=belediye_tipi
+    )
+
+    # İl merkezlerine performans rengi ekle
+    puan_by_il = {p["il"]: p["puan"] for p in provinces}
+    for c in map_data.get("il_merkezleri") or []:
+        puan = puan_by_il.get(c["il"], c.get("intensity", 0) * 100)
+        c["puan"] = round(float(puan), 1)
+        c["renk"] = "yesil" if puan >= 70 else "sari" if puan >= 40 else "kirmizi"
+        c["performans"] = (
+            "Yüksek" if puan >= 70 else "Orta" if puan >= 40 else "Düşük"
+        )
+
+    en_basarili = board[:10]
+    gelisim = sorted(
+        [r for r in board if r["gelisim_yuzde"] > 0],
+        key=lambda r: -r["gelisim_yuzde"],
+    )[:10]
+    riskli = sorted(
+        [r for r in board if r["renk"] == "kirmizi" or r["puan"] < 40],
+        key=lambda r: r["puan"],
+    )[:10]
+
+    return {
+        "kpi": kpi,
+        "map_data": map_data,
+        "province_rankings": rankings,
+        "provinces": provinces,
+        "en_basarili_belediyeler": en_basarili,
+        "gelisim_gosteren": gelisim,
+        "riskli_belediyeler": riskli,
+        "ai_ozeti": ministry_ai_summary(kpi, board, provinces),
+        "filtre": {
+            "il": _norm(il),
+            "ilce": _norm(ilce),
+            "kategori": _norm(kategori),
+            "tarih": _norm(tarih),
+            "belediye_tipi": _norm(belediye_tipi),
+        },
     }

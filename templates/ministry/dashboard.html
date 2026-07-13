@@ -1,10 +1,10 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="content-section fade-in">
+<div class="content-section fade-in ministry-national-center">
   <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-start gap-2">
     <div>
-      <h3 class="fw-bold"><i class="bi bi-globe2 me-2"></i>Bakanlık Yönetim Paneli</h3>
-      <small class="text-muted">Türkiye → İl → İlçe → Belediye → Kurum drill-down</small>
+      <h3 class="fw-bold"><i class="bi bi-globe2 me-2"></i>Ulusal Yönetim Merkezi</h3>
+      <small class="text-muted">Türkiye özeti · canlı harita · belediye performansı · AI özeti</small>
     </div>
     <a href="{{ url_for('admin_ministry.surdurulebilirlik') }}" class="btn btn-sm btn-outline-success">
       <i class="bi bi-leaf me-1"></i>Sustainability Scoring
@@ -13,75 +13,159 @@
 
   {% include "ministry/_filters.html" %}
 
+  <h6 class="text-uppercase text-muted fw-semibold mb-2 small">Türkiye Özeti</h6>
   <div class="row g-3 mb-4">
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ kpi.toplam_ilan }}</h5><small class="text-muted">Toplam İlan</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <h5>{{ kpi.aktif_belediye }}</h5><small class="text-muted">Aktif belediye</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <h5>{{ kpi.aktif_kurum }}</h5><small class="text-muted">Aktif kurum</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
         <h5>{{ "%.1f"|format(kpi.toplam_geri_kazanim_kg) }} kg</h5>
-        <small class="text-muted">Toplam Geri Kazanım</small>
+        <small class="text-muted">Toplam geri kazanım</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
         <h5>{{ "%.1f"|format(kpi.co2_tasarrufu_kg) }} kg</h5>
-        <small class="text-muted">CO₂ Tasarrufu</small>
+        <small class="text-muted">CO₂ tasarrufu</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
         <h5>{{ "%.1f"|format(kpi.enerji_tasarrufu_kwh) }} kWh</h5>
-        <small class="text-muted">Enerji Tasarrufu</small>
+        <small class="text-muted">Enerji tasarrufu</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
         <h5>{{ "%.0f"|format(kpi.su_tasarrufu_litre) }} L</h5>
-        <small class="text-muted">Su Tasarrufu</small>
+        <small class="text-muted">Su tasarrufu</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ kpi.aktif_belediye }}</h5><small class="text-muted">Aktif Belediye</small>
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
+        <h5>{{ kpi.vatandas_sayisi }}</h5><small class="text-muted">Vatandaş sayısı</small>
       </div></div>
     </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
-        <h5>{{ kpi.aktif_kurum }}</h5><small class="text-muted">Aktif Kurum</small>
-      </div></div>
-    </div>
-    <div class="col-6 col-md-4 col-lg-3">
-      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+    <div class="col-6 col-md-4 col-xl-3">
+      <div class="card stat-card shadow-sm h-100"><div class="card-body py-3">
         <h5>%{{ kpi.vatandas_katilim_orani }}</h5>
-        <small class="text-muted">Vatandaş Katılım</small>
+        <small class="text-muted">Vatandaş katılımı</small>
       </div></div>
     </div>
   </div>
 
   <div class="card shadow-sm mb-4">
-    <div class="card-header fw-bold"><i class="bi bi-thermometer-half me-2"></i>Türkiye Isı Haritası (İl Yoğunluğu)</div>
+    <div class="card-header fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span><i class="bi bi-map me-2"></i>Canlı Türkiye Haritası</span>
+      <div class="d-flex flex-wrap gap-2 small">
+        <span class="badge ministry-legend-yesil">Yüksek performans</span>
+        <span class="badge ministry-legend-sari">Orta</span>
+        <span class="badge ministry-legend-kirmizi">Düşük / risk</span>
+      </div>
+    </div>
     <div class="card-body p-0">
       <div id="ministryIsiHaritasi" class="map-container map-container-tall"></div>
     </div>
+    <div class="card-footer small text-muted">
+      İller renk ve performans skoruna göre gösterilir · Filtre: il / kategori / tarih / belediye tipi
+    </div>
   </div>
 
-  <div class="row g-4">
-    <div class="col-lg-6">
+  <div class="row g-4 mb-4">
+    <div class="col-lg-4">
       <div class="card shadow-sm h-100">
-        <div class="card-header fw-bold text-success">En Başarılı 10 İl</div>
-        <div class="card-body">
-          <canvas id="ministryTopChart" height="260"></canvas>
+        <div class="card-header fw-bold text-success">En başarılı 10 belediye</div>
+        <ul class="list-group list-group-flush ministry-rank-list">
+          {% for r in center.en_basarili_belediyeler %}
+          <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">{{ loop.index }}. {{ r.ad }}</div>
+              <small class="text-muted">{{ r.il }}{% if r.ilce %} / {{ r.ilce }}{% endif %}</small>
+            </div>
+            <span class="badge text-bg-success">{{ r.puan }}</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Veri yok</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold text-primary">Gelişim gösteren belediyeler</div>
+        <ul class="list-group list-group-flush ministry-rank-list">
+          {% for r in center.gelisim_gosteren %}
+          <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">{{ r.ad }}</div>
+              <small class="text-muted">{{ r.il }}</small>
+            </div>
+            <span class="badge text-bg-primary">+{{ "%.0f"|format(r.gelisim_yuzde) }}%</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Gelişim kaydı yok</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold text-danger">Riskli belediyeler</div>
+        <ul class="list-group list-group-flush ministry-rank-list">
+          {% for r in center.riskli_belediyeler %}
+          <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">{{ r.ad }}</div>
+              <small class="text-muted">{{ r.il }} · teslim %{{ r.teslim_orani }}</small>
+            </div>
+            <span class="badge text-bg-danger">{{ r.puan }}</span>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">Risk bandında belediye yok</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-5">
+      <div class="card shadow-sm h-100 ministry-ai-summary border-0">
+        <div class="card-header fw-bold bg-transparent border-0 pt-3">🤖 AI Özeti</div>
+        <div class="card-body pt-0">
+          {% for tip in center.ai_ozeti %}
+          <p class="ministry-ai-line mb-3{% if loop.last %} mb-0{% endif %}">{{ tip }}</p>
+          {% else %}
+          <p class="text-muted mb-0">Özet henüz oluşmadı.</p>
+          {% endfor %}
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="card shadow-sm h-100">
-        <div class="card-header fw-bold text-warning">En Düşük 10 İl</div>
-        <div class="card-body">
-          <canvas id="ministryBottomChart" height="260"></canvas>
+    <div class="col-lg-7">
+      <div class="row g-3 h-100">
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header fw-bold text-success">En başarılı 10 il</div>
+            <div class="card-body">
+              <canvas id="ministryTopChart" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header fw-bold text-warning">Gelişim alanı — iller</div>
+            <div class="card-body">
+              <canvas id="ministryBottomChart" height="220"></canvas>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -89,6 +173,24 @@
 
   {% include "_prediction_panel.html" %}
 </div>
+
+<style>
+.ministry-rank-list { max-height: 360px; overflow-y: auto; }
+.ministry-legend-yesil { background:#d1fae5; color:#065f46; }
+.ministry-legend-sari { background:#fef3c7; color:#92400e; }
+.ministry-legend-kirmizi { background:#fee2e2; color:#991b1b; }
+.ministry-ai-summary {
+  background: linear-gradient(145deg, #ecfdf5 0%, #ffffff 55%, #f0fdfa 100%);
+  border: 1px solid rgba(15, 118, 110, 0.12) !important;
+}
+.ministry-ai-line {
+  color: #134e4a;
+  line-height: 1.5;
+  padding-left: 0.75rem;
+  border-left: 3px solid #5eead4;
+  font-size: 0.95rem;
+}
+</style>
 
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=true) }}

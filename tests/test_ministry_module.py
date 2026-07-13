@@ -168,9 +168,11 @@ def test_ministry_dashboard_allowed(client, ministry_data):
     resp = client.get("/minister/dashboard")
     assert resp.status_code == 200
     text = resp.data.decode("utf-8", errors="ignore")
-    assert "Bakanlık Yönetim Paneli" in text
-    assert "Toplam İlan" in text
+    assert "Ulusal Yönetim Merkezi" in text or "Bakanlık" in text
+    assert "Aktif belediye" in text
     assert "CO₂" in text or "CO2" in text
+    assert "AI Özeti" in text
+    assert "En başarılı 10 belediye" in text
 
 
 def test_ministry_dashboard_allowed_for_admin(client, ministry_data):
@@ -199,6 +201,7 @@ def test_api_kpi(client, ministry_data):
     assert data["aktif_belediye"] >= 2
     assert data["aktif_kurum"] >= 1
     assert "vatandas_katilim_orani" in data
+    assert "vatandas_sayisi" in data
 
 
 def test_api_map(client, ministry_data):

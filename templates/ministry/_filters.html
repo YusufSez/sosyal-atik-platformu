@@ -1,5 +1,5 @@
 <form method="GET" class="row g-2 align-items-end mb-3 ministry-filters" id="ministryFilterForm">
-  <div class="col-6 col-md-3 col-lg">
+  <div class="col-6 col-md-4 col-lg">
     <label class="form-label small mb-1">İl</label>
     <select name="il" id="minFiltreIl" class="form-select form-select-sm">
       <option value="">Türkiye</option>
@@ -8,7 +8,7 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-6 col-md-3 col-lg">
+  <div class="col-6 col-md-4 col-lg">
     <label class="form-label small mb-1">İlçe</label>
     <select name="ilce" id="minFiltreIlce" class="form-select form-select-sm">
       <option value="">Tümü</option>
@@ -17,7 +17,33 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-6 col-md-3 col-lg">
+  <div class="col-6 col-md-4 col-lg">
+    <label class="form-label small mb-1">Kategori</label>
+    <select name="kategori" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for k in kategoriler or [] %}
+      <option value="{{ k }}" {% if secili_kategori == k %}selected{% endif %}>{{ k }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <label class="form-label small mb-1">Tarih</label>
+    <select name="tarih" class="form-select form-select-sm">
+      <option value="" {% if not secili_tarih %}selected{% endif %}>Tümü</option>
+      <option value="7" {% if secili_tarih == '7' %}selected{% endif %}>Son 7 gün</option>
+      <option value="30" {% if secili_tarih == '30' %}selected{% endif %}>Son 30 gün</option>
+      <option value="90" {% if secili_tarih == '90' %}selected{% endif %}>Son 90 gün</option>
+    </select>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
+    <label class="form-label small mb-1">Belediye tipi</label>
+    <select name="belediye_tipi" class="form-select form-select-sm">
+      <option value="" {% if not secili_belediye_tipi %}selected{% endif %}>Tümü</option>
+      <option value="ilce" {% if secili_belediye_tipi == 'ilce' %}selected{% endif %}>İlçe belediyesi</option>
+      <option value="merkez" {% if secili_belediye_tipi == 'merkez' %}selected{% endif %}>Merkez</option>
+    </select>
+  </div>
+  <div class="col-6 col-md-4 col-lg">
     <label class="form-label small mb-1">Belediye</label>
     <select name="belediye_id" id="minFiltreBelediye" class="form-select form-select-sm">
       <option value="">Tümü</option>
@@ -28,7 +54,7 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-6 col-md-3 col-lg">
+  <div class="col-6 col-md-4 col-lg">
     <label class="form-label small mb-1">Kurum</label>
     <select name="kurum_id" id="minFiltreKurum" class="form-select form-select-sm">
       <option value="">Tümü</option>

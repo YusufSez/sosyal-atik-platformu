@@ -8,9 +8,10 @@ from services.ministry_analytics import (
     ministry_drilldown_options,
     ministry_kpi,
     ministry_map_data,
+    ministry_national_center,
     ministry_statistics,
-    top_bottom_provinces,
 )
+from constants import MUNICIPALITY_CATEGORY_GROUPS
 from services.sustainability_ai import generate_sustainability_suggestions
 from services.sustainability_pdf import export_sustainability_pdf
 from services.sustainability_scoring import sustainability_dashboard
@@ -25,6 +26,20 @@ def _filters():
         "ilce": request.args.get("ilce") or None,
         "belediye_id": request.args.get("belediye_id") or None,
         "kurum_id": request.args.get("kurum_id") or None,
+        "kategori": request.args.get("kategori") or None,
+        "tarih": request.args.get("tarih") or None,
+        "belediye_tipi": request.args.get("belediye_tipi") or None,
+    }
+
+
+def _geo_only(filters=None):
+    """Mevcut API'ler için yalnızca coğrafi filtreler (geriye uyum)."""
+    filters = filters or _filters()
+    return {
+        "il": filters.get("il"),
+        "ilce": filters.get("ilce"),
+        "belediye_id": filters.get("belediye_id"),
+        "kurum_id": filters.get("kurum_id"),
     }
 
 
@@ -50,10 +65,14 @@ def _page_context(**extra):
         "ilceler": opts["ilceler"],
         "belediyeler": opts["belediyeler"],
         "kurumlar": opts["kurumlar"],
+        "kategoriler": MUNICIPALITY_CATEGORY_GROUPS,
         "secili_il": filters["il"],
         "secili_ilce": filters["ilce"],
         "secili_belediye_id": str(filters["belediye_id"] or ""),
         "secili_kurum_id": str(filters["kurum_id"] or ""),
+        "secili_kategori": filters["kategori"],
+        "secili_tarih": filters["tarih"],
+        "secili_belediye_tipi": filters["belediye_tipi"],
     }
     ctx.update(extra)
     return ctx
@@ -66,17 +85,29 @@ def _page_context(**extra):
 def dashboard():
     filters = _filters()
     if _wants_json():
-        return jsonify(ministry_statistics(**filters))
+        return jsonify(ministry_statistics(
+            il=filters["il"],
+            ilce=filters["ilce"],
+            belediye_id=filters["belediye_id"],
+            kurum_id=filters["kurum_id"],
+        ))
 
-    kpi = ministry_kpi(**filters)
-    rankings = top_bottom_provinces(10)
-    map_data = ministry_map_data(il=filters["il"], ilce=filters["ilce"])
+    center = ministry_national_center(
+        il=filters["il"],
+        ilce=filters["ilce"],
+        belediye_id=filters["belediye_id"],
+        kurum_id=filters["kurum_id"],
+        kategori=filters["kategori"],
+        tarih=filters["tarih"],
+        belediye_tipi=filters["belediye_tipi"],
+    )
     return render_template(
         "ministry/dashboard.html",
-        title="Bakanlık Dashboard",
-        kpi=kpi,
-        rankings=rankings,
-        map_data=map_data,
+        title="Ulusal Yönetim Merkezi",
+        kpi=center["kpi"],
+        rankings=center["province_rankings"],
+        map_data=center["map_data"],
+        center=center,
         **_page_context(),
     )
 
@@ -85,22 +116,21 @@ def dashboard():
 @login_required
 @ministry_required
 def api_map():
-    filters = _filters()
-    return jsonify(ministry_map_data(il=filters["il"], ilce=filters["ilce"]))
+    return jsonify(ministry_map_data(**{k: v for k, v in _geo_only().items() if k in ("il", "ilce")}))
 
 
 @admin_ministry_bp.route("/kpi")
 @login_required
 @ministry_required
 def api_kpi():
-    return jsonify(ministry_kpi(**_filters()))
+    return jsonify(ministry_kpi(**_geo_only()))
 
 
 @admin_ministry_bp.route("/statistics")
 @login_required
 @ministry_required
 def api_statistics():
-    return jsonify(ministry_statistics(**_filters()))
+    return jsonify(ministry_statistics(**_geo_only()))
 
 
 @admin_ministry_bp.route("/api/drilldown")

@@ -9,6 +9,13 @@
     return;
   }
 
+  function renkHex(renk) {
+    if (renk === "yesil") return "#059669";
+    if (renk === "sari") return "#f59e0b";
+    if (renk === "kirmizi") return "#dc2626";
+    return "#64748b";
+  }
+
   if (typeof L !== "undefined") {
     var map = L.map("ministryIsiHaritasi").setView([39.0, 35.0], 6);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -16,7 +23,7 @@
     }).addTo(map);
 
     var heat = config.heat || [];
-    if (heat.length) {
+    if (heat.length && typeof L.heatLayer === "function") {
       L.heatLayer(heat, {
         radius: 28,
         blur: 22,
@@ -32,22 +39,26 @@
     }
 
     (config.il_merkezleri || []).forEach(function (c) {
-      var color =
-        c.intensity >= 0.7 ? "#059669" : c.intensity >= 0.4 ? "#f59e0b" : "#64748b";
+      var color = renkHex(c.renk) || (
+        c.intensity >= 0.7 ? "#059669" : c.intensity >= 0.4 ? "#f59e0b" : "#64748b"
+      );
+      var puan = c.puan != null ? c.puan : Math.round((c.intensity || 0) * 100);
       L.circleMarker([c.lat, c.lng], {
-        radius: 8 + c.intensity * 10,
+        radius: 8 + Math.min(1, (c.intensity || puan / 100)) * 10,
         color: color,
         fillColor: color,
-        fillOpacity: 0.55,
+        fillOpacity: 0.6,
         weight: 1,
       })
         .bindPopup(
           "<strong>" +
             c.il +
-            "</strong><br>Yoğunluk: " +
-            Math.round(c.intensity * 100) +
-            "<br>Kullanıcı: " +
-            c.kullanici
+            "</strong><br>Performans: " +
+            (c.performans || "—") +
+            " (" +
+            puan +
+            ")<br>Kullanıcı: " +
+            (c.kullanici || "—")
         )
         .addTo(map);
     });
@@ -78,6 +89,7 @@
       options: {
         indexAxis: "y",
         responsive: true,
+        maintainAspectRatio: true,
         plugins: { legend: { display: false } },
         scales: { x: { beginAtZero: true, max: 100 } },
       },
