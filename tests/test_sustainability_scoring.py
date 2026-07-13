@@ -202,10 +202,15 @@ def sustainability_data(app):
 
 def test_grade_for_score_bands():
     assert grade_for_score(95) == "A+"
-    assert grade_for_score(85) == "A"
+    assert grade_for_score(90) == "A"
+    assert grade_for_score(85) == "B+"
     assert grade_for_score(70) == "B"
     assert grade_for_score(55) == "C"
-    assert grade_for_score(10) == "D"
+    assert grade_for_score(35) == "D"
+    assert grade_for_score(11) == "F"
+    assert grade_for_score(31) == "D"
+    # 11 ve 31 aynı harf bandında olmamalı
+    assert grade_for_score(11) != grade_for_score(31)
 
 
 def test_weights_sum_100():
@@ -216,9 +221,12 @@ def test_score_region_bounds_and_criteria(app, sustainability_data):
     with app.app_context():
         scored = score_region(il="Sakarya", ilce="Serdivan")
         assert 0 <= scored["puan"] <= 100
-        assert scored["grade"] in ("A+", "A", "B", "C", "D")
+        assert scored["grade"] in ("A+", "A", "B+", "B", "C+", "C", "D+", "D", "E", "F")
         keys = {c["key"] for c in scored["criteria"]}
         assert keys == set(SUSTAINABILITY_WEIGHTS)
+        # Ağırlıklı katkı toplamı ≈ puan
+        weighted = sum(c["weighted"] for c in scored["criteria"])
+        assert abs(weighted - scored["puan"]) < 0.6
         assert scored["metrics"]["teslim"] >= 2
         assert scored["metrics"]["co2e_kg"] >= 20
 
@@ -248,6 +256,8 @@ def test_dashboard_bundle(app, sustainability_data):
         assert "turkey_ranking" in dash
         assert "province_ranking" in dash
         assert "il_ranking" in dash
+        assert "comparison" in dash
+        assert dash["comparison"].get("message")
         assert dash["current"]["belediye_id"] == muni.id
         assert dash["my_rank"] is not None
 
@@ -258,8 +268,18 @@ def test_ai_suggestions_rule_based(app, sustainability_data):
             result = generate_sustainability_suggestions(il="Sakarya", ilce="Serdivan")
         assert result["source"] == "rules"
         assert result["suggestions"]
-        text = " ".join(result["suggestions"]).lower()
-        assert "elektronik" in text or "bitkisel" in text or "puan" in text
+        first = result["suggestions"][0]
+        assert isinstance(first, dict)
+        assert first.get("title")
+        assert first.get("description")
+        assert first.get("priority") in ("Kritik", "Yüksek", "Orta", "Düşük")
+        assert first.get("duration") in ("Kısa", "Orta", "Uzun")
+        assert first.get("reason")
+        text = " ".join(
+            f"{s.get('title','')} {s.get('description','')} {s.get('reason','')}"
+            for s in result["suggestions"]
+        ).lower()
+        assert "elektronik" in text or "bitkisel" in text or "puan" in text or "teslim" in text
 
 
 def test_pdf_export(app, sustainability_data):

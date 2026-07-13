@@ -68,15 +68,22 @@ SUSTAINABILITY_CRITERION_LABELS = {
     "teslim_suresi": "Teslim süresi",
     "ai_dogruluk": "AI doğruluk oranı",
 }
-# Harf notu eşikleri (puan alt sınırı)
+# Harf notu eşikleri (puan alt sınırı) — 11 ile 31 aynı banda düşmesin
 SUSTAINABILITY_GRADES = (
-    (90, "A+"),
-    (80, "A"),
-    (65, "B"),
+    (95, "A+"),
+    (90, "A"),
+    (80, "B+"),
+    (70, "B"),
+    (60, "C+"),
     (50, "C"),
-    (0, "D"),
+    (40, "D+"),
+    (30, "D"),
+    (20, "E"),
+    (0, "F"),
 )
-# Karbon: bölge başına bu kg CO₂e tasarrufu ≈ 100 puan
+# Eksik veri (payda=0) için nötr skor — sıfırlar toplamı ezmesin
+SUSTAINABILITY_MISSING_NEUTRAL = 45.0
+# Karbon: bölge başına bu kg CO₂e tasarrufu ≈ 100 puan (log ölçek)
 SUSTAINABILITY_CO2_BENCHMARK_KG = 50.0
 # Teslim süresi: ideal gün / sıfır puan gün
 SUSTAINABILITY_DELIVERY_IDEAL_DAYS = 3.0

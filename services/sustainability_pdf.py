@@ -7,12 +7,14 @@ import io
 from utils import utc_now
 
 
-def export_sustainability_pdf(dashboard: dict, suggestions: list[str] | None = None) -> tuple[bytes, str]:
+def export_sustainability_pdf(dashboard: dict, suggestions: list | None = None) -> tuple[bytes, str]:
     """Skor kartı + lider tablosu PDF (reportlab)."""
+    from services.sustainability_ai import suggestion_cards_as_text
+
     current = dashboard.get("current") or {}
     leaders = dashboard.get("leaderboard") or []
     provinces = dashboard.get("province_ranking") or []
-    suggestions = suggestions or []
+    tip_lines = suggestion_cards_as_text(suggestions or [])
     ts = utc_now().strftime("%Y%m%d_%H%M")
     filename = f"surdurulebilirlik_{ts}.pdf"
 
@@ -38,7 +40,10 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list[str] | None = N
             f"(Not: {current.get('grade', '—')})",
             styles["Heading2"],
         ))
-        story.append(Spacer(1, 8))
+        comparison = (dashboard.get("comparison") or {}).get("message")
+        if comparison:
+            story.append(Paragraph(comparison, styles["Normal"]))
+            story.append(Spacer(1, 8))
 
         crit_rows = [["Kriter", "Puan", "Ağırlık", "Katkı"]]
         for c in current.get("criteria") or []:
@@ -59,9 +64,9 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list[str] | None = N
         story.append(t1)
         story.append(Spacer(1, 16))
 
-        if suggestions:
+        if tip_lines:
             story.append(Paragraph("AI Önerileri", styles["Heading2"]))
-            for tip in suggestions[:8]:
+            for tip in tip_lines[:8]:
                 story.append(Paragraph(f"• {tip}", styles["Normal"]))
             story.append(Spacer(1, 12))
 
@@ -114,6 +119,6 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list[str] | None = N
         ]
         for c in current.get("criteria") or []:
             lines.append(f"- {c.get('label')}: {c.get('score')}")
-        for tip in suggestions:
+        for tip in tip_lines:
             lines.append(f"* {tip}")
         return "\n".join(lines).encode("utf-8"), filename.replace(".pdf", ".txt")
