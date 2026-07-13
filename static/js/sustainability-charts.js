@@ -9,6 +9,7 @@
   }
 
   var UI = window.AtikPortUI || null;
+  if (UI && UI.applyChartTheme) UI.applyChartTheme();
   var DEMO = (UI && UI.DEMO) || {};
   var radar = cfg.radar || {};
   var history = cfg.history || {};

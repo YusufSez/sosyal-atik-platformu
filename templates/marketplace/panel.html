@@ -221,6 +221,7 @@
 }|tojson }}</script>
 <script type="application/json" id="marketplace-map-config">{{ {'points': map_points}|tojson }}</script>
 
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=false) }}
 <script src="{{ url_for('static', filename='js/marketplace-map.js') }}"></script>

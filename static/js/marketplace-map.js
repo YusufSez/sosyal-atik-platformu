@@ -9,9 +9,16 @@
   }
   var points = config.points || [];
   var map = L.map("marketplaceMap").setView([39.0, 35.0], 6);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap",
-  }).addTo(map);
+  var UI = window.AtikPortUI;
+  L.tileLayer(
+    (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      attribution:
+        (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
+        "© OpenStreetMap",
+    }
+  ).addTo(map);
 
   if (!points.length) return;
   var bounds = [];

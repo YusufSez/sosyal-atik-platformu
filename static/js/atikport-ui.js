@@ -1,5 +1,5 @@
 /**
- * AtıkPort ortak UI yardımcıları — empty state, skeleton, demo chart verisi.
+ * AtıkPort ortak UI yardımcıları — empty state, skeleton, demo, dark theme.
  * Backend / API değiştirmez.
  */
 (function (global) {
@@ -26,6 +26,50 @@
       values: [88, 81, 76, 71, 65],
     },
   };
+
+  function isDark() {
+    return document.documentElement.getAttribute("data-bs-theme") === "dark";
+  }
+
+  function leafletTileUrl() {
+    return isDark()
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  }
+
+  function leafletAttribution() {
+    return isDark()
+      ? '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+      : "© OpenStreetMap";
+  }
+
+  function applyChartTheme() {
+    if (typeof Chart === "undefined") return;
+    var dark = isDark();
+    Chart.defaults.color = dark ? "#cbd5e1" : "#475569";
+    Chart.defaults.borderColor = dark
+      ? "rgba(148, 163, 184, 0.18)"
+      : "rgba(15, 23, 42, 0.08)";
+    Chart.defaults.plugins = Chart.defaults.plugins || {};
+    Chart.defaults.plugins.legend = Chart.defaults.plugins.legend || {};
+    Chart.defaults.plugins.legend.labels = Chart.defaults.plugins.legend.labels || {};
+    Chart.defaults.plugins.legend.labels.color = dark ? "#e2e8f0" : "#334155";
+    Chart.defaults.plugins.tooltip = Chart.defaults.plugins.tooltip || {};
+    Chart.defaults.plugins.tooltip.backgroundColor = dark
+      ? "rgba(15, 23, 42, 0.95)"
+      : "rgba(15, 23, 42, 0.92)";
+    Chart.defaults.plugins.tooltip.titleColor = "#f8fafc";
+    Chart.defaults.plugins.tooltip.bodyColor = "#e2e8f0";
+    Chart.defaults.plugins.tooltip.borderColor = dark
+      ? "rgba(45, 212, 191, 0.35)"
+      : "rgba(13, 148, 136, 0.35)";
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.scale = Chart.defaults.scale || {};
+    Chart.defaults.scale.grid = Chart.defaults.scale.grid || {};
+    Chart.defaults.scale.grid.color = dark
+      ? "rgba(148, 163, 184, 0.12)"
+      : "rgba(15, 23, 42, 0.06)";
+  }
 
   function escapeHtml(s) {
     return String(s == null ? "" : s)
@@ -88,7 +132,10 @@
 
   function markDemo(canvas, on) {
     if (!canvas) return;
-    var host = canvas.closest(".ops-panel-body, .ds-panel-body, .ss-radar-body, .pred-chart-wrap") || canvas.parentElement;
+    var host =
+      canvas.closest(
+        ".ops-panel-body, .ds-panel-body, .ss-radar-body, .pred-chart-wrap, .ss-history-wrap"
+      ) || canvas.parentElement;
     if (!host) return;
     var badge = host.querySelector(".ap-demo-badge");
     if (on) {
@@ -104,8 +151,14 @@
     }
   }
 
+  applyChartTheme();
+
   global.AtikPortUI = {
     DEMO: DEMO,
+    isDark: isDark,
+    leafletTileUrl: leafletTileUrl,
+    leafletAttribution: leafletAttribution,
+    applyChartTheme: applyChartTheme,
     emptyHtml: emptyHtml,
     mountEmpty: mountEmpty,
     wrapChartOrEmpty: wrapChartOrEmpty,

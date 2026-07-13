@@ -17,10 +17,17 @@
   }
 
   if (typeof L !== "undefined") {
+    var UI = window.AtikPortUI;
     var map = L.map("ministryIsiHaritasi").setView([39.0, 35.0], 6);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-    }).addTo(map);
+    L.tileLayer(
+      (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        attribution:
+          (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
+          "© OpenStreetMap",
+      }
+    ).addTo(map);
 
     var heat = config.heat || [];
     if (heat.length && typeof L.heatLayer === "function") {
@@ -68,6 +75,7 @@
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return;
     var UI = window.AtikPortUI || null;
+    if (UI && UI.applyChartTheme) UI.applyChartTheme();
     var DEMO = (UI && UI.DEMO) || {};
     var labels = (rows || []).map(function (r) {
       return r.il;

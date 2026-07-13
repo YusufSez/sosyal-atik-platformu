@@ -27,16 +27,16 @@
 
   {% include "ministry/_filters.html" %}
 
-  {# —— Türkiye Özeti —— #}
-  <h6 class="ops-section-title">Türkiye Özeti</h6>
+  <p class="ap-flow-note">Türkiye özeti</p>
+  <h6 class="ops-section-title">Türkiye KPI</h6>
   <div class="row g-3 mb-4 ops-kpi-row">
     <div class="col-6 col-md-4 col-xl">
       <div class="ops-kpi ops-kpi-teal h-100">
         <div class="ops-kpi-icon"><i class="bi bi-recycle"></i></div>
         <div class="ops-kpi-body">
-          <div class="ops-kpi-label">Toplam geri kazanım</div>
-          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.toplam_geri_kazanim_kg) }}</div>
+          <div class="ops-kpi-label">Geri kazanım</div>
           <div class="ops-kpi-sub">kg</div>
+          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.toplam_geri_kazanim_kg) }}</div>
         </div>
       </div>
     </div>
@@ -45,6 +45,7 @@
         <div class="ops-kpi-icon"><i class="bi bi-building"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">Aktif belediye</div>
+          <div class="ops-kpi-sub">Ulusal kapsama</div>
           <div class="ops-kpi-value">{{ kpi.aktif_belediye }}</div>
         </div>
       </div>
@@ -54,6 +55,7 @@
         <div class="ops-kpi-icon"><i class="bi bi-briefcase"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">Aktif kurum</div>
+          <div class="ops-kpi-sub">B2B birim</div>
           <div class="ops-kpi-value">{{ kpi.aktif_kurum }}</div>
         </div>
       </div>
@@ -63,8 +65,8 @@
         <div class="ops-kpi-icon"><i class="bi bi-cloud"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">CO₂</div>
-          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.co2_tasarrufu_kg) }}</div>
           <div class="ops-kpi-sub">kg tasarruf</div>
+          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.co2_tasarrufu_kg) }}</div>
         </div>
       </div>
     </div>
@@ -73,8 +75,8 @@
         <div class="ops-kpi-icon"><i class="bi bi-lightning-charge"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">Enerji</div>
-          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.enerji_tasarrufu_kwh) }}</div>
           <div class="ops-kpi-sub">kWh</div>
+          <div class="ops-kpi-value">{{ "%.1f"|format(kpi.enerji_tasarrufu_kwh) }}</div>
         </div>
       </div>
     </div>
@@ -83,8 +85,8 @@
         <div class="ops-kpi-icon"><i class="bi bi-droplet"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">Su</div>
-          <div class="ops-kpi-value">{{ "%.0f"|format(kpi.su_tasarrufu_litre) }}</div>
           <div class="ops-kpi-sub">litre</div>
+          <div class="ops-kpi-value">{{ "%.0f"|format(kpi.su_tasarrufu_litre) }}</div>
         </div>
       </div>
     </div>
@@ -93,14 +95,14 @@
         <div class="ops-kpi-icon"><i class="bi bi-people"></i></div>
         <div class="ops-kpi-body">
           <div class="ops-kpi-label">Katılım</div>
-          <div class="ops-kpi-value">%{{ kpi.vatandas_katilim_orani }}</div>
           <div class="ops-kpi-sub">{{ kpi.vatandas_sayisi }} vatandaş</div>
+          <div class="ops-kpi-value"><span class="ap-pct-badge">%{{ kpi.vatandas_katilim_orani }}</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  {# —— Tam genişlik Heat Map —— #}
+  <p class="ap-flow-note">Heat Map</p>
   <div class="ops-panel mb-4">
     <div class="ops-panel-head">
       <span><i class="bi bi-map me-2"></i>Türkiye Heat Map</span>
@@ -118,6 +120,7 @@
     </div>
   </div>
 
+  <p class="ap-flow-note">Sıralama · Risk · Gelişim</p>
   {# —— Belediye sıraları —— #}
   <div class="row g-3 mb-4 ops-equal-row">
     <div class="col-lg-4">
@@ -182,6 +185,7 @@
     </div>
   </div>
 
+  <p class="ap-flow-note">AI · Karar destek</p>
   {# —— AI Ulusal Analiz —— #}
   {% set risk_n = center.riskli_belediyeler|length %}
   {% set risk_label = 'Yüksek' if risk_n >= 3 else ('Orta' if risk_n >= 1 else 'Düşük') %}
@@ -283,6 +287,7 @@
     </div>
   </div>
 
+  <p class="ap-flow-note">Grafikler</p>
   {# İl grafikleri (mevcut veri — kompakt) #}
   <div class="row g-3 mb-4">
     <div class="col-md-6">

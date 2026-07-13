@@ -8,6 +8,7 @@
     return;
   }
   var UI = window.AtikPortUI || null;
+  if (UI && UI.applyChartTheme) UI.applyChartTheme();
   var DEMO = (UI && UI.DEMO) || {};
   var accent = "#0f766e";
   var amber = "#b45309";

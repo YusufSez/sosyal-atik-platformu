@@ -50,9 +50,9 @@
 
   <div class="row g-4 mb-4">
     <div class="col-lg-6">
-      <div class="ds-panel h-100">
+      <div class="ds-panel h-100 ds-card-weekly">
         <div class="ds-panel-head">
-          <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Haftalık rapor</h5>
+          <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Haftalık</h5>
           <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='weekly') }}">PDF ↓</a>
         </div>
         <div class="ds-panel-body">
@@ -71,9 +71,9 @@
       </div>
     </div>
     <div class="col-lg-6">
-      <div class="ds-panel h-100">
+      <div class="ds-panel h-100 ds-card-monthly">
         <div class="ds-panel-head">
-          <h5 class="mb-0"><i class="bi bi-calendar-month me-2"></i>Aylık rapor</h5>
+          <h5 class="mb-0"><i class="bi bi-calendar-month me-2"></i>Aylık</h5>
           <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='monthly') }}">PDF ↓</a>
         </div>
         <div class="ds-panel-body">
@@ -95,8 +95,8 @@
 
   <div class="row g-4 mb-4">
     <div class="col-lg-5">
-      <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Risk analizi</h5></div>
+      <div class="ds-panel h-100 ds-card-risk">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Risk</h5></div>
         <div class="ds-panel-body">
           <div class="mb-2">
             <span class="badge ds-risk-{{ center.risk_analysis.level }}">{{ center.risk_analysis.level }}</span>
@@ -125,8 +125,8 @@
       </div>
     </div>
     <div class="col-lg-7">
-      <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-people me-2"></i>Vatandaş katılım eğilimleri</h5></div>
+      <div class="ds-panel h-100 ds-card-part">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-people me-2"></i>Katılım</h5></div>
         <div class="ds-panel-body position-relative">
           <canvas id="dsParticipationChart" height="200"></canvas>
           <div class="small text-muted mt-2">
@@ -140,8 +140,8 @@
 
   <div class="row g-4 mb-4">
     <div class="col-lg-6">
-      <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Kategori değişimleri</h5></div>
+      <div class="ds-panel h-100 ds-card-cat">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Kategori</h5></div>
         <div class="ds-panel-body position-relative">
           <canvas id="dsCategoryChart" height="220"></canvas>
         </div>
@@ -173,8 +173,8 @@
 
   <div class="row g-4 mb-4">
     <div class="col-lg-6">
-      <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-megaphone me-2"></i>Yeni kampanya önerileri</h5></div>
+      <div class="ds-panel h-100 ds-card-campaign">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-megaphone me-2"></i>Kampanya</h5></div>
         <div class="ds-panel-body">
           {% for c in center.campaigns %}
           <article class="ds-card-item mb-3">

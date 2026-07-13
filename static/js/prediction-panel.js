@@ -333,6 +333,9 @@
 
   function renderCharts(primary) {
     if (typeof Chart === "undefined") return;
+    if (window.AtikPortUI && window.AtikPortUI.applyChartTheme) {
+      window.AtikPortUI.applyChartTheme();
+    }
     var band = buildConfidenceBand(primary);
     var accent = "#0f766e";
     var forecastColor = "#0369a1";

@@ -9,6 +9,7 @@
     {% include '_vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/layout-shell.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/atikport-dashboard.css') }}" rel="stylesheet">
 </head>
 <body data-authenticated="{{ '1' if current_user.is_authenticated else '0' }}"
       data-giris-url="{{ url_for('auth.giris') }}"

@@ -68,13 +68,21 @@
         return r.json();
       })
       .then(function (noktalar) {
+        var UI = window.AtikPortUI;
+        if (UI && UI.applyChartTheme) UI.applyChartTheme();
         var map = L.map(mapEl).setView(
           [center.lat || 40.77, center.lng || 30.4],
           center.zoom || 11
         );
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap",
-        }).addTo(map);
+        L.tileLayer(
+          (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution:
+              (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
+              "© OpenStreetMap",
+          }
+        ).addTo(map);
 
         var pts = Array.isArray(noktalar) ? noktalar : [];
         if (pts.length && L.heatLayer) {
@@ -139,6 +147,9 @@
 
   function renderCharts() {
     if (typeof Chart === "undefined") return;
+    if (window.AtikPortUI && window.AtikPortUI.applyChartTheme) {
+      window.AtikPortUI.applyChartTheme();
+    }
     var m = cfg.metrics || {};
     var accent = "#0f766e";
     var palette = [

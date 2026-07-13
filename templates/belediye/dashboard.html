@@ -21,19 +21,23 @@
   </div>
   {% include "belediye/_nav.html" %}
 
-  {# Belediye → İlçe → Mahalle (il filtresi yok; il gizli kilitli) #}
-  <nav class="ops-breadcrumb" aria-label="Bölge hiyerarşisi">
-    <span><i class="bi bi-building me-1"></i>{{ belediye_adi }}{% if 'belediye' not in (belediye_adi|lower) %} Belediyesi{% endif %}</span>
-    {% if locked_il %}<span class="sep">↓</span><span class="text-muted">{{ locked_il }}</span>{% endif %}
-    {% if secili_ilce %}<span class="sep">↓</span><span>{{ secili_ilce }}</span>{% endif %}
-    {% if secili_mahalle %}<span class="sep">↓</span><span class="current">{{ secili_mahalle }}</span>{% endif %}
-  </nav>
+  {# Tek belediye paneli — il seçilemez #}
+  <div class="ap-location-card" title="Belediye kapsamı kilitli">
+    <i class="bi bi-geo-alt-fill"></i>
+    <span>
+      {% if locked_il %}
+        {{ belediye_adi }}{% if 'belediye' not in (belediye_adi|lower) %} Belediyesi{% endif %}
+        <span class="ap-loc-sub">· {{ locked_il }}</span>
+      {% else %}
+        Aktif Belediye
+      {% endif %}
+    </span>
+  </div>
 
   <div class="ops-filter-bar mb-4">
     <form method="GET" class="row g-2 align-items-end" id="belediyeFilterForm">
-      {# İl UI'da yok; heatmap/API kapsamı için belediye ili kilitli #}
       <input type="hidden" name="il" id="filtreIl" value="{{ locked_il }}">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <label class="form-label small mb-1"><i class="bi bi-geo me-1"></i>İlçe</label>
         <select name="ilce" id="filtreIlce" class="form-select form-select-sm">
           <option value="">Tümü</option>
@@ -42,7 +46,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <label class="form-label small mb-1"><i class="bi bi-pin-map me-1"></i>Mahalle</label>
         <select name="mahalle" id="filtreMahalle" class="form-select form-select-sm">
           <option value="">Tümü</option>
@@ -51,13 +55,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-3">
-        <label class="form-label small mb-1">Tarih</label>
-        <select class="form-select form-select-sm" disabled title="Operasyon görünümü: bugün">
-          <option selected>Bugün</option>
-        </select>
-      </div>
-      <div class="col-6 col-md-3 d-flex gap-2">
+      <div class="col-12 col-md-4 d-flex gap-2">
         <button type="submit" class="btn btn-sm btn-success flex-grow-1">Uygula</button>
         <a href="{{ url_for('belediye.dashboard', il=locked_il) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
       </div>
@@ -74,6 +72,7 @@
             <div class="ops-kpi-icon"><i class="bi bi-file-earmark-plus"></i></div>
             <div class="ops-kpi-body">
               <div class="ops-kpi-label">Bugün açılan ilanlar</div>
+              <div class="ops-kpi-sub">Günlük açılış</div>
               <div class="ops-kpi-value">{{ c.bugun_acilan }}</div>
             </div>
           </div>
@@ -82,7 +81,8 @@
           <div class="ops-kpi ops-kpi-amber h-100">
             <div class="ops-kpi-icon"><i class="bi bi-hourglass-split"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Bekleyen teslim</div>
+              <div class="ops-kpi-label">Bekleyen</div>
+              <div class="ops-kpi-sub">Teslim sırası</div>
               <div class="ops-kpi-value">{{ c.bekleyen_teslimler }}</div>
             </div>
           </div>
@@ -91,9 +91,9 @@
           <div class="ops-kpi ops-kpi-green h-100">
             <div class="ops-kpi-icon"><i class="bi bi-check2-circle"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Teslim edilen</div>
-              <div class="ops-kpi-value">{{ ozet.toplam_teslim }}</div>
+              <div class="ops-kpi-label">Teslim</div>
               <div class="ops-kpi-sub">24s: {{ c.son_24_saat.teslim }}</div>
+              <div class="ops-kpi-value">{{ ozet.toplam_teslim }}</div>
             </div>
           </div>
         </div>
@@ -101,9 +101,9 @@
           <div class="ops-kpi ops-kpi-blue h-100">
             <div class="ops-kpi-icon"><i class="bi bi-people"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Vatandaş katılımı</div>
-              <div class="ops-kpi-value">%{{ c.vatandas_katilimi.oran }}</div>
+              <div class="ops-kpi-label">Katılım</div>
               <div class="ops-kpi-sub">{{ c.vatandas_katilimi.gunluk }}/{{ c.vatandas_katilimi.toplam }}</div>
+              <div class="ops-kpi-value"><span class="ap-pct-badge">%{{ c.vatandas_katilimi.oran }}</span></div>
             </div>
           </div>
         </div>
@@ -111,11 +111,12 @@
           <div class="ops-kpi ops-kpi-red h-100">
             <div class="ops-kpi-icon"><i class="bi bi-exclamation-triangle"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Riskli bölge</div>
+              <div class="ops-kpi-label">Risk</div>
               {% if c.riskli_bolgeler %}
-              <div class="ops-kpi-value text-truncate" title="{{ c.riskli_bolgeler[0].bolge }}">{{ c.riskli_bolgeler[0].bolge }}</div>
               <div class="ops-kpi-sub">{{ c.riskli_bolgeler|length }} bölge</div>
+              <div class="ops-kpi-value text-truncate" title="{{ c.riskli_bolgeler[0].bolge }}">{{ c.riskli_bolgeler[0].bolge }}</div>
               {% else %}
+              <div class="ops-kpi-sub">Bölge izleme</div>
               <div class="ops-kpi-value">Yok</div>
               {% endif %}
             </div>
@@ -125,11 +126,12 @@
           <div class="ops-kpi ops-kpi-violet h-100">
             <div class="ops-kpi-icon"><i class="bi bi-geo-alt-fill"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">En yoğun mahalle</div>
+              <div class="ops-kpi-label">Yoğun mahalle</div>
               {% if c.en_yogun_mahalle %}
-              <div class="ops-kpi-value text-truncate" title="{{ c.en_yogun_mahalle.bolge }}">{{ c.en_yogun_mahalle.bolge }}</div>
               <div class="ops-kpi-sub">{{ c.en_yogun_mahalle.ilan_sayisi }} ilan</div>
+              <div class="ops-kpi-value text-truncate" title="{{ c.en_yogun_mahalle.bolge }}">{{ c.en_yogun_mahalle.bolge }}</div>
               {% else %}
+              <div class="ops-kpi-sub">Yoğunluk</div>
               <div class="ops-kpi-value">—</div>
               {% endif %}
             </div>
@@ -139,15 +141,16 @@
           <div class="ops-kpi ops-kpi-orange h-100">
             <div class="ops-kpi-icon"><i class="bi bi-tags"></i></div>
             <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Kritik kategori</div>
+              <div class="ops-kpi-label">Kritik kat.</div>
               {% if c.kritik_kategori %}
-              <div class="ops-kpi-value text-truncate">{{ c.kritik_kategori.kategori }}</div>
               <div class="ops-kpi-sub">
                 {% if c.kritik_kategori.degisim_yuzde %}
                 %{% if c.kritik_kategori.degisim_yuzde > 0 %}+{% endif %}{{ "%.0f"|format(c.kritik_kategori.degisim_yuzde) }}
                 {% else %}öne çıkan{% endif %}
               </div>
+              <div class="ops-kpi-value text-truncate">{{ c.kritik_kategori.kategori }}</div>
               {% else %}
+              <div class="ops-kpi-sub">Kategori</div>
               <div class="ops-kpi-value">—</div>
               {% endif %}
             </div>
@@ -158,8 +161,8 @@
             <div class="ops-kpi-icon"><i class="bi bi-robot"></i></div>
             <div class="ops-kpi-body">
               <div class="ops-kpi-label">AI Alarm</div>
-              <div class="ops-kpi-value">{{ c.ai_uyarilari }}</div>
               <div class="ops-kpi-sub">{{ c.yuksek_risk_ilan }} yüksek risk</div>
+              <div class="ops-kpi-value">{{ c.ai_uyarilari }}</div>
             </div>
           </div>
         </div>
@@ -170,7 +173,7 @@
         <div class="col-lg-7">
           <div class="ops-panel h-100">
             <div class="ops-panel-head">
-              <span><i class="bi bi-thermometer-half me-2"></i>Heat Map · Belediye sınırı</span>
+              <span><i class="bi bi-thermometer-half me-2"></i>Yerel Heat Map</span>
               <a class="small" href="{{ url_for('belediye.heatmap', il=locked_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">Tam ekran →</a>
             </div>
             <div class="ops-panel-body p-0 position-relative">
