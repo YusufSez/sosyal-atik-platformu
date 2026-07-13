@@ -48,11 +48,48 @@ CONTENT_SECURITY_POLICY = {
     "manifest-src": "'self'",
 }
 
+# Allowlist değerleri (dict); header'a liste string'i yazılmaz — format_permissions_policy kullanın.
 PERMISSIONS_POLICY = {
     "geolocation": ["self"],
     "microphone": [],
     "camera": [],
 }
+
+
+def format_permissions_policy(policy):
+    """Permissions-Policy header değerini structured-field sözdizimine çevirir.
+
+    Örnek giriş: {"geolocation": ["self"], "camera": [], "fullscreen": ["self"]}
+    Örnek çıkış: "geolocation=(self), camera=(), fullscreen=(self)"
+    """
+    if isinstance(policy, str):
+        return policy
+
+    parts = []
+    for feature, allowlist in (policy or {}).items():
+        if allowlist is None:
+            allowlist = []
+        if isinstance(allowlist, str):
+            tokens = [allowlist]
+        else:
+            tokens = list(allowlist)
+
+        formatted = []
+        for token in tokens:
+            value = str(token).strip().strip("'\"")
+            if not value:
+                continue
+            # Origin allowlist: https://example.com → "https://example.com"
+            if value.startswith(("http://", "https://")):
+                formatted.append(f'"{value}"')
+            else:
+                # self | none | src | *
+                formatted.append(value)
+
+        parts.append(f"{feature}=({', '.join(formatted)})")
+
+    return ", ".join(parts)
+
 
 _STATIC_CACHE_PATH_PREFIXES = (
     "/static/",
@@ -92,7 +129,8 @@ def init_security(app):
         content_security_policy_nonce_in=["script-src"],
         referrer_policy="strict-origin-when-cross-origin",
         frame_options="SAMEORIGIN",
-        permissions_policy=PERMISSIONS_POLICY,
+        # Talisman dict'i str(list) ile bozar; RFC uyumlu string verilir.
+        permissions_policy=format_permissions_policy(PERMISSIONS_POLICY),
         session_cookie_secure=force_https,
     )
 
