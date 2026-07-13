@@ -81,6 +81,8 @@
       </div>
     </div>
   </div>
+
+  {% include "_prediction_panel.html" %}
 </div>
 
 {% from '_leaflet_assets.html' import leaflet_assets %}
@@ -93,4 +95,12 @@
   'bottom': rankings.en_dusuk
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='js/ministry-dashboard.js') }}"></script>
+<script type="application/json" id="prediction-panel-config">{{ {
+  'apiUrl': url_for('admin_ministry.api_predictions'),
+  'query': {
+    'il': secili_il or '',
+    'ilce': secili_ilce or ''
+  }
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/prediction-panel.js') }}"></script>
 {% endblock %}

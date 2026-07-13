@@ -109,3 +109,23 @@ def api_drilldown():
         ilce=filters["ilce"],
         belediye_id=filters["belediye_id"],
     ))
+
+
+@admin_ministry_bp.route("/predictions")
+@login_required
+@ministry_required
+def api_predictions():
+    """AI Prediction Engine API (ulusal / filtrelenmiş)."""
+    from services.prediction_ai import generate_prediction_report
+
+    filters = _filters()
+    lookback = request.args.get("lookback", type=int) or 12
+    report = generate_prediction_report(
+        lookback_months=lookback,
+        il=filters["il"],
+        ilce=filters["ilce"],
+        include_all_lookbacks=True,
+    )
+    if str(lookback) in (report.get("lookbacks") or {}):
+        report["primary"] = report["lookbacks"][str(lookback)]
+    return jsonify(report)

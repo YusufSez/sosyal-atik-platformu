@@ -160,3 +160,25 @@ def api_geography():
         il=request.args.get("il") or None,
         ilce=request.args.get("ilce") or None,
     ))
+
+
+@belediye_bp.route("/api/predictions")
+@login_required
+@municipality_required
+def api_predictions():
+    """AI Prediction Engine — istatistiksel tahmin + AI yorum."""
+    from services.prediction_ai import generate_prediction_report
+
+    filters = _filters_from_request()
+    lookback = request.args.get("lookback", type=int) or 12
+    report = generate_prediction_report(
+        lookback_months=lookback,
+        il=filters["il"],
+        ilce=filters["ilce"],
+        mahalle=filters["mahalle"],
+        include_all_lookbacks=True,
+    )
+    # Seçili lookback'i primary yap
+    if str(lookback) in (report.get("lookbacks") or {}):
+        report["primary"] = report["lookbacks"][str(lookback)]
+    return jsonify(report)

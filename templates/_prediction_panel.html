@@ -1,0 +1,66 @@
+<div class="card shadow-sm mb-4" id="predictionPanel">
+  <div class="card-header fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-graph-up-arrow me-2"></i>AI Prediction Engine</span>
+    <div class="d-flex gap-2 align-items-center">
+      <label class="small text-muted mb-0">Analiz penceresi</label>
+      <select id="predictionLookback" class="form-select form-select-sm" style="width:auto">
+        <option value="12" selected>Son 12 ay</option>
+        <option value="24">Son 24 ay</option>
+        <option value="36">Son 36 ay</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-body">
+    <p class="small text-muted mb-3">
+      İstatistiksel OLS trend tahmini · Önümüzdeki 7 / 30 / 90 gün · Gemini yalnızca yorum üretir
+    </p>
+    <div class="row g-3 mb-3" id="predictionHorizonCards">
+      <div class="col-md-4">
+        <div class="border rounded p-3 h-100">
+          <div class="small text-muted">7 gün</div>
+          <div class="fw-semibold" data-pred="atik-7">—</div>
+          <div class="small" data-pred="kaynak-7">Kaynak: —</div>
+          <div class="small" data-pred="teslim-7">Teslim: —</div>
+          <div class="small text-success" data-pred="kat-7">Kategori: —</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-3 h-100 border-success">
+          <div class="small text-muted">30 gün</div>
+          <div class="fw-semibold" data-pred="atik-30">—</div>
+          <div class="small" data-pred="kaynak-30">Kaynak: —</div>
+          <div class="small" data-pred="teslim-30">Teslim: —</div>
+          <div class="small text-success" data-pred="kat-30">Kategori: —</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-3 h-100">
+          <div class="small text-muted">90 gün</div>
+          <div class="fw-semibold" data-pred="atik-90">—</div>
+          <div class="small" data-pred="kaynak-90">Kaynak: —</div>
+          <div class="small" data-pred="teslim-90">Teslim: —</div>
+          <div class="small text-success" data-pred="kat-90">Kategori: —</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-lg-6">
+        <canvas id="predictionHistoryChart" height="200"></canvas>
+      </div>
+      <div class="col-lg-6">
+        <canvas id="predictionForecastChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="border rounded p-3 bg-light-subtle">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <strong>AI Yorum</strong>
+        <span class="badge bg-secondary" id="predictionNarrativeSource">—</span>
+      </div>
+      <ul class="mb-0 ps-3" id="predictionNarratives">
+        <li class="text-muted">Yükleniyor…</li>
+      </ul>
+    </div>
+  </div>
+</div>
