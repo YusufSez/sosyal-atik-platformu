@@ -140,12 +140,13 @@ def export_pdf(scope: str) -> tuple[bytes, str]:
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        from services.pdf_fonts import get_pdf_styles, table_font_commands
 
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4)
-        styles = getSampleStyleSheet()
+        styles = get_pdf_styles()
         story = [
             Paragraph(f"AtıkPort Moderasyon Export — {scope}", styles["Title"]),
             Spacer(1, 12),
@@ -158,7 +159,7 @@ def export_pdf(scope: str) -> tuple[bytes, str]:
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                *table_font_commands(size=8),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
             ]))
             story.append(table)

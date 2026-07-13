@@ -24,12 +24,13 @@ def export_decision_support_pdf(center: dict, report_type: str = "full") -> tupl
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        from services.pdf_fonts import get_pdf_styles, table_font_commands
 
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-        styles = getSampleStyleSheet()
+        styles = get_pdf_styles()
         titles = {
             "weekly": "Haftalık Ulusal Karar Destek Raporu",
             "monthly": "Aylık Ulusal Karar Destek Raporu",
@@ -62,7 +63,7 @@ def export_decision_support_pdf(center: dict, report_type: str = "full") -> tupl
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            *table_font_commands(size=9),
         ]))
         story.append(t)
         story.append(Spacer(1, 12))
@@ -118,7 +119,7 @@ def export_decision_support_pdf(center: dict, report_type: str = "full") -> tupl
             tc.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#134e4a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                *table_font_commands(size=8),
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ]))
             story.append(tc)

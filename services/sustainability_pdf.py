@@ -30,12 +30,13 @@ def export_sustainability_pdf(
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import getSampleStyleSheet
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        from services.pdf_fonts import get_pdf_styles, table_font_commands
 
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
-        styles = getSampleStyleSheet()
+        styles = get_pdf_styles()
         story = [
             Paragraph("AtıkPort — Sustainability Scoring Engine", styles["Title"]),
             Spacer(1, 8),
@@ -82,7 +83,7 @@ def export_sustainability_pdf(
         t1.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            *table_font_commands(size=9),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdfa")]),
         ]))
@@ -110,7 +111,7 @@ def export_sustainability_pdf(
             th.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#115e59")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                *table_font_commands(size=8),
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ]))
             story.append(th)
@@ -131,7 +132,7 @@ def export_sustainability_pdf(
             ts_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                *table_font_commands(size=8),
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ]))
             story.append(ts_table)
@@ -178,7 +179,7 @@ def export_sustainability_pdf(
         t2.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#134e4a")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            *table_font_commands(size=8),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ]))
         story.append(t2)
@@ -198,7 +199,7 @@ def export_sustainability_pdf(
         t3.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#115e59")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            *table_font_commands(size=8),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ]))
         story.append(t3)
