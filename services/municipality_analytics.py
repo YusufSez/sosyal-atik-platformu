@@ -398,6 +398,126 @@ def district_density_summary(il=None) -> list[dict]:
     return mahalle_analizi(il=il)[:10]
 
 
+def period_listing_counts(il=None, ilce=None, mahalle=None, *, days: int = 30) -> dict:
+    """Son N gün vs önceki N gün ilan / teslim sayıları."""
+    geo = _geo_filters(il, ilce, mahalle)
+    now = utc_now()
+    cur_start = now - timedelta(days=days)
+    prev_start = now - timedelta(days=days * 2)
+
+    def _count(model, start, end, *, teslim_only=False):
+        q = model.query.filter(model.tarih >= start, model.tarih < end)
+        if teslim_only:
+            q = q.filter(model.ilan_durumu == "Teslim Edildi")
+        return _join_user_filter(q, model, geo).count()
+
+    cur_ilan = _count(Kaynak, cur_start, now) + _count(Atik, cur_start, now)
+    prev_ilan = _count(Kaynak, prev_start, cur_start) + _count(Atik, prev_start, cur_start)
+    cur_teslim = (
+        _count(Kaynak, cur_start, now, teslim_only=True)
+        + _count(Atik, cur_start, now, teslim_only=True)
+    )
+    prev_teslim = (
+        _count(Kaynak, prev_start, cur_start, teslim_only=True)
+        + _count(Atik, prev_start, cur_start, teslim_only=True)
+    )
+
+    def _pct(cur, prev):
+        if prev <= 0:
+            return 100.0 if cur > 0 else 0.0
+        return round(((cur - prev) / prev) * 100.0, 1)
+
+    return {
+        "days": days,
+        "ilan_son": cur_ilan,
+        "ilan_onceki": prev_ilan,
+        "ilan_degisim_yuzde": _pct(cur_ilan, prev_ilan),
+        "teslim_son": cur_teslim,
+        "teslim_onceki": prev_teslim,
+        "teslim_degisim_yuzde": _pct(cur_teslim, prev_teslim),
+    }
+
+
+def seasonal_category_shift(il=None, ilce=None, mahalle=None) -> list[dict]:
+    """Son 90 günü 3×30 günlük dilimlere bölerek mevsimsel / dönemsel kayma."""
+    geo = _geo_filters(il, ilce, mahalle)
+    now = utc_now()
+    windows = []
+    for i in range(3):
+        end = now - timedelta(days=30 * i)
+        start = now - timedelta(days=30 * (i + 1))
+        counts = defaultdict(int)
+        for model in (Kaynak, Atik):
+            q = (
+                db.session.query(model.kategori, func.count(model.id))
+                .filter(model.tarih >= start, model.tarih < end)
+                .group_by(model.kategori)
+            )
+            if geo:
+                q = q.join(User, model.user_id == User.id).filter(*geo)
+            for kat, adet in q.all():
+                counts[normalize_municipality_category(kat)] += int(adet or 0)
+        windows.append({"label": f"son_{30*(i+1)}_gun", "counts": dict(counts)})
+
+    # En yeni vs en eski dilim
+    latest = windows[0]["counts"]
+    oldest = windows[2]["counts"]
+    shifts = []
+    cats = set(latest) | set(oldest)
+    for cat in cats:
+        a = latest.get(cat, 0)
+        b = oldest.get(cat, 0)
+        if a + b == 0:
+            continue
+        if b == 0:
+            pct = 100.0 if a else 0.0
+        else:
+            pct = round(((a - b) / b) * 100.0, 1)
+        shifts.append({
+            "kategori": cat,
+            "son_dilim": a,
+            "eski_dilim": b,
+            "degisim_yuzde": pct,
+        })
+    return sorted(shifts, key=lambda x: -abs(x["degisim_yuzde"]))
+
+
+def municipality_analysis_context(il=None, ilce=None, mahalle=None) -> dict:
+    """AI / rule engine için birleşik analiz bağlamı."""
+    geo = _geo_filters(il, ilce, mahalle)
+    dashboard = municipality_dashboard(il=il, ilce=ilce, mahalle=mahalle)
+    total = (dashboard.get("toplam_aktif_ilan") or 0) + (dashboard.get("toplam_teslim") or 0)
+    teslim = dashboard.get("toplam_teslim") or 0
+    teslim_orani = round(100.0 * teslim / total, 1) if total else 0.0
+
+    user_q = User.query.filter(
+        User.role.notin_(("admin", "superadmin", "ministry")),
+        User.is_deactivated.is_(False),
+    )
+    if geo:
+        user_q = user_q.filter(*geo)
+    toplam_vatandas = user_q.count()
+    katilim = (
+        round(100.0 * (dashboard.get("gunluk_kullanici") or 0) / toplam_vatandas, 1)
+        if toplam_vatandas
+        else 0.0
+    )
+
+    return {
+        "dashboard": dashboard,
+        "kategori_artisi": weekly_category_deltas(il=il),
+        "mahalle_yogunlugu": district_density_summary(il=il),
+        "teslim_orani": teslim_orani,
+        "vatandas_katilimi": {
+            "oran": katilim,
+            "gunluk": dashboard.get("gunluk_kullanici") or 0,
+            "toplam": toplam_vatandas,
+        },
+        "trend_30_gun": period_listing_counts(il=il, ilce=ilce, mahalle=mahalle, days=30),
+        "mevsimsel": seasonal_category_shift(il=il, ilce=ilce, mahalle=mahalle)[:6],
+    }
+
+
 def _count_since(model, geo, since, *, durum=None):
     q = model.query.filter(model.tarih >= since)
     if durum:

@@ -296,6 +296,12 @@ def test_ai_insights_rule_based_without_gemini(app, municipality_data, monkeypat
             result = generate_municipality_insights(il="Sakarya")
         assert result["source"] == "rules"
         assert len(result["insights"]) >= 1
+        first = result["insights"][0]
+        assert isinstance(first, dict)
+        assert first.get("title")
+        assert first.get("analysis")
+        assert first.get("priority") in ("Kritik", "Yüksek", "Orta", "Düşük")
+        assert "expected_impact" in first
 
 
 def test_ai_insights_endpoint(client, municipality_data):
@@ -306,6 +312,9 @@ def test_ai_insights_endpoint(client, municipality_data):
     data = resp.get_json()
     assert "insights" in data
     assert isinstance(data["insights"], list)
+    if data["insights"]:
+        assert "title" in data["insights"][0]
+        assert "analysis" in data["insights"][0]
 
 
 def test_geography_api(client, municipality_data):

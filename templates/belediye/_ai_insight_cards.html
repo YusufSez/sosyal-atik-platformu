@@ -1,0 +1,31 @@
+{# Belediye AI analiz kartları — title / analysis / expected_impact / priority #}
+{% if insights %}
+<div class="row g-3">
+  {% for tip in insights %}
+  <div class="col-12 {% if compact %}{% else %}col-md-6{% endif %}">
+    <div class="card h-100 shadow-sm belediye-insight-card border-0">
+      <div class="card-body">
+        {% if tip is mapping %}
+        <div class="fw-semibold belediye-insight-title mb-2">{{ tip.title }}</div>
+        <p class="small belediye-insight-analysis mb-2">{{ tip.analysis }}</p>
+        <div class="small text-muted mb-2">
+          <strong>Beklenen Etki:</strong> {{ tip.expected_impact or '—' }}
+        </div>
+        <span class="badge
+          {% if tip.priority == 'Kritik' %}text-bg-danger
+          {% elif tip.priority == 'Yüksek' %}text-bg-warning
+          {% elif tip.priority == 'Orta' %}text-bg-info
+          {% else %}text-bg-secondary{% endif %}">
+          Öncelik: {{ tip.priority or 'Orta' }}
+        </span>
+        {% else %}
+        <p class="belediye-insight-analysis mb-0">{{ tip }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-muted mb-0">Şu an gösterilecek analiz bulunmuyor.</p>
+{% endif %}
