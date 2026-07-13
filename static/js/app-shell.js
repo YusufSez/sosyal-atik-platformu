@@ -70,7 +70,8 @@
     hideLoading();
 
     setTimeout(function () {
-        var alerts = document.querySelectorAll(".alert");
+        // Yalnızca flash / kapatılabilir uyarılar — içerik kartlarındaki .alert kalıcı kalsın
+        var alerts = document.querySelectorAll(".alert.alert-dismissible");
         for (var i = 0; i < alerts.length; i++) {
             if (typeof bootstrap !== "undefined" && bootstrap.Alert) {
                 var bsAlert = new bootstrap.Alert(alerts[i]);

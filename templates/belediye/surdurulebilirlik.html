@@ -59,17 +59,17 @@
     </div>
   </div>
 
-  <div class="alert alert-success">
-    <div class="fw-bold mb-2"><i class="bi bi-stars me-1"></i>AI Önerileri
-      <span class="badge bg-secondary">{{ suggestion_source }}</span>
-    </div>
-    <ul class="mb-0">
-      {% for tip in suggestions %}
-      <li>{{ tip }}</li>
+  <div class="card shadow-sm mb-4 sustainability-ai-card border-0">
+    <div class="card-body p-4">
+      <h5 class="fw-bold mb-3">🤖 Yapay Zekâ Önerileri</h5>
+      {% if suggestions %}
+        {% for tip in suggestions %}
+        <p class="mb-2{% if loop.last %} mb-0{% endif %}">{{ tip }}</p>
+        {% endfor %}
       {% else %}
-      <li class="text-muted">Öneri yok</li>
-      {% endfor %}
-    </ul>
+        <p class="text-muted mb-0">Şu an gösterilecek öneri bulunmuyor.</p>
+      {% endif %}
+    </div>
   </div>
 
   <div class="row g-4">
@@ -144,5 +144,18 @@
 </div>
 <style>
 .badge.bg-teal { background:#ccfbf1 !important; }
+.sustainability-ai-card {
+  background: linear-gradient(145deg, #f0fdfa 0%, #ffffff 55%, #ecfeff 100%);
+  border: 1px solid rgba(15, 118, 110, 0.12) !important;
+}
+.sustainability-ai-card h5 {
+  color: #0f766e;
+  letter-spacing: 0.01em;
+}
+.sustainability-ai-card p {
+  color: #134e4a;
+  line-height: 1.55;
+  font-size: 0.98rem;
+}
 </style>
 {% endblock %}
