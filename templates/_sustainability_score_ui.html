@@ -126,21 +126,19 @@
   {# —— 3. Kategori puanları —— #}
   <h6 class="ops-section-title">Kategori puanları</h6>
   <div class="row g-3 mb-4 ss-equal-cards">
+    {% set bar_colors = ['ss-bar-teal', 'ss-bar-green', 'ss-bar-blue', 'ss-bar-orange', 'ss-bar-violet', 'ss-bar-amber', 'ss-bar-red'] %}
     {% for c in dash.category_scores or cur.criteria %}
     <div class="col-md-6 col-xl-4">
       <div class="ss-cat-card h-100">
-        <div class="d-flex align-items-start gap-3">
+        <div class="d-flex align-items-start gap-3 w-100">
           <div class="ss-cat-icon"><i class="bi {{ cat_icon(c.key) }}"></i></div>
           <div class="flex-grow-1 min-w-0">
             <div class="d-flex justify-content-between align-items-baseline gap-2 mb-1">
               <div class="ss-cat-label">{{ c.label }}</div>
               <div class="ss-cat-pct">%{{ c.score }}</div>
             </div>
-            <div class="progress ss-progress">
-              <div class="progress-bar
-                {% if c.score >= 70 %}bg-success
-                {% elif c.score >= 40 %}bg-warning
-                {% else %}bg-secondary{% endif %}"
+            <div class="progress ss-progress {{ bar_colors[loop.index0 % 7] }}">
+              <div class="progress-bar"
                    style="width: {{ c.score }}%"
                    role="progressbar"
                    aria-valuenow="{{ c.score }}"
@@ -206,11 +204,13 @@
   <div class="ops-panel mb-4">
     <div class="ops-panel-head">
       <span><i class="bi bi-robot me-2"></i>AI Değerlendirmesi</span>
-      <span class="badge text-bg-secondary">{{ report.source or suggestion_source or 'rules' }}</span>
     </div>
     <div class="ops-panel-body">
       {% if report.summary %}
-      <p class="ss-ai-summary mb-4">{{ report.summary }}</p>
+      <div class="ap-ai-block mb-4">
+        <div class="ap-ai-heading">📊 Durum</div>
+        <ul class="ap-ai-body"><li>{{ report.summary|replace(';', '.') }}</li></ul>
+      </div>
       {% endif %}
 
       <div class="ss-ai-group-label text-success"><i class="bi bi-check-circle me-1"></i>3 Güçlü yön</div>
@@ -218,8 +218,8 @@
         {% for item in report.strengths or [] %}
         <div class="col-md-4">
           <article class="ss-ai-card ss-ai-strength h-100">
-            <div class="ss-ai-card-kicker">Güçlü yön {{ loop.index }}</div>
-            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+            <div class="ap-ai-heading">📊 Durum</div>
+            <ul class="ap-ai-body"><li>{{ item|replace(';', '.') }}</li></ul>
           </article>
         </div>
         {% else %}
@@ -232,8 +232,8 @@
         {% for item in report.improvements or [] %}
         <div class="col-md-4">
           <article class="ss-ai-card ss-ai-improve h-100">
-            <div class="ss-ai-card-kicker">Gelişim alanı {{ loop.index }}</div>
-            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+            <div class="ap-ai-heading">⚠ Risk</div>
+            <ul class="ap-ai-body"><li>{{ item|replace(';', '.') }}</li></ul>
           </article>
         </div>
         {% else %}
@@ -246,8 +246,8 @@
         {% for item in report.recommendations or [] %}
         <div class="col-md-4">
           <article class="ss-ai-card ss-ai-reco h-100">
-            <div class="ss-ai-card-kicker">Öneri {{ loop.index }}</div>
-            <p class="ss-ai-card-text mb-0">{{ item }}</p>
+            <div class="ap-ai-heading">💡 Öneri</div>
+            <ul class="ap-ai-body"><li>{{ item|replace(';', '.') }}</li></ul>
           </article>
         </div>
         {% else %}
@@ -257,8 +257,8 @@
 
       <div class="ss-ai-group-label text-success"><i class="bi bi-trophy me-1"></i>Beklenen kazanım</div>
       <article class="ss-ai-card ss-ai-gain">
-        <div class="ss-ai-card-kicker">Beklenen kazanım</div>
-        <p class="ss-ai-card-text mb-0">{{ report.expected_gains or '—' }}</p>
+        <div class="ap-ai-heading">📈 Beklenen Etki</div>
+        <ul class="ap-ai-body"><li>{{ (report.expected_gains or '—')|replace(';', '.') }}</li></ul>
       </article>
     </div>
   </div>

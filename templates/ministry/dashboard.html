@@ -116,7 +116,7 @@
       <div id="ministryIsiHaritasi" class="ops-map ops-map-tall"></div>
     </div>
     <div class="ops-panel-foot small text-muted">
-      İller performans rengine göre gösterilir · Yeşil / Sarı / Kırmızı
+      Performans renkleri · Yeşil yüksek · Sarı orta · Kırmızı risk · Gri veri yok (81 il)
     </div>
   </div>
 
@@ -198,38 +198,46 @@
         {% for tip in center.ai_ozeti %}
         <div class="col-md-6 col-xl-4">
           <article class="ops-ai-card h-100">
-            <div class="ops-ai-card-title">Ulusal bulgu {{ loop.index }}</div>
-            <div class="ops-ai-card-label">Durum</div>
-            <p class="ops-ai-card-text">{{ tip }}</p>
-            <div class="ops-ai-card-label">Risk</div>
-            <p class="mb-2">
-              <span class="badge
-                {% if 'risk' in tip|lower %}text-bg-danger
-                {% elif risk_n >= 1 and loop.index == 1 %}text-bg-warning
-                {% else %}text-bg-success{% endif %}">
-                {% if 'risk' in tip|lower %}Yüksek izleme
-                {% elif loop.index == 1 %}{{ risk_label }}
-                {% else %}İzleniyor{% endif %}
-              </span>
-            </p>
-            <div class="ops-ai-card-label">Öneri</div>
-            <p class="ops-ai-card-text">
-              {% if 'risk' in tip|lower %}
-              Riskli belediyeler için öncelikli saha desteği ve haftalık brifing planlayın.
-              {% elif 'gelişim' in tip|lower or 'gelisim' in tip|lower %}
-              İyi uygulama modelini ulusal bültende paylaşın ve benzer illere yayılmasını teşvik edin.
-              {% elif 'katılım' in tip|lower %}
-              Vatandaş katılım kampanyalarını güçlendirin; rozet ve bilgilendirme duyurularını artırın.
-              {% else %}
-              İlgili metrikleri Karar Destek Merkezi raporlarıyla birlikte izlemeye devam edin.
-              {% endif %}
-            </p>
-            <div class="ops-ai-card-label">Beklenen etki</div>
-            <p class="ops-ai-card-impact mb-0">
-              {% if 'risk' in tip|lower %}Risk bandındaki birim sayısında azalma
-              {% elif 'CO' in tip or 'geri kazanım' in tip|lower %}Çevresel etki göstergelerinde artış
-              {% else %}Ulusal performans görünürlüğü ve karar kalitesinde iyileşme{% endif %}
-            </p>
+            <div class="ap-ai-block">
+              <div class="ap-ai-heading">📊 Durum</div>
+              <ul class="ap-ai-body"><li>{{ tip|replace(';', '.') }}</li></ul>
+            </div>
+            <div class="ap-ai-block">
+              <div class="ap-ai-heading">⚠ Risk</div>
+              <ul class="ap-ai-body">
+                <li>
+                  {% if 'risk' in tip|lower %}Yüksek izleme
+                  {% elif loop.index == 1 %}{{ risk_label }}
+                  {% else %}İzleniyor{% endif %}
+                </li>
+              </ul>
+            </div>
+            <div class="ap-ai-block">
+              <div class="ap-ai-heading">💡 Öneri</div>
+              <ul class="ap-ai-body">
+                <li>
+                  {% if 'risk' in tip|lower %}
+                  Riskli belediyeler için öncelikli saha desteği planlayın.
+                  {% elif 'gelişim' in tip|lower or 'gelisim' in tip|lower %}
+                  İyi uygulama modelini ulusal bültende paylaşın.
+                  {% elif 'katılım' in tip|lower %}
+                  Vatandaş katılım kampanyalarını güçlendirin.
+                  {% else %}
+                  Karar Destek raporlarıyla birlikte izlemeye devam edin.
+                  {% endif %}
+                </li>
+              </ul>
+            </div>
+            <div class="ap-ai-block">
+              <div class="ap-ai-heading">📈 Beklenen Etki</div>
+              <ul class="ap-ai-body">
+                <li>
+                  {% if 'risk' in tip|lower %}Risk bandındaki birim sayısında azalma
+                  {% elif 'CO' in tip or 'geri kazanım' in tip|lower %}Çevresel etki göstergelerinde artış
+                  {% else %}Ulusal karar kalitesinde iyileşme{% endif %}
+                </li>
+              </ul>
+            </div>
           </article>
         </div>
         {% else %}
@@ -500,6 +508,7 @@
 {{ leaflet_assets(heat=true) }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/turkey-provinces.js') }}"></script>
 <script type="application/json" id="ministry-dashboard-config">{{ {
   'heat': map_data.heat,
   'il_merkezleri': map_data.il_merkezleri,

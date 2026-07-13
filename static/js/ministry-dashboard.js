@@ -10,10 +10,10 @@
   }
 
   function renkHex(renk) {
-    if (renk === "yesil") return "#059669";
+    if (renk === "yesil") return "#16a34a";
     if (renk === "sari") return "#f59e0b";
     if (renk === "kirmizi") return "#dc2626";
-    return "#64748b";
+    return "#94a3b8";
   }
 
   if (typeof L !== "undefined") {
@@ -36,36 +36,54 @@
         blur: 22,
         maxZoom: 10,
         gradient: {
-          0.2: "#93c5fd",
-          0.4: "#34d399",
-          0.6: "#fbbf24",
-          0.8: "#f97316",
+          0.2: "#bbf7d0",
+          0.45: "#86efac",
+          0.65: "#fbbf24",
+          0.85: "#f97316",
           1: "#dc2626",
         },
       }).addTo(map);
     }
 
+    var byIl = {};
     (config.il_merkezleri || []).forEach(function (c) {
-      var color = renkHex(c.renk) || (
-        c.intensity >= 0.7 ? "#059669" : c.intensity >= 0.4 ? "#f59e0b" : "#64748b"
-      );
-      var puan = c.puan != null ? c.puan : Math.round((c.intensity || 0) * 100);
-      L.circleMarker([c.lat, c.lng], {
-        radius: 8 + Math.min(1, (c.intensity || puan / 100)) * 10,
+      if (c && c.il) byIl[c.il] = c;
+    });
+
+    var allProvinces = window.ATIKPORT_IL_MERKEZLERI || [];
+    allProvinces.forEach(function (base) {
+      var c = byIl[base.il] || {};
+      var hasData = !!(byIl[base.il] && (c.puan != null || c.intensity != null || c.renk));
+      var color = hasData ? renkHex(c.renk) : "#94a3b8";
+      if (hasData && !c.renk) {
+        color =
+          (c.intensity || 0) >= 0.7
+            ? "#16a34a"
+            : (c.intensity || 0) >= 0.4
+              ? "#f59e0b"
+              : "#dc2626";
+      }
+      var puan = c.puan != null ? c.puan : hasData ? Math.round((c.intensity || 0) * 100) : null;
+      var lat = c.lat != null ? c.lat : base.lat;
+      var lng = c.lng != null ? c.lng : base.lng;
+      L.circleMarker([lat, lng], {
+        radius: hasData ? 7 + Math.min(1, (c.intensity || (puan || 0) / 100)) * 8 : 5,
         color: color,
         fillColor: color,
-        fillOpacity: 0.6,
-        weight: 1,
+        fillOpacity: hasData ? 0.7 : 0.35,
+        weight: hasData ? 1.5 : 1,
       })
         .bindPopup(
           "<strong>" +
-            c.il +
-            "</strong><br>Performans: " +
-            (c.performans || "—") +
-            " (" +
-            puan +
-            ")<br>Kullanıcı: " +
-            (c.kullanici || "—")
+            base.il +
+            "</strong><br>" +
+            (hasData
+              ? "Performans: " +
+                (c.performans || "—") +
+                (puan != null ? " (" + puan + ")" : "") +
+                "<br>Kullanıcı: " +
+                (c.kullanici || "—")
+              : "Bu il için henüz yeterli veri oluşmamıştır.")
         )
         .addTo(map);
     });

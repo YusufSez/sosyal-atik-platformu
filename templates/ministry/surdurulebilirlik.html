@@ -1,6 +1,11 @@
 {% extends "layout.html" %}
 {% block content %}
 <div class="content-section fade-in">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <a href="{{ url_for('admin_ministry.dashboard') }}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-arrow-left me-1"></i>Ulusal Yönetim Merkezi
+    </a>
+  </div>
   {% include "ministry/_filters.html" %}
 
   {% set pdf_url = url_for('admin_ministry.surdurulebilirlik_pdf', il=secili_il, ilce=secili_ilce) %}

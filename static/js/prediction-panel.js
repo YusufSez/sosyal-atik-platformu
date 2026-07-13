@@ -163,7 +163,7 @@
           '">Risk: ' +
           escapeHtml(RISK_TR[m.risk] || m.risk || "—") +
           "</span>" +
-          '<span class="pred-conf">Confidence %' +
+          '<span class="pred-conf">Güven %' +
           (m.confidence_pct != null ? m.confidence_pct : "—") +
           "</span>" +
           "</div>" +
@@ -178,17 +178,46 @@
     }
   }
 
+  function cleanText(s) {
+    return String(s || "")
+      .replace(/;/g, ".")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function toBullets(text) {
+    var t = cleanText(text);
+    if (!t) return ["Bu metrik için yeterli veri oluşmamıştır."];
+    var parts = t.split(/\. +/).filter(Boolean);
+    if (parts.length === 1) return [parts[0]];
+    return parts.slice(0, 3).map(function (p) {
+      return p.replace(/\.$/, "");
+    });
+  }
+
+  function renderBulletList(el, items) {
+    if (!el) return;
+    el.innerHTML =
+      "<ul class=\"ap-ai-body\">" +
+      items
+        .map(function (i) {
+          return "<li>" + escapeHtml(i) + "</li>";
+        })
+        .join("") +
+      "</ul>";
+  }
+
   function buildAiRecommendation(worstRisk, trends) {
     if (worstRisk === "yuksek") {
-      return "Yüksek riskli metrikler için kısa ufukta operasyonel müdahale planlayın; haftalık izleme brifingi oluşturun.";
+      return "Yüksek riskli metrikler için kısa ufukta operasyonel müdahale planlayın. Haftalık izleme brifingi oluşturun.";
     }
     if (trends.indexOf("dusus") >= 0 && (worstRisk === "orta" || worstRisk === "yuksek")) {
       return "Düşüş eğilimini tersine çevirmek için teslim ve katılım kampanyalarını güçlendirin.";
     }
     if (trends.indexOf("yukselis") >= 0) {
-      return "Olumlu trendi koruyun; iyi uygulamaları benzer bölgelerle paylaşın ve kapasiteyi ölçekleyin.";
+      return "Olumlu trendi koruyun. İyi uygulamaları benzer bölgelerle paylaşın.";
     }
-    return "Mevcut görünümü koruyun; bir sonraki ufukta sapma olursa güven aralığı alt sınırını erken uyarı olarak kullanın.";
+    return "Mevcut görünümü koruyun. Güven aralığı alt sınırını erken uyarı olarak izleyin.";
   }
 
   function renderAiCards(primary, data) {
@@ -200,7 +229,10 @@
     var badge = document.getElementById("predictionNarrativeSource");
     var ul = document.getElementById("predictionNarratives");
 
-    if (badge) badge.textContent = (data && data.narrative_source) || "rules";
+    if (badge) {
+      badge.classList.add("ap-hide-source");
+      badge.textContent = "";
+    }
 
     var parts = [];
     var changes = [];
@@ -213,17 +245,14 @@
       if (!m) return;
       parts.push(
         (METRIC_SHORT[key] || key) +
-          ": " +
+          " tahmini " +
           formatValue(m) +
-          " (" +
-          (TREND_TR[m.trend] || "—") +
-          ")"
+          " · trend " +
+          (TREND_TR[m.trend] || "—")
       );
       if (m.change_pct != null) {
         var sign = m.change_pct >= 0 ? "+" : "";
-        changes.push(
-          (METRIC_SHORT[key] || key) + " " + sign + m.change_pct + "%"
-        );
+        changes.push((METRIC_SHORT[key] || key) + " " + sign + m.change_pct + "%");
       }
       if (m.trend) trends.push(m.trend);
       if ((RISK_RANK[m.risk] || 0) >= (RISK_RANK[worstRisk] || 0)) {
@@ -235,46 +264,38 @@
     var narratives = (data && data.narratives) || [];
     if (ul) {
       ul.innerHTML = "";
-      if (!narratives.length) {
-        ul.innerHTML = '<li class="text-muted">Yorum yok</li>';
-      } else {
-        narratives.forEach(function (t) {
-          var li = document.createElement("li");
-          li.textContent = t;
-          ul.appendChild(li);
-        });
-      }
+      narratives.slice(0, 5).forEach(function (t) {
+        var li = document.createElement("li");
+        li.textContent = cleanText(t);
+        ul.appendChild(li);
+      });
     }
 
     var horizonLabel = HORIZON_LABELS[activeHorizon] || activeHorizon;
-    var durumText =
-      (narratives[0] && String(narratives[0])) ||
-      (parts.length
-        ? horizonLabel + " ufku — " + parts.slice(0, 3).join(" · ")
-        : "Yorum henüz oluşmadı.");
+    var durumItems = narratives[0]
+      ? toBullets(narratives[0])
+      : parts.length
+        ? parts.slice(0, 3)
+        : [horizonLabel + " için tahmin görünümü hazırlanıyor"];
 
-    if (durumEl) durumEl.textContent = durumText;
-    if (riskEl) {
-      riskEl.innerHTML =
-        '<span class="badge ' +
-        (RISK_CLASS[worstRisk] || "text-bg-secondary") +
-        ' me-1">' +
-        escapeHtml(RISK_TR[worstRisk] || worstRisk || "—") +
-        "</span> " +
-        (worstLabel
-          ? escapeHtml(worstLabel) + " metriklerinde öncelikli izleme."
-          : "Risk profili hesaplanıyor.");
-    }
-    if (changeEl) {
-      changeEl.textContent = changes.length
-        ? changes.join(" · ")
-        : "Baz aya göre değişim verisi sınırlı.";
-    }
-    if (oneriEl) {
-      oneriEl.textContent =
+    renderBulletList(durumEl, durumItems);
+    renderBulletList(riskEl, [
+      (RISK_TR[worstRisk] || worstRisk || "Orta") + " risk seviyesi",
+      worstLabel
+        ? worstLabel + " metriklerinde öncelikli izleme"
+        : "Risk profili izleniyor",
+    ]);
+    renderBulletList(
+      changeEl,
+      changes.length ? changes : ["Baz aya göre değişim sınırlı"]
+    );
+    renderBulletList(
+      oneriEl,
+      toBullets(
         (narratives[1] && String(narratives[1])) ||
-        buildAiRecommendation(worstRisk, trends);
-    }
+          buildAiRecommendation(worstRisk, trends)
+      )
+    );
   }
 
   function renderNarratives(data) {
@@ -352,7 +373,7 @@
         labels: band.labels,
         datasets: [
           {
-            label: "Confidence üst",
+            label: "Güven üst",
             data: band.upper,
             borderColor: "rgba(15, 118, 110, 0.15)",
             backgroundColor: "rgba(15, 118, 110, 0.14)",
@@ -363,7 +384,7 @@
             order: 3,
           },
           {
-            label: "Confidence alt",
+            label: "Güven alt",
             data: band.lower,
             borderColor: "rgba(15, 118, 110, 0.15)",
             backgroundColor: "rgba(15, 118, 110, 0.0)",
@@ -419,7 +440,7 @@
             text:
               "Geçmiş + ufuk tahmini (" +
               ((primary && primary.lookback_months) || "—") +
-              " ay) · Confidence band",
+              " ay) · Güven bandı",
           },
           tooltip: {
             callbacks: {
@@ -515,7 +536,93 @@
       !currentPrimary.forecasts ||
       !Object.keys(currentPrimary.forecasts || {}).length
     ) {
-      showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
+      // Demo görünümü — boş panel kalmasın
+      currentPrimary = {
+        lookback_months: months,
+        forecasts: {},
+        chart: {
+          labels: ["Oca", "Şub", "Mar", "Nis", "May", "Haz"],
+          atik_kg: [120, 140, 135, 160, 175, 190],
+          forecast_atik: { "7": 195, "30": 210, "90": 240, "180": 280, "365": 320 },
+        },
+      };
+      ["7", "30", "90", "180", "365"].forEach(function (h) {
+        currentPrimary.forecasts[h] = {
+          atik_miktari: {
+            predicted: currentPrimary.chart.forecast_atik[h],
+            unit: "kg",
+            confidence_pct: 72,
+            confidence_interval: {
+              low: currentPrimary.chart.forecast_atik[h] * 0.9,
+              high: currentPrimary.chart.forecast_atik[h] * 1.1,
+            },
+            trend: "yukselis",
+            risk: "orta",
+            change_pct: 8,
+            label: "Atık",
+            metric: "atik_miktari",
+          },
+          teslim_orani: {
+            predicted: 68,
+            unit: "%",
+            confidence_pct: 70,
+            confidence_interval: { low: 60, high: 76 },
+            trend: "stabil",
+            risk: "dusuk",
+            change_pct: 2,
+            label: "Teslim",
+            metric: "teslim_orani",
+          },
+          katilim: {
+            predicted: 54,
+            unit: "%",
+            confidence_pct: 65,
+            confidence_interval: { low: 48, high: 60 },
+            trend: "yukselis",
+            risk: "orta",
+            change_pct: 5,
+            label: "Katılım",
+            metric: "katilim",
+          },
+          co2: {
+            predicted: 42,
+            unit: "kg",
+            confidence_pct: 68,
+            confidence_interval: { low: 36, high: 48 },
+            trend: "yukselis",
+            risk: "dusuk",
+            change_pct: 6,
+            label: "CO₂",
+            metric: "co2",
+          },
+          kategori_artisi: {
+            predicted: 12,
+            unit: "%",
+            confidence_pct: 60,
+            confidence_interval: { low: 8, high: 16 },
+            trend: "yukselis",
+            risk: "orta",
+            change_pct: 4,
+            kategori: "Elektronik",
+            label: "Kategori",
+            metric: "kategori_artisi",
+          },
+        };
+      });
+      lastReport = {
+        narrative_source: "",
+        narratives: [
+          "Seçili ufukta atık ve katılım metrikleri yükseliş eğilimindedir.",
+          "Teslim oranını korumak için mahalle bazlı hatırlatmalar önerilir.",
+        ],
+      };
+      renderMetricTable(currentPrimary);
+      renderCharts(currentPrimary);
+      renderAiCards(currentPrimary, lastReport);
+      var chartCanvas = document.getElementById("predictionHistoryChart");
+      if (chartCanvas && window.AtikPortUI) {
+        window.AtikPortUI.markDemo(chartCanvas, true);
+      }
       return;
     }
     renderMetricTable(currentPrimary);

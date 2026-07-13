@@ -52,7 +52,7 @@
           <div class="pred-chart-legend small text-muted mt-2">
             <span class="pred-leg"><i class="pred-leg-line"></i> Geçmiş</span>
             <span class="pred-leg"><i class="pred-leg-dash"></i> Tahmin</span>
-            <span class="pred-leg"><i class="pred-leg-band"></i> Confidence band</span>
+            <span class="pred-leg"><i class="pred-leg-band"></i> Güven bandı</span>
           </div>
         </div>
       </div>
@@ -68,23 +68,24 @@
         </div>
         <div class="ops-panel-body pred-ai-stack" id="predictionAiCards">
           <article class="pred-ai-card">
-            <div class="pred-ai-kicker">Durum</div>
-            <p class="pred-ai-text mb-0 text-muted" id="predAiDurum">Yükleniyor…</p>
+            <div class="ap-ai-heading">📊 Durum</div>
+            <div class="pred-ai-text" id="predAiDurum">Yükleniyor…</div>
           </article>
           <article class="pred-ai-card pred-ai-risk">
-            <div class="pred-ai-kicker">Risk</div>
-            <p class="pred-ai-text mb-0 text-muted" id="predAiRisk">—</p>
+            <div class="ap-ai-heading">⚠ Risk</div>
+            <div class="pred-ai-text" id="predAiRisk">—</div>
           </article>
           <article class="pred-ai-card pred-ai-change">
-            <div class="pred-ai-kicker">Beklenen değişim</div>
-            <p class="pred-ai-text mb-0 text-muted" id="predAiChange">—</p>
+            <div class="ap-ai-heading">📈 Beklenen Etki</div>
+            <div class="pred-ai-text" id="predAiChange">—</div>
           </article>
           <article class="pred-ai-card pred-ai-reco">
-            <div class="pred-ai-kicker">Öneri</div>
-            <p class="pred-ai-text mb-0 text-muted" id="predAiOneri">—</p>
+            <div class="ap-ai-heading">💡 Öneri</div>
+            <div class="pred-ai-text" id="predAiOneri">—</div>
           </article>
         </div>
         <ul class="visually-hidden" id="predictionNarratives" aria-hidden="true"></ul>
+        <span class="ap-hide-source" id="predictionNarrativeSource"></span>
       </div>
     </div>
   </div>

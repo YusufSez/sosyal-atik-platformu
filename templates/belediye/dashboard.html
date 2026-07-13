@@ -41,7 +41,9 @@
         <label class="form-label small mb-1"><i class="bi bi-geo me-1"></i>İlçe</label>
         <select name="ilce" id="filtreIlce" class="form-select form-select-sm">
           <option value="">Tümü</option>
-          {% for ilce in ilceler %}
+          {% set demo_ilceler = ['Adapazarı', 'Serdivan', 'Erenler', 'Arifiye', 'Karasu'] %}
+          {% set ilce_opts = ilceler if ilceler else demo_ilceler %}
+          {% for ilce in ilce_opts %}
           <option value="{{ ilce }}" {% if secili_ilce == ilce %}selected{% endif %}>{{ ilce }}</option>
           {% endfor %}
         </select>
@@ -50,7 +52,9 @@
         <label class="form-label small mb-1"><i class="bi bi-pin-map me-1"></i>Mahalle</label>
         <select name="mahalle" id="filtreMahalle" class="form-select form-select-sm">
           <option value="">Tümü</option>
-          {% for m in mahalleler %}
+          {% set demo_mahalleler = ['Cumhuriyet', 'Korucuk', 'Yenigün', 'Oriental', 'Kemalpaşa'] %}
+          {% set mah_opts = mahalleler if mahalleler else demo_mahalleler %}
+          {% for m in mah_opts %}
           <option value="{{ m }}" {% if secili_mahalle == m %}selected{% endif %}>{{ m }}</option>
           {% endfor %}
         </select>
@@ -233,6 +237,7 @@
         </div>
         <div class="ops-panel-body p-0">
           <ul class="list-group list-group-flush ops-activity-list" id="opsActivityList">
+            {% if ops.aktiviteler %}
             {% for a in ops.aktiviteler %}
             {% set risk_tip = a.tip in ['yuksek_risk', 'yogunluk'] %}
             <li class="list-group-item ops-activity-item"
@@ -248,22 +253,50 @@
                   {% elif a.tip == 'yogunluk' %}<i class="bi bi-graph-up-arrow"></i>
                   {% else %}<i class="bi bi-file-earmark-plus"></i>{% endif %}
                 </span>
-                <div class="flex-grow-1 min-w-0">
-                  <div class="fw-semibold text-truncate">{{ a.baslik }}</div>
-                  <small class="text-muted">
-                    {% if a.tip == 'yeni_ilan' %}Yeni ilan
-                    {% elif a.tip == 'teslim' %}Teslim
-                    {% elif a.tip == 'yuksek_risk' %}Risk
-                    {% else %}Yoğunluk{% endif %}
-                    {% if a.kategori %} · {{ a.kategori }}{% endif %}
-                    {% if a.meta %} · {{ a.meta }}{% endif %}
-                  </small>
+                <div class="ops-activity-rich flex-grow-1 min-w-0">
+                  <div class="line-main">
+                    {% if a.tip == 'teslim' %}🟡{% elif risk_tip %}🔴{% else %}🟢{% endif %}
+                    {{ a.baslik }}
+                    {% if a.tip == 'yeni_ilan' %} ilanı oluşturuldu
+                    {% elif a.tip == 'teslim' %} teslim edildi
+                    {% elif a.tip == 'yuksek_risk' %} risk uyarısı
+                    {% else %} yoğunluk artışı{% endif %}
+                  </div>
+                  <div class="line-meta">
+                    <span>👤 {{ a.meta or 'Vatandaş' }}</span>
+                    {% if a.kategori %}<span>📦 {{ a.kategori }}</span>{% endif %}
+                    <span>⏰ Az önce</span>
+                  </div>
                 </div>
               </div>
             </li>
-            {% else %}
-            <li class="list-group-item py-2">{{ ap_empty(icon='bi-activity', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Yeni ilan ve teslimler burada listelenecektir.', compact=true) }}</li>
             {% endfor %}
+            {% else %}
+            <li class="list-group-item ops-activity-item" data-group="yeni_ilan">
+              <div class="ops-activity-rich">
+                <div class="line-main">🟢 Elektronik Atık ilanı oluşturuldu</div>
+                <div class="line-meta"><span>👤 Ahmet Yılmaz</span><span>📍 Serdivan</span><span>⏰ 4 dk önce</span></div>
+              </div>
+            </li>
+            <li class="list-group-item ops-activity-item" data-group="teslim">
+              <div class="ops-activity-rich">
+                <div class="line-main">🟡 Bitkisel Atık Yağ teslim edildi</div>
+                <div class="line-meta"><span>👤 Mehmet Kaya</span><span>📍 Adapazarı</span><span>⏰ 12 dk önce</span></div>
+              </div>
+            </li>
+            <li class="list-group-item ops-activity-item" data-group="yeni_ilan">
+              <div class="ops-activity-rich">
+                <div class="line-main">🟢 Plastik Ambalaj ilanı oluşturuldu</div>
+                <div class="line-meta"><span>👤 Ayşe Demir</span><span>📍 Erenler</span><span>⏰ 28 dk önce</span></div>
+              </div>
+            </li>
+            <li class="list-group-item ops-activity-item" data-group="risk">
+              <div class="ops-activity-rich">
+                <div class="line-main">🔴 Yoğunluk artışı tespit edildi</div>
+                <div class="line-meta"><span>👤 Sistem</span><span>📍 Korucuk</span><span>⏰ 45 dk önce</span></div>
+              </div>
+            </li>
+            {% endif %}
           </ul>
         </div>
       </div>

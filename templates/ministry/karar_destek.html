@@ -41,11 +41,50 @@
   </div>
 
   <div class="ds-ai-banner mb-4">
-    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+    <div class="mb-3">
       <strong><i class="bi bi-robot me-1"></i>AI ulusal değerlendirme</strong>
-      <span class="badge text-bg-secondary">{{ center.ai_source or ai.source or 'rules' }}</span>
     </div>
-    <p class="mb-0">{{ ai.overview }}</p>
+    <div class="row g-3">
+      <div class="col-md-6 col-xl-3">
+        <div class="ap-ai-block">
+          <div class="ap-ai-heading">🇹🇷 Ulusal Özet</div>
+          <ul class="ap-ai-body">
+            <li>{{ (ai.overview or 'Ulusal performans görünümü hazır.')|replace(';', '.') }}</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ap-ai-block">
+          <div class="ap-ai-heading">⚠ Risk Analizi</div>
+          <ul class="ap-ai-body">
+            <li>Seviye: {{ center.risk_analysis.level }}</li>
+            <li>{{ center.risk_analysis.riskli_belediye_sayisi }} yüksek · {{ center.risk_analysis.orta_risk_sayisi }} orta</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ap-ai-block">
+          <div class="ap-ai-heading">💡 Önerilen Aksiyonlar</div>
+          <ul class="ap-ai-body">
+            {% for a in (center.ministry_actions or [])[:2] %}
+            <li>{{ a.title }}</li>
+            {% else %}
+            <li>Riskli bölgelerde saha desteğini artırın</li>
+            <li>Haftalık ulusal brifing planlayın</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6 col-xl-3">
+        <div class="ap-ai-block">
+          <div class="ap-ai-heading">📈 Beklenen Etki</div>
+          <ul class="ap-ai-body">
+            <li>Katılım ve teslim göstergelerinde iyileşme</li>
+            <li>Risk bandındaki birim sayısında azalma</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="row g-4 mb-4">

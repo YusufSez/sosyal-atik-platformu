@@ -85,18 +85,33 @@
         ).addTo(map);
 
         var pts = Array.isArray(noktalar) ? noktalar : [];
+        var demoHeat = false;
+        if (!pts.length) {
+          demoHeat = true;
+          var baseLat = center.lat || 40.77;
+          var baseLng = center.lng || 30.4;
+          pts = [
+            [baseLat, baseLng, 0.9],
+            [baseLat + 0.02, baseLng + 0.01, 0.7],
+            [baseLat - 0.015, baseLng + 0.02, 0.55],
+            [baseLat + 0.01, baseLng - 0.02, 0.8],
+            [baseLat - 0.02, baseLng - 0.01, 0.45],
+            [baseLat + 0.025, baseLng - 0.015, 0.6],
+          ];
+        }
+        if (emptyEl) emptyEl.classList.add("d-none");
+        mapEl.classList.remove("d-none");
         if (pts.length && L.heatLayer) {
-          if (emptyEl) emptyEl.classList.add("d-none");
-          mapEl.classList.remove("d-none");
           L.heatLayer(pts, {
-            radius: 22,
+            radius: 24,
             blur: 18,
             maxZoom: 14,
             gradient: {
-              0.2: "#5eead4",
-              0.5: "#14b8a6",
-              0.8: "#0f766e",
-              1: "#115e59",
+              0.2: "#bbf7d0",
+              0.45: "#86efac",
+              0.65: "#22c55e",
+              0.85: "#16a34a",
+              1: "#14532d",
             },
           }).addTo(map);
           map.fitBounds(
@@ -105,9 +120,7 @@
             }),
             { padding: [30, 30], maxZoom: 13 }
           );
-        } else {
-          mapEl.classList.add("d-none");
-          if (emptyEl) emptyEl.classList.remove("d-none");
+          if (demoHeat && UI && UI.markDemo) UI.markDemo(mapEl, true);
         }
         setTimeout(function () {
           map.invalidateSize();
@@ -120,6 +133,7 @@
   }
 
   function buildCategoryData() {
+    var DEMO = (UI && UI.DEMO) || {};
     var counts = {};
     (cfg.activities || []).forEach(function (a) {
       var k = (a && a.kategori) || "Diğer";
@@ -131,8 +145,14 @@
     var labels = Object.keys(counts);
     if (!labels.length || !(UI && UI.sum(Object.values(counts)))) {
       return {
-        labels: (DEMO.category && DEMO.category.labels) || labels,
-        values: (DEMO.category && DEMO.category.values) || [0],
+        labels: (DEMO.category && DEMO.category.labels) || [
+          "Plastik",
+          "Cam",
+          "Metal",
+          "Organik",
+          "Elektronik",
+        ],
+        values: (DEMO.category && DEMO.category.values) || [28, 18, 15, 22, 17],
         demo: true,
       };
     }

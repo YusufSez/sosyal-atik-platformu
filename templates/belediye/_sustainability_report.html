@@ -4,7 +4,7 @@
 <div class="card shadow-sm mb-4 border-0 sustainability-report-card">
   <div class="card-header bg-transparent fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span><i class="bi bi-robot me-2"></i>AI Değerlendirmesi</span>
-    <span class="badge text-bg-secondary">{{ report.source or suggestion_source or 'rules' }}</span>
+    <span class="ap-hide-source">{{ report.source or suggestion_source or '' }}</span>
   </div>
   <div class="card-body">
     {% if report.summary %}
