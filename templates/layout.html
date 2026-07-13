@@ -43,6 +43,12 @@
         <a href="{{ url_for('auth.eposta_dogrula_bekle') }}" class="btn btn-sm btn-outline-dark">E-postayı Doğrula</a>
     </div>
     {% endif %}
+    {% if show_demo_mode_banner %}
+    <div class="alert alert-warning border-0 shadow-sm mb-3" role="status" style="background:#fff3e0;border-left:4px solid #ef6c00!important;">
+        <strong><i class="bi bi-exclamation-triangle me-1"></i>Demo Modu Aktif</strong>
+        <div class="small mt-1 mb-0">Gösterilen veriler sunum amaçlı örnek veriler içerebilir.</div>
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
 </main>
 

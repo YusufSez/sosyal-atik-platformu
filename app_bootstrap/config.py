@@ -122,6 +122,7 @@ def configure_app(app, config_overrides=None):
     app.config["REDIS_URL"] = os.getenv("REDIS_URL") or None
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
     app.config["ALLOW_SEED_ROUTE"] = env_to_bool(os.getenv("ALLOW_SEED_ROUTE"), default=False)
+    app.config["DEMO_MODE"] = env_to_bool(os.getenv("DEMO_MODE"), default=False)
     app.config["DEBUG"] = env_to_bool(os.getenv("DEBUG"), default=False)
     app.config["ITEMS_PER_PAGE"] = ITEMS_PER_PAGE
     app.config["WTF_CSRF_TIME_LIMIT"] = None

@@ -122,7 +122,7 @@ def municipality_dashboard(il=None, ilce=None, mahalle=None) -> dict:
 
     ortalama_teslim = _ortalama_teslim_suresi_gun(geo)
 
-    return {
+    data = {
         "bugun_ilan": bugun_kaynak_all.count() + bugun_atik_all.count(),
         "bugun_aktif_ilan": bugun_kaynak + bugun_atik,
         "toplam_aktif_ilan": aktif_kaynak + aktif_atik,
@@ -140,6 +140,18 @@ def municipality_dashboard(il=None, ilce=None, mahalle=None) -> dict:
         "etki_adet": int(etki_adet or 0),
         "filtre": {"il": _norm(il), "ilce": _norm(ilce), "mahalle": _norm(mahalle)},
     }
+    from services.demo_manager import is_dashboard_data_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "dashboard",
+        real_data_sufficient=is_dashboard_data_sufficient(data),
+    ):
+        demo = demo_provider.dashboard_kpis(
+            il=_norm(il), ilce=_norm(ilce), mahalle=_norm(mahalle)
+        )
+        return demo
+    return data
 
 
 def _ortalama_teslim_suresi_gun(geo) -> float | None:

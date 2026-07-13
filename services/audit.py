@@ -1,6 +1,6 @@
 """Yönetici işlemleri denetim kaydı."""
 
-from flask import request
+from flask import has_request_context, request
 from flask_login import current_user
 
 from extensions import db
@@ -23,11 +23,13 @@ def log_admin_action(
             return
         admin_id = current_user.id
 
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    if ip and "," in ip:
-        ip = ip.split(",")[0].strip()
-
-    user_agent = (request.headers.get("User-Agent") or "")[:500]
+    ip = None
+    user_agent = None
+    if has_request_context():
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        if ip and "," in ip:
+            ip = ip.split(",")[0].strip()
+        user_agent = (request.headers.get("User-Agent") or "")[:500]
 
     kayit = AdminAuditLog(
         admin_id=admin_id,

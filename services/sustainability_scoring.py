@@ -222,7 +222,7 @@ def score_region(il: str | None = None, ilce: str | None = None, mahalle: str | 
         })
 
     puan = _clamp(weighted_sum)
-    return {
+    result = {
         "il": _norm(il),
         "ilce": _norm(ilce),
         "mahalle": _norm(mahalle),
@@ -241,6 +241,17 @@ def score_region(il: str | None = None, ilce: str | None = None, mahalle: str | 
             "geri_donusum_orani": round(geri_donusum, 1),
         },
     }
+    from services.demo_manager import is_sustainability_data_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "sustainability",
+        real_data_sufficient=is_sustainability_data_sufficient(result),
+    ):
+        return demo_provider.sustainability_score(
+            il=_norm(il), ilce=_norm(ilce), mahalle=_norm(mahalle)
+        )
+    return result
 
 
 def score_municipality(user: User) -> dict:

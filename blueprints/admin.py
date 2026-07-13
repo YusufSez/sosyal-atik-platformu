@@ -436,3 +436,42 @@ def admin_destek_detail(talep_id: int):
         matched_user=matched_user,
         kategori_etiketi=kategori_etiketi,
     )
+
+
+@admin_bp.route("/admin/settings", methods=["GET", "POST"])
+@login_required
+@admin_required
+def admin_settings():
+    """Sistem ayarları — Demo Yönetimi."""
+    from services.demo_manager import (
+        DEMO_AI_KEY,
+        DEMO_DASHBOARD_KEY,
+        DEMO_MARKETPLACE_KEY,
+        DEMO_MODE_KEY,
+        DEMO_PREDICTION_KEY,
+        DEMO_SUSTAINABILITY_KEY,
+        get_stored_demo_settings,
+        save_demo_settings,
+    )
+
+    if request.method == "POST":
+        values = {
+            DEMO_MODE_KEY: bool(request.form.get(DEMO_MODE_KEY)),
+            DEMO_AI_KEY: bool(request.form.get(DEMO_AI_KEY)),
+            DEMO_DASHBOARD_KEY: bool(request.form.get(DEMO_DASHBOARD_KEY)),
+            DEMO_PREDICTION_KEY: bool(request.form.get(DEMO_PREDICTION_KEY)),
+            DEMO_SUSTAINABILITY_KEY: bool(request.form.get(DEMO_SUSTAINABILITY_KEY)),
+            DEMO_MARKETPLACE_KEY: bool(request.form.get(DEMO_MARKETPLACE_KEY)),
+        }
+        logged = save_demo_settings(values, admin_id=current_user.id)
+        if logged:
+            flash("Demo ayarları kaydedildi: " + ", ".join(logged), "success")
+        else:
+            flash("Demo ayarları kaydedildi.", "success")
+        return redirect(url_for("admin.admin_settings"))
+
+    return render_template(
+        "admin_settings.html",
+        demo_settings=get_stored_demo_settings(),
+        env_demo_mode=bool(current_app.config.get("DEMO_MODE")),
+    )

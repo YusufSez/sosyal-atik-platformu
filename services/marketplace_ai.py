@@ -86,9 +86,55 @@ def generate_match_report(
     limit: int = 12,
 ) -> dict:
     """En uygun eşleşmeler + AI/kural açıklaması."""
+    from services.demo_manager import (
+        is_marketplace_data_sufficient,
+        should_use_demo,
+        use_demo_ai,
+    )
+    from services import demo_provider
+
     matches = best_matches(listing, radius_km=radius_km, limit=limit)
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_data_sufficient(matches),
+    ):
+        matches = demo_provider.marketplace_matches(limit=limit)
+        explanation = (
+            f"“{listing.baslik}” için demo kurum eşleşmeleri gösteriliyor "
+            f"(en uygun: {matches[0]['ad']}, skor {matches[0]['eslesme_skoru']}/100)."
+        )
+        return {
+            "listing_id": listing.id,
+            "listing_baslik": listing.baslik,
+            "kategori": listing.kategori,
+            "matches": matches,
+            "explanation": explanation,
+            "explanation_source": "demo",
+            "nearby_suggestion": explanation,
+            "nearby_source": "demo",
+            "nearby_count": len(matches),
+            "radius_km": radius_km,
+            "source": "demo",
+        }
+
     explanation = _rule_match_explanation(listing, matches)
     source = "rules"
+
+    if use_demo_ai():
+        nearby_fit = suggest_nearby_fit(listing, radius_km=radius_km)
+        return {
+            "listing_id": listing.id,
+            "listing_baslik": listing.baslik,
+            "kategori": listing.kategori,
+            "matches": matches,
+            "explanation": explanation,
+            "explanation_source": "demo",
+            "nearby_suggestion": nearby_fit.get("suggestion"),
+            "nearby_source": "demo",
+            "nearby_count": nearby_fit.get("nearby_count"),
+            "radius_km": radius_km,
+            "source": "demo",
+        }
 
     client = get_client()
     if client and matches:

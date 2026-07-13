@@ -312,9 +312,21 @@ def generate_municipality_insights(il=None, ilce=None, mahalle=None) -> dict:
     Dönüş: insights = yapılandırılmış kart listesi (title/analysis/expected_impact/priority).
     Gemini yoksa gelişmiş rule engine aynı şemayı üretir.
     """
+    from services.demo_manager import use_demo_ai
+    from services import demo_provider
+
     ctx = municipality_analysis_context(il=il, ilce=ilce, mahalle=mahalle)
     dashboard = ctx["dashboard"]
     fallback = _advanced_rule_cards(ctx)
+
+    if use_demo_ai():
+        demo = demo_provider.municipality_ai_insights(dashboard)
+        return {
+            "source": demo["source"],
+            "insights": demo["insights"],
+            "dashboard": dashboard,
+            "context": ctx,
+        }
 
     client = get_client()
     if not client:

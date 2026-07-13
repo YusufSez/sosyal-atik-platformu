@@ -431,7 +431,13 @@ def generate_sustainability_suggestions(
     ilce: str | None = None,
     scored: dict | None = None,
 ) -> dict:
+    from services.demo_manager import use_demo_ai
+    from services import demo_provider
+
     scored = scored or score_region(il=il, ilce=ilce)
+    if use_demo_ai():
+        return demo_provider.sustainability_ai_report(scored)
+
     rules = _rule_suggestions(scored)
     report = _rule_ai_report(scored)
     source = "rules"

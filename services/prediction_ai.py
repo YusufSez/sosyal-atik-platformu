@@ -176,6 +176,13 @@ def generate_prediction_report(
     İstatistiksel tahmin + AI yorum.
     Gemini yalnızca yorum üretir; rakamlar prediction_engine'den gelir.
     """
+    from services.demo_manager import (
+        is_prediction_data_sufficient,
+        should_use_demo,
+        use_demo_ai,
+    )
+    from services import demo_provider
+
     filters = {"il": il, "ilce": ilce, "mahalle": mahalle}
     if include_all_lookbacks:
         multi = run_multi_lookback_forecast(**filters)
@@ -190,11 +197,30 @@ def generate_prediction_report(
             "metrics": list(METRIC_KEYS),
         }
 
+    if should_use_demo(
+        "prediction",
+        real_data_sufficient=is_prediction_data_sufficient(primary),
+    ):
+        return demo_provider.prediction_report(
+            lookback_months,
+            il=il,
+            ilce=ilce,
+            mahalle=mahalle,
+            include_all_lookbacks=include_all_lookbacks,
+        )
+
     # Önce tüm lookback'lere kural yorumu
     for payload in (multi.get("lookbacks") or {}).values():
         _apply_rule_comments(payload)
     narratives = _apply_rule_comments(primary)
     source = "rules"
+
+    if use_demo_ai():
+        return {
+            **multi,
+            "narratives": narratives,
+            "narrative_source": "demo",
+        }
 
     client = get_client()
     if client:

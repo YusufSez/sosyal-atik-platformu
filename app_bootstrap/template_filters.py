@@ -32,3 +32,22 @@ def register_template_filters(app):
             "sosyal_medya": SOSYAL_MEDYA,
             "now_year": local_now().year,
         }
+
+    @app.context_processor
+    def inject_demo_banner():
+        from flask_login import current_user
+
+        show = False
+        try:
+            if current_user.is_authenticated:
+                role = getattr(current_user, "role", None)
+                is_admin = role in ("admin", "superadmin") or getattr(
+                    current_user, "is_admin", False
+                )
+                if is_admin:
+                    from services.demo_manager import is_demo_mode
+
+                    show = is_demo_mode()
+        except Exception:
+            show = False
+        return {"show_demo_mode_banner": show}

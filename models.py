@@ -570,3 +570,15 @@ class MarketplaceEvent(db.Model):
 
     listing = db.relationship("MarketplaceListing", back_populates="events")
     actor = db.relationship("User", foreign_keys=[actor_id])
+
+
+class SystemSetting(db.Model):
+    """Kalıcı sistem ayarları (key/value). Demo Modu vb. için kullanılır."""
+
+    __tablename__ = "system_setting"
+
+    key = db.Column(db.String(80), primary_key=True)
+    value = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(db.DateTime, default=tr_time, onupdate=tr_time)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    updated_by = db.relationship("User", foreign_keys=[updated_by_id])
