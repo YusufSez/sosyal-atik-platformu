@@ -89,3 +89,22 @@ def gizlilik():
 @main_bp.route("/kullanim-kosullari")
 def kullanim_kosullari():
     return redirect(url_for("main.kurumsal_sayfa", slug="kullanim-kosullari"))
+
+
+@main_bp.route("/sitemap.xml")
+def sitemap_xml():
+    from flask import Response
+
+    from services.sitemap import render_sitemap_xml
+
+    xml = render_sitemap_xml()
+    return Response(xml, mimetype="application/xml")
+
+
+@main_bp.route("/robots.txt")
+def robots_txt():
+    from flask import Response
+
+    from services.sitemap import render_robots_txt
+
+    return Response(render_robots_txt(), mimetype="text/plain")

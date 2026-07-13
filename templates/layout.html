@@ -5,12 +5,23 @@
     <script src="{{ url_for('static', filename='js/theme-prefetch.js') }}"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>AI Atık Paylaşım Platformu - {{ title|default('Anasayfa') }}</title>
+    <title>{% block title %}AI Atık Paylaşım Platformu - {{ title|default('Anasayfa') }}{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}{{ seo_description }}{% endblock %}">
+    <link rel="canonical" href="{% block canonical %}{{ canonical_url }}{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}AI Atık Paylaşım Platformu - {{ title|default('Anasayfa') }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ seo_description }}{% endblock %}">
+    <meta property="og:type" content="{% block og_type %}{{ seo_og_type|default('website') }}{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ seo_og_url or canonical_url }}{% endblock %}">
+    <meta property="og:site_name" content="{{ seo_site_name|default('AtıkPort') }}">
+    <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}AI Atık Paylaşım Platformu - {{ title|default('Anasayfa') }}{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}{{ seo_description }}{% endblock %}">
     {% include '_vendor_assets.html' %}
     <link href="{{ url_for('static', filename='css/layout-shell.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/atikport-dashboard.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/dashboard-csp.css') }}" rel="stylesheet">
+    {% block head_extra %}{% endblock %}
 </head>
 <body data-authenticated="{{ '1' if current_user.is_authenticated else '0' }}"
       data-giris-url="{{ url_for('auth.giris') }}"

@@ -51,3 +51,39 @@ def register_template_filters(app):
         except Exception:
             show = False
         return {"show_demo_mode_banner": show}
+
+    @app.context_processor
+    def inject_seo_defaults():
+        from flask import has_request_context
+
+        from services.sitemap import (
+            build_canonical_url,
+            default_seo_description,
+            site_base_url,
+        )
+
+        defaults = {
+            "seo_description": (
+                "AtıkPort — atık ve kaynak paylaşım platformu. "
+                "Sürdürülebilir alışveriş, bağış ve geri dönüşüm ilanları."
+            ),
+            "seo_og_type": "website",
+            "canonical_url": "",
+            "seo_og_url": "",
+            "seo_site_name": app.config.get("SITE_NAME") or "AtıkPort",
+        }
+        if not has_request_context():
+            return defaults
+        try:
+            desc = default_seo_description()
+            canonical = build_canonical_url()
+            defaults.update(
+                {
+                    "seo_description": desc,
+                    "canonical_url": canonical,
+                    "seo_og_url": canonical or site_base_url(),
+                }
+            )
+        except Exception:
+            pass
+        return defaults
