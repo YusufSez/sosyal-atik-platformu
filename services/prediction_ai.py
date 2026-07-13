@@ -177,13 +177,26 @@ def generate_prediction_report(
     Gemini yalnızca yorum üretir; rakamlar prediction_engine'den gelir.
     """
     from services.demo_manager import (
+        is_demo_mode,
         is_prediction_data_sufficient,
         should_use_demo,
         use_demo_ai,
+        use_demo_prediction,
     )
     from services import demo_provider
 
     filters = {"il": il, "ilce": ilce, "mahalle": mahalle}
+
+    # Demo Mode / Demo Prediction açıkken MASTER zorunlu
+    if is_demo_mode() or use_demo_prediction():
+        return demo_provider.prediction_report(
+            lookback_months,
+            il=il,
+            ilce=ilce,
+            mahalle=mahalle,
+            include_all_lookbacks=include_all_lookbacks,
+        )
+
     if include_all_lookbacks:
         multi = run_multi_lookback_forecast(**filters)
         primary = multi["primary"]

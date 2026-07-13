@@ -154,14 +154,19 @@ def municipality_dashboard(il=None, ilce=None, mahalle=None) -> dict:
 
 
 def _demo_dashboard_active(il=None, ilce=None, mahalle=None) -> bool:
-    """Demo Manager kararı — heatmap/ops/mahalle/kategori ortak kapı."""
+    """Demo Manager kararı — heatmap/ops/mahalle/kategori ortak kapı.
+
+    Demo Mode veya Demo Dashboard açıkken MASTER zorunlu (TEKNOFEST panelleri).
+    İkisi de kapalıysa: gerçek veri yoksa ve özellik açıksa demo.
+    """
     from services.demo_manager import (
         is_dashboard_data_sufficient,
         is_demo_mode,
         should_use_demo,
+        use_demo_dashboard,
     )
 
-    if is_demo_mode():
+    if is_demo_mode() or use_demo_dashboard():
         return True
 
     geo = _geo_filters(il, ilce, mahalle)
@@ -703,6 +708,11 @@ def municipality_ops_center(il=None, ilce=None, mahalle=None) -> dict:
         "cards": cards,
         "aktiviteler": aktiviteler,
         "filtre": ozet.get("filtre") or {},
+        "charts": None,
+        "heatmap": [],
+        "map_center": None,
+        "prediction": None,
+        "source": "live",
     }
 
 

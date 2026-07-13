@@ -497,6 +497,10 @@
   }
 
   function showPredictionEmpty(msg) {
+    // Demo / bootstrap varken placeholder gösterme
+    if (meta.demoSource || (meta.bootstrap && meta.bootstrap.primary)) {
+      return;
+    }
     var cards = document.getElementById("predictionMetricCards");
     var chartWrap = document.querySelector("#predictionPanel .pred-chart-wrap");
     var title =
@@ -536,7 +540,6 @@
       !currentPrimary.forecasts ||
       !Object.keys(currentPrimary.forecasts || {}).length
     ) {
-      // İstemci tarafında sahte tahmin üretme — sunucu (MASTER/gerçek) beklenir
       showPredictionEmpty("Tahmin verisi alınamadı");
       return;
     }
@@ -547,10 +550,17 @@
 
   function load() {
     var months = lookbackEl ? lookbackEl.value : "12";
+    // SSR bootstrap (MASTER) — API'den önce
+    if (
+      meta.bootstrap &&
+      (meta.bootstrap.primary || meta.bootstrap.lookbacks)
+    ) {
+      applyPrimary(meta.bootstrap, months);
+    }
     var params = new URLSearchParams(meta.query || {});
     params.set("lookback", months);
     var cards = document.getElementById("predictionMetricCards");
-    if (cards) {
+    if (cards && !(meta.bootstrap && meta.bootstrap.primary)) {
       cards.innerHTML =
         '<div class="col-12"><div class="ap-skeleton"><div class="ap-skeleton-line" style="width:90%"></div><div class="ap-skeleton-line" style="width:70%"></div><div class="ap-skeleton-line" style="width:80%"></div></div></div>';
     }
@@ -562,6 +572,10 @@
         applyPrimary(data, months);
       })
       .catch(function () {
+        if (meta.bootstrap && meta.bootstrap.primary) {
+          applyPrimary(meta.bootstrap, months);
+          return;
+        }
         showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
         var ul = document.getElementById("predictionNarratives");
         if (ul) ul.innerHTML = '<li class="text-muted">Tahmin yüklenemedi</li>';

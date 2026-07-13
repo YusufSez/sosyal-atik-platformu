@@ -11,8 +11,17 @@
 
   var UI = window.AtikPortUI || null;
   var DEMO = (UI && UI.DEMO) || {};
-  var masterCharts = cfg.charts || null;
-  var fromMaster = !!cfg.demoSource || !!masterCharts;
+  var charts = cfg.charts || {};
+  var demoSource = !!cfg.demoSource;
+  var hasServerCharts = !!(
+    charts &&
+    (charts.category ||
+      charts.waste_categories ||
+      charts.trend ||
+      charts.monthly_trend ||
+      charts.teslim_history ||
+      charts.delivery_history)
+  );
 
   var updated = document.getElementById("opsLastUpdated");
   if (updated) {
@@ -49,22 +58,72 @@
     });
   }
 
+  function seriesOk(labels, values) {
+    if (!Array.isArray(labels) || !Array.isArray(values)) return false;
+    // Demo açıkken length==0 boş sayılmaz; labels varsa çiz
+    if (demoSource) {
+      return labels.length > 0 && values.length > 0;
+    }
+    return (
+      labels.length > 0 &&
+      values.length > 0 &&
+      values.some(function (v) {
+        return Number(v) !== 0 && v != null && v !== "";
+      })
+    );
+  }
+
+  function hideEmpty(el) {
+    if (!el) return;
+    el.classList.add("d-none");
+    el.setAttribute("hidden", "hidden");
+  }
+
+  function showEmpty(el) {
+    if (!el) return;
+    // Demo / sunucu verisi varken placeholder YASAK
+    if (demoSource || hasServerCharts) {
+      hideEmpty(el);
+      return;
+    }
+    el.classList.remove("d-none");
+    el.removeAttribute("hidden");
+  }
+
   function addHeatLayer(map, pts) {
     if (!pts.length) return false;
-    if (typeof L === "undefined" || !L.heatLayer) return false;
-    L.heatLayer(pts, {
-      radius: 28,
-      blur: 20,
-      maxZoom: 15,
-      minOpacity: 0.35,
-      gradient: {
-        0.2: "#bbf7d0",
-        0.45: "#86efac",
-        0.65: "#22c55e",
-        0.85: "#16a34a",
-        1: "#14532d",
-      },
-    }).addTo(map);
+    if (typeof L !== "undefined" && typeof L.heatLayer === "function") {
+      L.heatLayer(pts, {
+        radius: 28,
+        blur: 20,
+        maxZoom: 15,
+        minOpacity: 0.35,
+        gradient: {
+          0.2: "#bbf7d0",
+          0.45: "#86efac",
+          0.65: "#22c55e",
+          0.85: "#16a34a",
+          1: "#14532d",
+        },
+      }).addTo(map);
+      map.fitBounds(
+        pts.map(function (p) {
+          return [p[0], p[1]];
+        }),
+        { padding: [30, 30], maxZoom: 13 }
+      );
+      return true;
+    }
+    // leaflet-heat yoksa da boş gösterme — daire işaretçileri
+    pts.forEach(function (p) {
+      L.circleMarker([p[0], p[1]], {
+        radius: 6 + Math.min(10, (p[2] || 0.5) * 10),
+        color: "#0f766e",
+        fillColor: "#14b8a6",
+        fillOpacity: 0.55,
+        weight: 1,
+      }).addTo(map);
+    });
     map.fitBounds(
       pts.map(function (p) {
         return [p[0], p[1]];
@@ -77,12 +136,17 @@
   function loadHeatMap() {
     var mapEl = document.getElementById("opsHeatMap");
     var emptyEl = document.getElementById("opsHeatMapEmpty");
-    if (!mapEl || typeof L === "undefined") return;
+    if (!mapEl) return;
+    if (typeof L === "undefined") {
+      if (!demoSource) showEmpty(emptyEl);
+      return;
+    }
 
     var center = cfg.mapCenter || { lat: 40.77, lng: 30.4, zoom: 11 };
 
     function paint(pts) {
-      if (UI && UI.applyChartTheme) UI.applyChartTheme();
+      hideEmpty(emptyEl);
+      mapEl.classList.remove("d-none");
       var map = L.map(mapEl).setView(
         [center.lat || 40.77, center.lng || 30.4],
         center.zoom || 11
@@ -99,26 +163,26 @@
 
       pts = Array.isArray(pts) ? pts : [];
       if (!pts.length) {
+        if (demoSource || hasServerCharts) {
+          // Demo açıkken asla empty-state
+          hideEmpty(emptyEl);
+          setTimeout(function () {
+            map.invalidateSize();
+          }, 120);
+          return;
+        }
         mapEl.classList.add("d-none");
-        if (emptyEl) emptyEl.classList.remove("d-none");
+        showEmpty(emptyEl);
         return;
       }
-      if (emptyEl) emptyEl.classList.add("d-none");
-      mapEl.classList.remove("d-none");
-      var ok = addHeatLayer(map, pts);
-      if (!ok && emptyEl) {
-        mapEl.classList.add("d-none");
-        emptyEl.classList.remove("d-none");
-        emptyEl.textContent =
-          "Isı katmanı yüklenemedi. Sayfayı yenileyin veya leaflet-heat eklentisini kontrol edin.";
-      }
-      if (fromMaster && UI && UI.markDemo) UI.markDemo(mapEl, true);
+      addHeatLayer(map, pts);
+      if (demoSource && UI && UI.markDemo) UI.markDemo(mapEl, true);
       setTimeout(function () {
         map.invalidateSize();
       }, 120);
     }
 
-    var embedded = cfg.heatmap || [];
+    var embedded = cfg.heatmap || cfg.heat_points || [];
     if (Array.isArray(embedded) && embedded.length) {
       paint(embedded);
       return;
@@ -141,50 +205,90 @@
         paint(noktalar);
       })
       .catch(function () {
-        mapEl.classList.add("d-none");
-        if (emptyEl) emptyEl.classList.remove("d-none");
+        if (demoSource) {
+          hideEmpty(emptyEl);
+          mapEl.classList.remove("d-none");
+        } else {
+          mapEl.classList.add("d-none");
+          showEmpty(emptyEl);
+        }
       });
   }
 
-  function buildCategoryData() {
-    if (masterCharts && masterCharts.category) {
-      return {
-        labels: masterCharts.category.labels || [],
-        values: masterCharts.category.values || [],
-        demo: fromMaster,
-      };
+  function pickCategory() {
+    var cat = charts.category || charts.waste_categories;
+    if (cat && seriesOk(cat.labels, cat.values)) {
+      return { labels: cat.labels, values: cat.values, fromServer: true };
     }
+    // Sunucu yoksa aktiviteler; DEMO yalnızca en son çare ve demoSource değilken
     var counts = {};
     (cfg.activities || []).forEach(function (a) {
       var k = (a && a.kategori) || "Diğer";
       counts[k] = (counts[k] || 0) + 1;
     });
-    if (cfg.kritik && !counts[cfg.kritik]) {
-      counts[cfg.kritik] = Math.max(1, counts[cfg.kritik] || 0);
-    }
     var labels = Object.keys(counts);
-    if (!labels.length || !(UI && UI.sum(Object.values(counts)))) {
+    var values = labels.map(function (k) {
+      return counts[k];
+    });
+    if (seriesOk(labels, values)) {
+      return { labels: labels, values: values, fromServer: false };
+    }
+    if (!demoSource && DEMO.category) {
       return {
-        labels: (DEMO.category && DEMO.category.labels) || [],
-        values: (DEMO.category && DEMO.category.values) || [],
-        demo: true,
+        labels: DEMO.category.labels || [],
+        values: DEMO.category.values || [],
+        fromServer: false,
+        clientDemo: true,
       };
     }
-    return {
-      labels: labels,
-      values: labels.map(function (k) {
-        return counts[k];
-      }),
-      demo: false,
-    };
+    return { labels: [], values: [], fromServer: false };
+  }
+
+  function pickTrend() {
+    var tr = charts.monthly_trend || charts.trend;
+    if (tr && seriesOk(tr.labels, tr.values)) {
+      return { labels: tr.labels, values: tr.values, fromServer: true };
+    }
+    if (!demoSource && DEMO.trend) {
+      return {
+        labels: DEMO.trend.labels || [],
+        values: DEMO.trend.values || [],
+        fromServer: false,
+        clientDemo: true,
+      };
+    }
+    return { labels: [], values: [], fromServer: false };
+  }
+
+  function pickDelivery() {
+    var hist = charts.delivery_history || charts.teslim_history;
+    if (hist && seriesOk(hist.labels, hist.values)) {
+      return { type: "line", labels: hist.labels, values: hist.values, fromServer: true };
+    }
+    var del = charts.delivery;
+    if (del && Array.isArray(del.values) && del.values.length) {
+      return {
+        type: "doughnut",
+        labels: del.labels || ["Teslim", "Aktif", "Bekleyen"],
+        values: del.values,
+        fromServer: true,
+      };
+    }
+    if (!demoSource && DEMO.delivery) {
+      return {
+        type: "doughnut",
+        labels: ["Teslim", "Aktif", "Bekleyen"],
+        values: DEMO.delivery.values || [62, 24, 14],
+        fromServer: false,
+        clientDemo: true,
+      };
+    }
+    return { type: "line", labels: [], values: [], fromServer: false };
   }
 
   function renderCharts() {
     if (typeof Chart === "undefined") return;
-    if (window.AtikPortUI && window.AtikPortUI.applyChartTheme) {
-      window.AtikPortUI.applyChartTheme();
-    }
-    var m = cfg.metrics || {};
+    if (UI && UI.applyChartTheme) UI.applyChartTheme();
     var accent = "#0f766e";
     var palette = [
       "#0f766e",
@@ -196,20 +300,16 @@
       "#64748b",
     ];
 
-    var cat = buildCategoryData();
+    var cat = pickCategory();
     var catCanvas = document.getElementById("opsCategoryChart");
-    if (catCanvas) {
-      if (UI) UI.markDemo(catCanvas, !!cat.demo);
+    if (catCanvas && cat.labels.length) {
+      if (UI) UI.markDemo(catCanvas, !!(demoSource || cat.clientDemo));
       new Chart(catCanvas, {
         type: "doughnut",
         data: {
           labels: cat.labels,
           datasets: [
-            {
-              data: cat.values,
-              backgroundColor: palette,
-              borderWidth: 0,
-            },
+            { data: cat.values, backgroundColor: palette, borderWidth: 0 },
           ],
         },
         options: {
@@ -222,62 +322,23 @@
       });
     }
 
+    var trend = pickTrend();
     var trendCanvas = document.getElementById("opsTrendChart");
-    if (trendCanvas) {
-      var trendLabels;
-      var trendVals;
-      var trendDemo = false;
-      if (masterCharts && masterCharts.trend) {
-        trendLabels = masterCharts.trend.labels;
-        trendVals = masterCharts.trend.values;
-        trendDemo = fromMaster;
-      } else {
-        trendVals = [
-          m.bugun || 0,
-          m.ilan24 || 0,
-          m.teslim24 || 0,
-          m.aktif || 0,
-          m.teslim || 0,
-          m.bekleyen || 0,
-        ];
-        trendDemo = !(UI && UI.hasNumericSeries(trendVals));
-        if (trendDemo) {
-          trendVals = (DEMO.trend && DEMO.trend.values) || [12, 15, 11, 18, 16, 9];
-          trendLabels =
-            (DEMO.trend && DEMO.trend.labels) || [
-              "Pzt",
-              "Sal",
-              "Çar",
-              "Per",
-              "Cum",
-              "Cmt",
-              "Paz",
-            ];
-        } else {
-          trendLabels = [
-            "Bugün",
-            "Son 24s ilan",
-            "Son 24s teslim",
-            "Aktif",
-            "Teslim",
-            "Bekleyen",
-          ];
-        }
-      }
-      if (UI) UI.markDemo(trendCanvas, trendDemo);
+    if (trendCanvas && trend.labels.length) {
+      if (UI) UI.markDemo(trendCanvas, !!(demoSource || trend.clientDemo));
       new Chart(trendCanvas, {
         type: "line",
         data: {
-          labels: trendLabels,
+          labels: trend.labels,
           datasets: [
             {
               label: "Operasyon hacmi",
-              data: trendVals,
+              data: trend.values,
               borderColor: accent,
               backgroundColor: "rgba(15, 118, 110, 0.12)",
               fill: true,
               tension: 0.35,
-              pointRadius: 4,
+              pointRadius: 3,
             },
           ],
         },
@@ -289,27 +350,20 @@
       });
     }
 
+    var delivery = pickDelivery();
     var deliveryCanvas = document.getElementById("opsDeliveryChart");
     var caption = document.getElementById("opsDeliveryCaption");
-    if (deliveryCanvas) {
-      var teslimHist =
-        masterCharts && masterCharts.teslim_history
-          ? masterCharts.teslim_history
-          : null;
-      if (
-        teslimHist &&
-        (teslimHist.labels || []).length &&
-        (teslimHist.values || []).length
-      ) {
-        if (UI) UI.markDemo(deliveryCanvas, !!fromMaster);
+    if (deliveryCanvas && delivery.labels.length) {
+      if (UI) UI.markDemo(deliveryCanvas, !!(demoSource || delivery.clientDemo));
+      if (delivery.type === "line") {
         new Chart(deliveryCanvas, {
           type: "line",
           data: {
-            labels: teslimHist.labels,
+            labels: delivery.labels,
             datasets: [
               {
                 label: "Teslim oranı %",
-                data: teslimHist.values,
+                data: delivery.values,
                 borderColor: accent,
                 backgroundColor: "rgba(15, 118, 110, 0.12)",
                 fill: true,
@@ -327,57 +381,46 @@
           },
         });
         if (caption) {
-          var last =
-            teslimHist.values[teslimHist.values.length - 1] != null
-              ? teslimHist.values[teslimHist.values.length - 1]
-              : "—";
+          var last = delivery.values[delivery.values.length - 1];
           caption.textContent = "Son dönem teslim oranı: %" + last;
         }
       } else {
-      var teslim = Number(m.teslim || 0);
-      var aktif = Number(m.aktif || 0);
-      var bekleyen = Number(m.bekleyen || 0);
-      var demo = false;
-      var data;
-      if (masterCharts && masterCharts.delivery) {
-        data = masterCharts.delivery.values;
-        demo = fromMaster;
-      } else {
-        demo = teslim + aktif + bekleyen <= 0;
-        data = demo
-          ? (DEMO.delivery && DEMO.delivery.values) || [62, 24, 14]
-          : [teslim, aktif, bekleyen];
-      }
-      if (UI) UI.markDemo(deliveryCanvas, demo);
-      new Chart(deliveryCanvas, {
-        type: "doughnut",
-        data: {
-          labels:
-            (masterCharts &&
-              masterCharts.delivery &&
-              masterCharts.delivery.labels) || ["Teslim", "Aktif", "Bekleyen"],
-          datasets: [
-            {
-              data: data,
-              backgroundColor: [accent, "#3b82f6", "#f59e0b"],
-              borderWidth: 0,
+        new Chart(deliveryCanvas, {
+          type: "doughnut",
+          data: {
+            labels: delivery.labels,
+            datasets: [
+              {
+                data: delivery.values,
+                backgroundColor: [accent, "#3b82f6", "#f59e0b"],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            cutout: "68%",
+            plugins: {
+              legend: { position: "bottom", labels: { boxWidth: 12 } },
             },
-          ],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
-        },
-      });
-      if (caption) {
-        var sum = data.reduce(function (a, b) {
-          return a + Number(b || 0);
-        }, 0);
-        var pct = sum ? Math.round((Number(data[0] || 0) / sum) * 100) : 0;
-        caption.textContent = "Teslim payı ≈ %" + pct;
-      }
+          },
+        });
+        if (caption) {
+          var sum = delivery.values.reduce(function (a, b) {
+            return a + Number(b || 0);
+          }, 0);
+          var pct = sum
+            ? Math.round((Number(delivery.values[0] || 0) / sum) * 100)
+            : 0;
+          caption.textContent = "Teslim payı ≈ %" + pct;
+        }
       }
     }
+  }
+
+  // Demo kaynaklıysa empty bloğu DOM'da gizle
+  if (demoSource) {
+    hideEmpty(document.getElementById("opsHeatMapEmpty"));
   }
 
   loadHeatMap();

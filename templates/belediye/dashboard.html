@@ -69,105 +69,89 @@
   <div class="row g-4">
     {# —— Ana kolon —— #}
     <div class="col-xl-9">
-      {# KPI satırı #}
-      <div class="row g-3 mb-4 ops-kpi-row">
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-teal h-100">
+      {# KPI satırı — ikon / başlık / değer / alt bilgi ortalı #}
+      <div class="row g-3 mb-4 ops-kpi-row row-cols-2 row-cols-md-4">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-teal">
             <div class="ops-kpi-icon"><i class="bi bi-file-earmark-plus"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Bugün açılan ilanlar</div>
-              <div class="ops-kpi-sub">Günlük açılış</div>
-              <div class="ops-kpi-value">{{ c.bugun_acilan }}</div>
-            </div>
+            <div class="ops-kpi-label">Bugün açılan ilanlar</div>
+            <div class="ops-kpi-value">{{ c.bugun_acilan }}</div>
+            <div class="ops-kpi-sub">Günlük açılış</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-amber h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-amber">
             <div class="ops-kpi-icon"><i class="bi bi-hourglass-split"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Bekleyen</div>
-              <div class="ops-kpi-sub">Teslim sırası</div>
-              <div class="ops-kpi-value">{{ c.bekleyen_teslimler }}</div>
-            </div>
+            <div class="ops-kpi-label">Bekleyen</div>
+            <div class="ops-kpi-value">{{ c.bekleyen_teslimler }}</div>
+            <div class="ops-kpi-sub">Teslim sırası</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-green h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-green">
             <div class="ops-kpi-icon"><i class="bi bi-check2-circle"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Teslim</div>
-              <div class="ops-kpi-sub">24s: {{ c.son_24_saat.teslim }}</div>
-              <div class="ops-kpi-value">{{ ozet.toplam_teslim }}</div>
-            </div>
+            <div class="ops-kpi-label">Teslim</div>
+            <div class="ops-kpi-value">{{ ozet.toplam_teslim }}</div>
+            <div class="ops-kpi-sub">24s: {{ c.son_24_saat.teslim }}</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-blue h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-blue">
             <div class="ops-kpi-icon"><i class="bi bi-people"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Katılım</div>
-              <div class="ops-kpi-sub">{{ c.vatandas_katilimi.gunluk }}/{{ c.vatandas_katilimi.toplam }}</div>
-              <div class="ops-kpi-value"><span class="ap-pct-badge">%{{ c.vatandas_katilimi.oran }}</span></div>
-            </div>
+            <div class="ops-kpi-label">Katılım</div>
+            <div class="ops-kpi-value"><span class="ap-pct-badge">%{{ c.vatandas_katilimi.oran }}</span></div>
+            <div class="ops-kpi-sub">{{ c.vatandas_katilimi.gunluk }}/{{ c.vatandas_katilimi.toplam }}</div>
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-red h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-red">
             <div class="ops-kpi-icon"><i class="bi bi-exclamation-triangle"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Risk</div>
-              {% if c.riskli_bolgeler %}
-              <div class="ops-kpi-sub">{{ c.riskli_bolgeler|length }} bölge</div>
-              <div class="ops-kpi-value text-truncate" title="{{ c.riskli_bolgeler[0].bolge }}">{{ c.riskli_bolgeler[0].bolge }}</div>
-              {% else %}
-              <div class="ops-kpi-sub">Bölge izleme</div>
-              <div class="ops-kpi-value">Yok</div>
-              {% endif %}
-            </div>
+            <div class="ops-kpi-label">Risk</div>
+            {% if c.riskli_bolgeler %}
+            <div class="ops-kpi-value text-truncate" title="{{ c.riskli_bolgeler[0].bolge }}">{{ c.riskli_bolgeler[0].bolge }}</div>
+            <div class="ops-kpi-sub">{{ c.riskli_bolgeler|length }} bölge</div>
+            {% else %}
+            <div class="ops-kpi-value">Yok</div>
+            <div class="ops-kpi-sub">Bölge izleme</div>
+            {% endif %}
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-violet h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-violet">
             <div class="ops-kpi-icon"><i class="bi bi-geo-alt-fill"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Yoğun mahalle</div>
-              {% if c.en_yogun_mahalle %}
-              <div class="ops-kpi-sub">{{ c.en_yogun_mahalle.ilan_sayisi }} ilan</div>
-              <div class="ops-kpi-value text-truncate" title="{{ c.en_yogun_mahalle.bolge }}">{{ c.en_yogun_mahalle.bolge }}</div>
-              {% else %}
-              <div class="ops-kpi-sub">Yoğunluk</div>
-              <div class="ops-kpi-value">—</div>
-              {% endif %}
-            </div>
+            <div class="ops-kpi-label">Yoğun mahalle</div>
+            {% if c.en_yogun_mahalle %}
+            <div class="ops-kpi-value text-truncate" title="{{ c.en_yogun_mahalle.bolge }}">{{ c.en_yogun_mahalle.bolge }}</div>
+            <div class="ops-kpi-sub">{{ c.en_yogun_mahalle.ilan_sayisi }} ilan</div>
+            {% else %}
+            <div class="ops-kpi-value">—</div>
+            <div class="ops-kpi-sub">Yoğunluk</div>
+            {% endif %}
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-orange h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-orange">
             <div class="ops-kpi-icon"><i class="bi bi-tags"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">Kritik kat.</div>
-              {% if c.kritik_kategori %}
-              <div class="ops-kpi-sub">
-                {% if c.kritik_kategori.degisim_yuzde %}
-                %{% if c.kritik_kategori.degisim_yuzde > 0 %}+{% endif %}{{ "%.0f"|format(c.kritik_kategori.degisim_yuzde) }}
-                {% else %}öne çıkan{% endif %}
-              </div>
-              <div class="ops-kpi-value text-truncate">{{ c.kritik_kategori.kategori }}</div>
-              {% else %}
-              <div class="ops-kpi-sub">Kategori</div>
-              <div class="ops-kpi-value">—</div>
-              {% endif %}
+            <div class="ops-kpi-label">Kritik kat.</div>
+            {% if c.kritik_kategori %}
+            <div class="ops-kpi-value text-truncate">{{ c.kritik_kategori.kategori }}</div>
+            <div class="ops-kpi-sub">
+              {% if c.kritik_kategori.degisim_yuzde %}
+              %{% if c.kritik_kategori.degisim_yuzde > 0 %}+{% endif %}{{ "%.0f"|format(c.kritik_kategori.degisim_yuzde) }}
+              {% else %}öne çıkan{% endif %}
             </div>
+            {% else %}
+            <div class="ops-kpi-value">—</div>
+            <div class="ops-kpi-sub">Kategori</div>
+            {% endif %}
           </div>
         </div>
-        <div class="col-6 col-md-3">
-          <div class="ops-kpi ops-kpi-rose h-100">
+        <div class="col d-flex">
+          <div class="ops-kpi ops-kpi-rose">
             <div class="ops-kpi-icon"><i class="bi bi-robot"></i></div>
-            <div class="ops-kpi-body">
-              <div class="ops-kpi-label">AI Alarm</div>
-              <div class="ops-kpi-sub">{{ c.yuksek_risk_ilan }} yüksek risk</div>
-              <div class="ops-kpi-value">{{ c.ai_uyarilari }}</div>
-            </div>
+            <div class="ops-kpi-label">AI Alarm</div>
+            <div class="ops-kpi-value">{{ c.ai_uyarilari }}</div>
+            <div class="ops-kpi-sub">{{ c.yuksek_risk_ilan }} yüksek risk</div>
           </div>
         </div>
       </div>
@@ -182,7 +166,11 @@
             </div>
             <div class="ops-panel-body p-0 position-relative">
               <div id="opsHeatMap" class="ops-map"></div>
+              {% if ops.get('source') == 'demo' %}
+              <div id="opsHeatMapEmpty" class="d-none" hidden></div>
+              {% else %}
               <div id="opsHeatMapEmpty" class="d-none p-3">{{ ap_empty(icon='bi-map', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Seçili ilçe / mahalle için ısı noktası henüz oluşmadı.', compact=true) }}</div>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -387,8 +375,9 @@
   },
   'activities': ops.aktiviteler,
   'kritik': (c.kritik_kategori.kategori if c.kritik_kategori else None),
-  'charts': ops.get('charts'),
-  'heatmap': ops.get('heatmap') or [],
+  'charts': ops.get('charts') or {},
+  'heatmap': ops.get('heatmap') or ops.get('heat_points') or [],
+  'heat_points': ops.get('heat_points') or ops.get('heatmap') or [],
   'demoSource': ops.get('source') == 'demo'
 }|tojson }}</script>
 <script type="application/json" id="prediction-panel-config">{{ {
@@ -397,9 +386,10 @@
     'il': locked_il or '',
     'ilce': secili_ilce or '',
     'mahalle': secili_mahalle or ''
-  }
+  },
+  'demoSource': ops.get('source') == 'demo',
+  'bootstrap': ops.get('prediction')
 }|tojson }}</script>
-<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/belediye-ops-center.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prediction-panel.js') }}"></script>
 
@@ -512,14 +502,22 @@
 }
 .ops-kpi {
   display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
   border: 1px solid var(--ops-line);
   border-radius: 1rem;
-  padding: 0.95rem 1rem;
+  padding: 1rem 0.85rem;
   background: var(--bs-body-bg);
-  min-height: 6.5rem;
+  width: 100%;
+  min-height: 9.5rem;
+  height: 100%;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.ops-kpi-row > [class*="col"] {
+  display: flex;
 }
 .ops-kpi:hover {
   transform: translateY(-3px);
@@ -535,6 +533,7 @@
   justify-content: center;
   flex-shrink: 0;
   font-size: 1.15rem;
+  margin-bottom: 0.15rem;
 }
 .ops-kpi-label {
   font-size: 0.72rem;
@@ -542,14 +541,20 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--bs-secondary-color);
+  line-height: 1.25;
 }
 .ops-kpi-value {
   font-size: 1.35rem;
   font-weight: 800;
   color: var(--ops-ink);
   line-height: 1.2;
+  max-width: 100%;
 }
-.ops-kpi-sub { font-size: 0.75rem; color: var(--bs-secondary-color); }
+.ops-kpi-sub {
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+  line-height: 1.25;
+}
 .ops-kpi-teal .ops-kpi-icon { background: #ccfbf1; color: #0f766e; }
 .ops-kpi-amber .ops-kpi-icon { background: #fef3c7; color: #b45309; }
 .ops-kpi-green .ops-kpi-icon { background: #dcfce7; color: #15803d; }

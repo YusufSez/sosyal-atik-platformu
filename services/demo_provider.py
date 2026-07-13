@@ -369,6 +369,9 @@ def _build_city_package(city: str) -> dict:
 
     district_rows = _build_district_stats(seed, districts)
     top_district = district_rows[0] if district_rows else None
+    heat = _build_heatmap(
+        city, count=48 if city in ("İstanbul", "Ankara", "İzmir") else 36
+    )
 
     return {
         "population": seed["population"],
@@ -393,9 +396,8 @@ def _build_city_package(city: str) -> dict:
         },
         "gelisim_yuzde": gelisim,
         "risk_skoru": _risk_score(puan, seed["delivery_pct"], gelisim),
-        "heatmap": _build_heatmap(
-            city, count=48 if city in ("İstanbul", "Ankara", "İzmir") else 36
-        ),
+        "heatmap": heat,
+        "heat_points": heat,
         "map_center": {
             "lat": geo["center"][0],
             "lng": geo["center"][1],
@@ -547,7 +549,7 @@ def dashboard_kpis(*, il=None, ilce=None, mahalle=None) -> dict:
 
 def heat_map_points(*, il=None, ilce=None, mahalle=None, yogunluk="atik") -> list:
     pkg = get_city(il)
-    pts = deepcopy(pkg["heatmap"])
+    pts = deepcopy(pkg.get("heat_points") or pkg["heatmap"])
     scale = {"kaynak": 0.85, "teslim": 1.1}.get((yogunluk or "atik").lower(), 1.0)
     pts = [[p[0], p[1], round(min(1.0, p[2] * scale), 3)] for p in pts]
 
@@ -719,13 +721,22 @@ def ops_center(*, il=None, ilce=None, mahalle=None) -> dict:
             "values": pkg["sustainability_history"]["puanlar"],
         },
     }
+    # QA alias anahtarları (JS sözleşmesi)
+    charts["monthly_trend"] = charts["trend"]
+    charts["delivery_history"] = charts["teslim_history"]
+    charts["waste_categories"] = charts["category"]
+
     acts = deepcopy(pkg["activities"][:12])
     if ilce:
-        # İlçe adını meta'ya yansıt (liste boş kalmasın)
         for a in acts:
             meta = dict(a.get("meta") or {})
             meta["ilce"] = ilce
             a["meta"] = meta
+
+    heat = heat_map_points(il=il, ilce=ilce, mahalle=mahalle)
+    pred = prediction_report(
+        12, il=il, ilce=ilce, mahalle=mahalle, include_all_lookbacks=True
+    )
 
     return {
         "ozet": ozet,
@@ -734,7 +745,9 @@ def ops_center(*, il=None, ilce=None, mahalle=None) -> dict:
         "filtre": ozet["filtre"],
         "charts": charts,
         "map_center": deepcopy(pkg["map_center"]),
-        "heatmap": heat_map_points(il=il, ilce=ilce, mahalle=mahalle),
+        "heatmap": heat,
+        "heat_points": heat,
+        "prediction": pred,
         "source": "demo",
     }
 
@@ -954,6 +967,9 @@ def prediction_payload(
         "lookback_months": lookback_months,
         "history": history,
         "forecasts": forecasts,
+        # QA alias — MASTER monthly_history / forecast blokları
+        "prediction_history": history,
+        "prediction_forecast": forecasts,
         "metrics": list(METRIC_KEYS),
         "horizons_days": list(FORECAST_HORIZONS_DAYS),
         "horizon_labels": dict(HORIZON_LABELS),

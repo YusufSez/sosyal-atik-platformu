@@ -44,11 +44,18 @@ def test_ops_center_charts_and_heat_filled():
     ops = ops_center(il="Sakarya")
     assert ops["source"] == "demo"
     assert len(ops["heatmap"]) >= 8
+    assert len(ops["heat_points"]) >= 8
     assert ops["charts"]["category"]["labels"]
+    assert ops["charts"]["waste_categories"]["labels"]
     assert sum(ops["charts"]["category"]["values"]) > 0
     assert len(ops["charts"]["trend"]["labels"]) >= 6
+    assert ops["charts"]["monthly_trend"]["values"]
     assert sum(ops["charts"]["trend"]["values"]) > 0
     assert ops["charts"]["teslim_history"]["values"]
+    assert ops["charts"]["delivery_history"]["values"]
+    assert ops["prediction"]["primary"]["forecasts"]
+    assert ops["prediction"]["primary"]["prediction_history"]
+    assert ops["prediction"]["primary"]["prediction_forecast"]
     heat = heat_map_points(il="Sakarya", ilce="Serdivan")
     assert len(heat) >= 5
     city = dashboard_kpis(il="Sakarya")
@@ -159,12 +166,19 @@ def test_ops_and_ministry_http_demo(client, app):
     assert dash.status_code == 200
     assert b"ops-center-config" in dash.data
     assert b"heatmap" in dash.data
+    assert b'"demoSource": true' in dash.data or b'"demoSource":true' in dash.data
+    assert b"waste_categories" in dash.data or b"monthly_trend" in dash.data
+    assert b"prediction-panel-config" in dash.data
+    assert b"bootstrap" in dash.data
     heat = client.get("/belediye/api/heatmap?il=Sakarya&ilce=Serdivan")
     assert heat.status_code == 200
     assert len(heat.get_json()) >= 5
     pred = client.get("/belediye/api/predictions?il=Sakarya&ilce=Serdivan")
     assert pred.status_code == 200
-    assert pred.get_json().get("primary", {}).get("forecasts")
+    body = pred.get_json()
+    assert body.get("primary", {}).get("forecasts")
+    assert body.get("primary", {}).get("prediction_history")
+    assert body.get("primary", {}).get("prediction_forecast")
 
     client.get("/cikis", follow_redirects=True)
     client.post(
