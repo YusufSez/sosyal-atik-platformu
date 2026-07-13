@@ -1,4 +1,5 @@
 def register_blueprints(app):
+    from blueprints.belediye import belediye_bp
     from blueprints.gamification import gamification_bp
     from blueprints.kurum import kurum_bp
     from blueprints.admin import admin_bp
@@ -24,6 +25,7 @@ def register_blueprints(app):
     app.register_blueprint(ilan_bp)
     app.register_blueprint(impact_bp)
     app.register_blueprint(kurum_bp)
+    app.register_blueprint(belediye_bp)
     app.register_blueprint(gamification_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_moderation_bp)

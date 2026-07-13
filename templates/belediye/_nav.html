@@ -1,0 +1,16 @@
+{% set belediye_pages = [
+  ('belediye.dashboard', 'Dashboard', 'bi-speedometer2'),
+  ('belediye.mahalle', 'Mahalle / İlçe', 'bi-geo-alt'),
+  ('belediye.heatmap', 'Isı Haritası', 'bi-thermometer-half'),
+  ('belediye.kategori', 'Kategori', 'bi-bar-chart'),
+  ('belediye.ai_asistan', 'AI Asistan', 'bi-stars'),
+  ('belediye.performans', 'Performans', 'bi-trophy'),
+] %}
+<nav class="nav nav-pills flex-column flex-md-row gap-1 mb-4 belediye-subnav">
+  {% for endpoint, label, icon in belediye_pages %}
+  <a class="nav-link {% if request.endpoint == endpoint %}active{% endif %}"
+     href="{{ url_for(endpoint, il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
+    <i class="bi {{ icon }} me-1"></i>{{ label }}
+  </a>
+  {% endfor %}
+</nav>

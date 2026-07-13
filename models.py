@@ -14,6 +14,7 @@ class User(UserMixin, db.Model):
     dogum_tarihi = db.Column(db.String(20))
     il = db.Column(db.String(100))
     ilce = db.Column(db.String(100))
+    mahalle = db.Column(db.String(120), nullable=True)
     telefon = db.Column(db.String(20))
     adres = db.Column(db.String(255), nullable=True)
     profil_aciklama = db.Column(db.Text, nullable=True)
@@ -23,7 +24,7 @@ class User(UserMixin, db.Model):
     is_completed = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     # Authorization role (kept in sync with `is_admin` for backward compatibility).
-    # Values: user, admin, superadmin
+    # Values: user, admin, superadmin, municipality
     role = db.Column(db.String(20), nullable=False, default="user", index=True)
     # Ban state (superadmin can ban/unban users).
     is_banned = db.Column(db.Boolean, default=False, nullable=False)

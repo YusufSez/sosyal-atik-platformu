@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-bar-chart me-2"></i>Kategori Analizi</h3>
+    <small class="text-muted">Plastik, cam, metal, elektronik, organik ve diğer dağılım</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <canvas id="belediyeKategoriChart" height="220" aria-label="Kategori grafiği"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <ul class="list-group list-group-flush shadow-sm rounded">
+        {% for row in kategori_data.rows %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ row.kategori }}</span>
+          <span class="badge bg-success rounded-pill">{{ row.adet }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="small text-muted mt-2 mb-0">Toplam: {{ kategori_data.toplam }} ilan</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="application/json" id="belediye-kategori-config">{{ {
+  'labels': kategori_data.labels,
+  'values': kategori_data.adetler
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/belediye-kategori-chart.js') }}"></script>
+{% endblock %}

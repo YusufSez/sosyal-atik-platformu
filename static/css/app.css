@@ -267,6 +267,18 @@ body {
     color: #6ee7b7;
 }
 
+.belediye-subnav .nav-link {
+    color: var(--brand-dark, #134e4a);
+    border: 1px solid transparent;
+}
+.belediye-subnav .nav-link.active {
+    background: linear-gradient(135deg, #0f766e, #10b981);
+    color: #fff;
+}
+.belediye-filters .form-label {
+    color: var(--bs-secondary-color);
+}
+
 .auth-card {
     max-width: 420px;
     border: none;

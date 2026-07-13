@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-building-gear me-2"></i>Belediye Yönetim Paneli</h3>
+    <small class="text-muted">Bölgesel paylaşım, geri kazanım ve operasyon metrikleri</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="row g-3 mb-2">
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.bugun_ilan }}</h5><small class="text-muted">Bugünkü İlan</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.toplam_aktif_ilan }}</h5><small class="text-muted">Toplam Aktif İlan</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.toplam_teslim }}</h5><small class="text-muted">Toplam Teslim</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.1f"|format(ozet.geri_kazanilan_atik_kg) }} kg</h5>
+        <small class="text-muted">Geri Kazanılan Atık</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.geri_kazanilan_kaynak_adet }}</h5>
+        <small class="text-muted">Geri Kazanılan Kaynak</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.gunluk_kullanici }}</h5><small class="text-muted">Günlük Kullanıcı</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.aktif_kurum }}</h5><small class="text-muted">Aktif Kurum</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{% if ozet.ortalama_teslim_gun is not none %}{{ ozet.ortalama_teslim_gun }} gün{% else %}—{% endif %}</h5>
+        <small class="text-muted">Ort. Teslim Süresi</small>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

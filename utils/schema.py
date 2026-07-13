@@ -57,6 +57,8 @@ def ensure_schema():
                 conn.execute(text("ALTER TABLE user ADD COLUMN profil_aciklama TEXT"))
             if "telefon_verified" not in user_cols:
                 conn.execute(text("ALTER TABLE user ADD COLUMN telefon_verified BOOLEAN DEFAULT 0"))
+            if "mahalle" not in user_cols:
+                conn.execute(text("ALTER TABLE user ADD COLUMN mahalle VARCHAR(120)"))
 
     if "destek_talebi" in inspector.get_table_names():
         destek_cols = {c["name"] for c in inspector.get_columns("destek_talebi")}

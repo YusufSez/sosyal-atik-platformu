@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-geo-alt me-2"></i>Mahalle / İlçe Analizi</h3>
+    <small class="text-muted">İl → İlçe → Mahalle kırılımında paylaşım yoğunluğu</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Bölge</th>
+              <th class="text-end">İlan</th>
+              <th class="text-end">Atık (kg)</th>
+              <th class="text-end">Kaynak</th>
+              <th class="text-end">Kullanıcı Yoğunluğu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              <td>{{ row.bolge }}</td>
+              <td class="text-end">{{ row.ilan_sayisi }}</td>
+              <td class="text-end">{{ "%.1f"|format(row.atik_kg) }}</td>
+              <td class="text-end">{{ row.kaynak_adet }}</td>
+              <td class="text-end">{{ row.kullanici_yogunlugu }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted text-center py-4">Seçili filtre için veri yok</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

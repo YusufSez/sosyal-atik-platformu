@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-trophy me-2"></i>İlçe Performans</h3>
+    <small class="text-muted">100 üzerinden analiz puanı — tahmin yok</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Bölge</th>
+            <th class="text-end">Puan</th>
+            <th class="text-end">İlan</th>
+            <th class="text-end">Atık kg</th>
+            <th class="text-end">Kaynak</th>
+            <th class="text-end">Kullanıcı</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.bolge }}</td>
+            <td class="text-end">
+              <span class="badge {% if row.puan >= 70 %}bg-success{% elif row.puan >= 40 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ row.puan }}
+              </span>
+            </td>
+            <td class="text-end">{{ row.ilan_sayisi }}</td>
+            <td class="text-end">{{ "%.1f"|format(row.atik_kg) }}</td>
+            <td class="text-end">{{ row.kaynak_adet }}</td>
+            <td class="text-end">{{ row.kullanici_yogunlugu }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-muted text-center py-4">Performans verisi yok</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -63,6 +63,28 @@ def admin_required(view):
     return wrapped
 
 
+def is_municipality_user(user) -> bool:
+    """ROLE_MUNICIPALITY veya admin/superadmin belediye paneline erişebilir."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    role = getattr(user, "role", None)
+    if role == "municipality":
+        return True
+    if role in ("admin", "superadmin"):
+        return True
+    return bool(getattr(user, "is_admin", False))
+
+
+def municipality_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not is_municipality_user(current_user):
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
 def is_super_admin(user) -> bool:
     if not user or not user.is_authenticated:
         return False

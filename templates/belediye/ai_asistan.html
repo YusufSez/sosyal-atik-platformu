@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-stars me-2"></i>AI Belediye Asistanı</h3>
+    <small class="text-muted">Dashboard verisine dayalı analiz — tahmin üretilmez</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.toplam_aktif_ilan }}</h5><small class="text-muted">Aktif İlan</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.toplam_teslim }}</h5><small class="text-muted">Teslim</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ "%.1f"|format(ozet.geri_kazanilan_atik_kg) }} kg</h5>
+        <small class="text-muted">Atık</small>
+      </div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card stat-card shadow-sm"><div class="card-body py-3">
+        <h5>{{ ozet.geri_kazanilan_kaynak_adet }}</h5><small class="text-muted">Kaynak</small>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+      <span>Analiz Özeti</span>
+      <span class="badge bg-secondary">{{ insight_source or 'rules' }}</span>
+    </div>
+    <ul class="list-group list-group-flush">
+      {% for item in insights %}
+      <li class="list-group-item"><i class="bi bi-lightbulb me-2 text-warning"></i>{{ item }}</li>
+      {% else %}
+      <li class="list-group-item text-muted">Henüz içgörü üretilemedi.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

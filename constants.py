@@ -1,5 +1,22 @@
 """Uygulama genelinde kullanılan sabitler."""
 
+# RBAC rolleri (User.role)
+ROLE_USER = "user"
+ROLE_ADMIN = "admin"
+ROLE_SUPERADMIN = "superadmin"
+ROLE_MUNICIPALITY = "municipality"
+
+# Belediye kategori analizi paneli (görüntüleme grupları)
+MUNICIPALITY_CATEGORY_GROUPS = (
+    "Plastik",
+    "Cam",
+    "Metal",
+    "Elektronik",
+    "Organik",
+    "Bitkisel Yağ",
+    "Diğer",
+)
+
 KATEGORILER_KAYNAK = [
     "Mobilya",
     "Elektronik",

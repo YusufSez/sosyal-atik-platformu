@@ -1,0 +1,79 @@
+<form method="GET" class="row g-2 align-items-end mb-3 belediye-filters" id="belediyeFilterForm">
+  <div class="col-12 col-sm-6 col-md-3">
+    <label class="form-label small mb-1">İl</label>
+    <select name="il" id="filtreIl" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for il in iller %}
+      <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-6 col-md-3">
+    <label class="form-label small mb-1">İlçe</label>
+    <select name="ilce" id="filtreIlce" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for ilce in ilceler %}
+      <option value="{{ ilce }}" {% if secili_ilce == ilce %}selected{% endif %}>{{ ilce }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-6 col-md-3">
+    <label class="form-label small mb-1">Mahalle</label>
+    <select name="mahalle" id="filtreMahalle" class="form-select form-select-sm">
+      <option value="">Tümü</option>
+      {% for m in mahalleler %}
+      <option value="{{ m }}" {% if secili_mahalle == m %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-6 col-md-3 d-flex gap-2">
+    <button type="submit" class="btn btn-sm btn-success flex-grow-1">Filtrele</button>
+    <a href="{{ url_for(request.endpoint) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
+  </div>
+  {% if extra_fields is defined %}{{ extra_fields }}{% endif %}
+</form>
+<script>
+(function () {
+  var il = document.getElementById("filtreIl");
+  var ilce = document.getElementById("filtreIlce");
+  var mahalle = document.getElementById("filtreMahalle");
+  if (!il || !ilce) return;
+
+  function fillSelect(el, items, selected) {
+    var keep = el.options[0] ? el.options[0].outerHTML : '<option value="">Tümü</option>';
+    el.innerHTML = keep;
+    (items || []).forEach(function (v) {
+      var opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      if (selected && selected === v) opt.selected = true;
+      el.appendChild(opt);
+    });
+  }
+
+  function loadGeo() {
+    var params = new URLSearchParams();
+    if (il.value) params.set("il", il.value);
+    if (ilce.value) params.set("ilce", ilce.value);
+    fetch("{{ url_for('belediye.api_geography') }}?" + params.toString(), {
+      credentials: "same-origin",
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        fillSelect(ilce, data.ilceler || [], ilce.value);
+        fillSelect(mahalle, data.mahalleler || [], mahalle.value);
+      })
+      .catch(function () {});
+  }
+
+  il.addEventListener("change", function () {
+    ilce.value = "";
+    mahalle.value = "";
+    loadGeo();
+  });
+  ilce.addEventListener("change", function () {
+    mahalle.value = "";
+    loadGeo();
+  });
+})();
+</script>

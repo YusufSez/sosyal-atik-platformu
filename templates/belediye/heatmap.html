@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3">
+    <h3 class="fw-bold"><i class="bi bi-thermometer-half me-2"></i>Isı Haritası</h3>
+    <small class="text-muted">Atık, kaynak ve teslim yoğunluğu</small>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% set extra_fields %}
+  <input type="hidden" name="yogunluk" value="{{ secili_yogunluk }}">
+  {% endset %}
+  {% include "belediye/_filters.html" %}
+
+  <div class="btn-group mb-3" role="group" aria-label="Yoğunluk türü">
+    {% for key, label in [('atik', 'Atık'), ('kaynak', 'Kaynak'), ('teslim', 'Teslim')] %}
+    <a class="btn btn-sm {% if secili_yogunluk == key %}btn-success{% else %}btn-outline-success{% endif %}"
+       href="{{ url_for('belediye.heatmap', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle, yogunluk=key) }}">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body p-0">
+      <div id="belediyeIsiHaritasi" class="map-container map-container-tall"></div>
+    </div>
+    <div class="card-footer small text-muted">
+      Yoğunluk:
+      <span class="badge bg-primary">Atık</span>
+      <span class="badge bg-success">Kaynak</span>
+      <span class="badge bg-warning text-dark">Teslim</span>
+      — koyu renkler daha yoğun bölgeleri gösterir.
+    </div>
+  </div>
+</div>
+
+{% from '_leaflet_assets.html' import leaflet_assets %}
+{{ leaflet_assets(heat=true) }}
+<script type="application/json" id="belediye-heatmap-config">{{ {
+  'isi_noktalari': noktalar,
+  'yogunluk': secili_yogunluk
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/belediye-heatmap.js') }}"></script>
+{% endblock %}
