@@ -56,7 +56,24 @@ def _rule_narratives(center: dict) -> dict:
 
 def enrich_decision_support(center: dict | None = None) -> dict:
     """Analitik paket + AI/kural anlatım."""
+    from services.demo_manager import is_demo_mode, use_demo_ai
+
     center = center or build_decision_support_center()
+
+    # Demo: MASTER AI hazırsa Gemini'ye gitme
+    if (
+        is_demo_mode()
+        or use_demo_ai()
+        or center.get("source") == "demo"
+        or center.get("ai_source") == "demo"
+    ):
+        if not center.get("ai"):
+            narratives = _rule_narratives(center)
+            narratives["source"] = "demo"
+            center["ai"] = narratives
+        center["ai_source"] = center.get("ai_source") or (center.get("ai") or {}).get("source") or "demo"
+        return center
+
     narratives = _rule_narratives(center)
     source = "rules"
 

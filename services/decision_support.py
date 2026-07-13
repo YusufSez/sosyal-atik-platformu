@@ -411,10 +411,13 @@ def ministry_action_items(risk: dict, comparisons: dict, weekly: dict, monthly: 
 
 def build_decision_support_center(*, now=None) -> dict:
     """Ulusal Karar Destek Merkezi dashboard paketi."""
-    from services.demo_manager import should_use_demo
+    from services.demo_manager import is_demo_mode, should_use_demo
     from services import demo_provider
 
     now = now or utc_now()
+    if is_demo_mode():
+        return demo_provider.decision_support_center()
+
     kpi = ministry_kpi()
     kpi_ok = bool((kpi or {}).get("toplam_ilan") or (kpi or {}).get("etki_adet"))
     if should_use_demo("dashboard", real_data_sufficient=kpi_ok):

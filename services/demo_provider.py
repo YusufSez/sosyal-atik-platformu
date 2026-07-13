@@ -1001,100 +1001,295 @@ def municipality_ai_insights(dashboard: dict | None = None, *, il=None) -> dict:
 
 
 def decision_support_center() -> dict:
-    """Ulusal karar destek — MASTER_DATASET agregasyonu."""
-    board = national_leaderboard()
+    """Ulusal karar destek — MASTER_DATASET (template/PDF şemasına tam uyumlu)."""
+    muni_board = _municipality_board()
     now = utc_now()
     nat = ministry_kpi()
     total_ilan = nat["toplam_ilan"]
-    total_co2 = nat["co2_tasarrufu_kg"] / 1000.0
-    cats = {k: 0.0 for k in CATEGORY_KEYS}
-    for city, pkg in MASTER_DATASET.items():
-        w = pkg["dashboard"]["toplam_aktif_ilan"]
-        for k, pct in pkg["waste_categories"].items():
-            cats[k] = cats.get(k, 0) + w * pct
-    cat_sum = sum(cats.values()) or 1
-    cat_labels = list(CATEGORY_KEYS)
-    cat_values = [round(100.0 * cats[k] / cat_sum, 1) for k in cat_labels]
 
-    # 8 haftalık katılım (Sakarya history proxy + national scale)
-    sak = MASTER_DATASET[DEFAULT_CITY]["monthly_history"][-6:]
+    # Kategori payları → dönemsel shift benzeri sayılar
+    cat_counts = []
+    for k in CATEGORY_KEYS:
+        cur = 0
+        for city, pkg in MASTER_DATASET.items():
+            cur += int(round(pkg["dashboard"]["toplam_aktif_ilan"] * pkg["waste_categories"].get(k, 0) / 100.0))
+        prev = max(1, int(cur * 0.88))
+        # Elektronik yükseliş, Organik düşüş senaryosu
+        if k == "Elektronik":
+            prev = max(1, int(cur * 0.82))
+        elif k == "Organik":
+            prev = int(cur * 1.12)
+        elif k == "Bitkisel yağ":
+            prev = max(1, int(cur * 0.75))
+        delta = cur - prev
+        cat_counts.append({
+            "kategori": "Bitkisel Yağ" if k == "Bitkisel yağ" else k,
+            "current": cur,
+            "previous": prev,
+            "delta": delta,
+            "change_pct": round(((cur - prev) / prev) * 100.0, 1) if prev else 0.0,
+        })
+    cat_counts.sort(key=lambda x: -abs(x["delta"]))
+    rising = [s for s in cat_counts if s["delta"] > 0][:5]
+    falling = [s for s in cat_counts if s["delta"] < 0][:5]
+
+    # 8 haftalık katılım
+    hist = MASTER_DATASET[DEFAULT_CITY]["monthly_history"][-6:]
+    aktif_series = [int(55 + i * 2.5 + (row["katilim"] * 0.15)) for i, row in enumerate(hist)]
+    # 8 noktaya tamamla
+    while len(aktif_series) < 8:
+        aktif_series.append(aktif_series[-1] + 2)
+    ilan_series = [int(total_ilan * (0.012 + i * 0.001)) for i in range(8)]
+    labels = [f"W{i+1}" for i in range(8)]
+    part_change = round(
+        ((aktif_series[-1] - aktif_series[0]) / max(aktif_series[0], 1)) * 100.0, 1
+    )
     participation = {
-        "labels": [row["ay"] for row in sak] + ["W7", "W8"],
-        "aktif": [int(row["katilim"]) for row in sak] + [72, 74],
-        "ilanlar": [int(row["kaynak_adet"] * 3) for row in sak] + [40, 44],
+        "weeks": 8,
+        "series": [
+            {"label": labels[i], "aktif_kullanici": aktif_series[i], "ilan": ilan_series[i]}
+            for i in range(8)
+        ],
+        "labels": labels,
+        "aktif": aktif_series,
+        "ilanlar": ilan_series,
+        "change_pct": part_change,
+        "trend": "yukselis" if part_change >= 8 else ("dusus" if part_change <= -8 else "stabil"),
     }
+
+    risky_rows = sorted(muni_board, key=lambda r: r["puan"])[:5]
+    medium_rows = [r for r in muni_board if r["renk"] == "sari"]
+    risk_level = "orta" if len(risky_rows) >= 3 else "dusuk"
+    if risky_rows and risky_rows[0]["puan"] < 70:
+        risk_level = "orta"
+    findings = [
+        f"{len(risky_rows)} il düşük sürdürülebilirlik bandında "
+        f"(ör. {risky_rows[0]['ad']}).",
+        f"Elektronik kategorisinde artış (%{rising[0]['change_pct'] if rising else 12}).",
+        "Bitkisel yağ kampanyası birden fazla ilde yükselişte.",
+        f"Vatandaş katılımı son dönemde %{part_change} değişti.",
+    ]
+    risk = {
+        "level": risk_level,
+        "riskli_belediye_sayisi": len(risky_rows),
+        "orta_risk_sayisi": len(medium_rows) or 3,
+        "riskli_belediyeler": [
+            {
+                "belediye_adi": r["ad"],
+                "il": r["il"],
+                "ilce": r.get("ilce"),
+                "puan": r["puan"],
+                "renk": r["renk"],
+            }
+            for r in risky_rows
+        ],
+        "falling_categories": falling[:3],
+        "participation_change_pct": part_change,
+        "findings": findings,
+    }
+
+    top = [
+        {
+            "belediye_adi": r["ad"],
+            "il": r["il"],
+            "ilce": r.get("ilce"),
+            "puan": r["puan"],
+            "gelisim_yuzde": r["gelisim_yuzde"],
+            "renk": r["renk"],
+        }
+        for r in muni_board[:8]
+    ]
+    bottom = [
+        {
+            "belediye_adi": r["ad"],
+            "il": r["il"],
+            "ilce": r.get("ilce"),
+            "puan": r["puan"],
+            "gelisim_yuzde": r["gelisim_yuzde"],
+            "renk": r["renk"],
+        }
+        for r in sorted(muni_board, key=lambda x: x["puan"])[:8]
+    ]
+    comparisons = {
+        "top": top,
+        "bottom": bottom,
+        "provinces_top": province_statistics()[:8],
+        "provinces_bottom": list(reversed(province_statistics()[-5:])),
+        "chart": {
+            "labels": [r["belediye_adi"] for r in top[:6]],
+            "puanlar": [r["puan"] for r in top[:6]],
+        },
+    }
+
+    weekly = {
+        "period": "weekly",
+        "label": "Haftalık",
+        "days": 7,
+        "start": (now).isoformat(),
+        "end": now.isoformat(),
+        "metrics": {
+            "ilan": int(total_ilan * 0.02),
+            "teslim": int(total_ilan * 0.012),
+            "aktif_kullanici": aktif_series[-1],
+            "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.08, 1),
+            "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.08, 1),
+            "su_litre": round(nat["su_tasarrufu_litre"] * 0.08, 1),
+            "adet": int(nat["etki_adet"] * 0.08),
+        },
+        "previous": {
+            "ilan": int(total_ilan * 0.018),
+            "teslim": int(total_ilan * 0.01),
+            "aktif_kullanici": aktif_series[-2],
+            "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.07, 1),
+            "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.07, 1),
+        },
+        "change_pct": {
+            "ilan": 6.2,
+            "teslim": 4.8,
+            "aktif_kullanici": 5.1,
+            "co2e_kg": 5.5,
+            "atik_kg": 4.1,
+        },
+    }
+    monthly = {
+        "period": "monthly",
+        "label": "Aylık",
+        "days": 30,
+        "start": now.isoformat(),
+        "end": now.isoformat(),
+        "metrics": {
+            "ilan": int(total_ilan * 0.08),
+            "teslim": int(total_ilan * 0.05),
+            "aktif_kullanici": int(aktif_series[-1] * 1.4),
+            "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.25, 1),
+            "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.25, 1),
+            "su_litre": round(nat["su_tasarrufu_litre"] * 0.25, 1),
+            "adet": int(nat["etki_adet"] * 0.25),
+        },
+        "previous": {
+            "ilan": int(total_ilan * 0.07),
+            "teslim": int(total_ilan * 0.045),
+            "aktif_kullanici": int(aktif_series[-1] * 1.2),
+            "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.22, 1),
+            "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.22, 1),
+        },
+        "change_pct": {
+            "ilan": 8.4,
+            "teslim": 6.0,
+            "aktif_kullanici": 7.2,
+            "co2e_kg": 7.1,
+            "atik_kg": 5.2,
+        },
+    }
+
+    campaigns = [
+        {
+            "title": "Elektronik Atık Haftası",
+            "description": (
+                "Elektronik kategorisinde ulusal artış gözleniyor. "
+                "Toplama günleri ve farkındalık etkinlikleri önerilir."
+            ),
+            "priority": "Yüksek",
+            "horizon": "Kısa",
+        },
+        {
+            "title": "Bitkisel Yağ Toplama Kampanyası",
+            "description": (
+                "Kampanya sonrası yükseliş birden fazla ilde sürüyor; "
+                "yaygınlaştırma önerilir."
+            ),
+            "priority": "Orta",
+            "horizon": "Orta",
+        },
+        {
+            "title": "Organik Kompost Programı",
+            "description": (
+                "Organik payındaki düşüşü dengelemek için mahalle kompost "
+                "programları planlanabilir."
+            ),
+            "priority": "Orta",
+            "horizon": "Orta",
+        },
+        {
+            "title": "Riskli İl Destek Paketi",
+            "description": (
+                f"{risky_rows[0]['il']} ve benzeri düşük skorlu iller için "
+                "operasyonel destek önerilir."
+            ),
+            "priority": "Yüksek",
+            "horizon": "Kısa",
+        },
+    ]
+    actions = [
+        {
+            "title": f"{bottom[0]['belediye_adi']} için iyileştirme planı",
+            "detail": "Düşük performanslı birimlerle hedef odaklı eylem planı paylaşın.",
+            "priority": "Yüksek",
+        },
+        {
+            "title": "Elektronik atık lojistiğini güçlendirin",
+            "detail": "Ulusal elektronik artışına karşı toplama kapasitesini artırın.",
+            "priority": "Yüksek",
+        },
+        {
+            "title": "İller arası iyi uygulama paylaşımı",
+            "detail": "İzmir–İstanbul modellerini ulusal bültende yayınlayın.",
+            "priority": "Orta",
+        },
+    ]
+
+    ai = {
+        "overview": (
+            f"Ulusal özet: {nat['aktif_belediye']} il senaryosu, "
+            f"{nat['vatandas_sayisi']} vatandaş, katılım %{nat['vatandas_katilim_orani']}. "
+            f"Risk seviyesi: {risk_level}. Elektronik artıyor, organik azalıyor, "
+            "bitkisel yağ kampanyası yükseliyor."
+        ),
+        "weekly_narrative": [
+            f"Son 7 günde {weekly['metrics']['ilan']} ilan, "
+            f"{weekly['metrics']['teslim']} teslim kaydedildi.",
+            f"Haftalık CO₂ tasarrufu {weekly['metrics']['co2e_kg']:.0f} kg.",
+            f"Aktif vatandaş {weekly['metrics']['aktif_kullanici']}.",
+        ],
+        "monthly_narrative": [
+            f"Son 30 günde {monthly['metrics']['ilan']} ilan üretildi.",
+            f"Aylık geri kazanım {monthly['metrics']['atik_kg']:.0f} kg; "
+            f"CO₂ {monthly['metrics']['co2e_kg']:.0f} kg.",
+            f"Katılım eğilimi: {participation['trend']} (%{part_change}).",
+        ],
+        "risk_narrative": findings[:3],
+        "source": "demo",
+    }
+
     return {
         "generated_at": now.isoformat(),
-        "kpi": {
-            "aktif_belediye": nat["aktif_belediye"],
-            "toplam_ilan": total_ilan,
-            "co2_ton": round(total_co2, 1),
-            "ortalama_puan": round(sum(r["puan"] for r in board) / len(board), 1),
-        },
-        "weekly_report": {
-            "metrics": {
-                "ilan": int(total_ilan * 0.02),
-                "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.08, 1),
-                "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.08, 1),
-            },
-            "change_pct": {"ilan": 6.2, "atik_kg": 4.1, "co2e_kg": 5.5},
-        },
-        "monthly_report": {
-            "metrics": {
-                "ilan": int(total_ilan * 0.08),
-                "atik_kg": round(nat["toplam_geri_kazanim_kg"] * 0.25, 1),
-                "co2e_kg": round(nat["co2_tasarrufu_kg"] * 0.25, 1),
-            },
-            "change_pct": {"ilan": 8.4, "atik_kg": 5.2, "co2e_kg": 7.1},
-        },
-        "risk_analysis": {
-            "high": [r for r in board if r["puan"] < 70],
-            "medium": [r for r in board if 70 <= r["puan"] < 78],
-            "low": [r for r in board if r["puan"] >= 78],
-        },
-        "campaigns": [
-            {"title": "Elektronik Atık Haftası", "detail": "Ulusal elektronik artışı için ortak kampanya.", "priority": "Yüksek"},
-            {"title": "Bitkisel Yağ Toplama", "detail": "Kampanya sonrası yükselişi yaygınlaştırın.", "priority": "Orta"},
-            {"title": "Organik Kompost", "detail": "Organik düşüşü dengelemek için kompost programı.", "priority": "Orta"},
-        ],
-        "municipality_comparisons": {
-            "labels": [r["il"] for r in board[:8]],
-            "puanlar": [r["puan"] for r in board[:8]],
-        },
+        "kpi": dict(nat),
+        "weekly_report": weekly,
+        "monthly_report": monthly,
+        "risk_analysis": risk,
+        "campaigns": campaigns,
+        "municipality_comparisons": comparisons,
         "category_shifts": {
-            "labels": cat_labels,
-            "previous": [max(1, v - 2) for v in cat_values],
-            "current": cat_values,
+            "days": 30,
+            "all": cat_counts,
+            "rising": rising,
+            "falling": falling,
+            "chart": {
+                "labels": [s["kategori"] for s in cat_counts[:8]],
+                "current": [s["current"] for s in cat_counts[:8]],
+                "previous": [s["previous"] for s in cat_counts[:8]],
+            },
         },
         "participation_trends": participation,
-        "ministry_actions": [
-            {"title": "Riskli illerde saha desteği", "detail": "Trabzon ve benzeri illerde teslim oranı iyileştirmesi.", "priority": "Yüksek"},
-            {"title": "İyi uygulama paylaşımı", "detail": "İzmir–İstanbul modellerini ulusal bültende yayınlayın.", "priority": "Orta"},
-        ],
+        "ministry_actions": actions,
         "reports": {
             "weekly": {"title": "Haftalık Rapor", "key": "weekly"},
             "monthly": {"title": "Aylık Rapor", "key": "monthly"},
             "full": {"title": "Tam Karar Destek Raporu", "key": "full"},
         },
-        "ai": {
-            "overview": "Ulusal demo senaryosu: elektronik artıyor, organik azalıyor, bitkisel yağ kampanyası yükseliyor.",
-            "weekly_narrative": [
-                "Elektronik atık son dönemde belirgin arttı.",
-                "Teslim oranları genel olarak yükseliyor.",
-                "CO₂ kazanımı hedefin üzerinde.",
-            ],
-            "monthly_narrative": [
-                "Son 30 günde ulusal ilan hacmi arttı.",
-                "Bitkisel yağ kampanyası başarılı.",
-                "Organik atıkta düşüş sürüyor.",
-            ],
-            "risk_narrative": [
-                "Düşük skorlu illerde saha takibi önerilir.",
-                "Sanayi hatlarında metal lojistiği kritik.",
-            ],
-            "source": "demo",
-        },
+        "ai": ai,
         "ai_source": "demo",
+        "source": "demo",
     }
 
 
