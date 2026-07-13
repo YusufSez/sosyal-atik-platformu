@@ -178,6 +178,7 @@ def surdurulebilirlik():
         dash=dash,
         suggestions=ai.get("suggestions") or [],
         suggestion_source=ai.get("source"),
+        ai_report=ai.get("report") or {},
         **_page_context(),
     )
 
@@ -191,7 +192,11 @@ def surdurulebilirlik_pdf():
     filters = _filters()
     dash = sustainability_dashboard(il=filters["il"], ilce=filters["ilce"])
     ai = generate_sustainability_suggestions(scored=dash["current"])
-    data, filename = export_sustainability_pdf(dash, ai.get("suggestions") or [])
+    data, filename = export_sustainability_pdf(
+        dash,
+        ai.get("suggestions") or [],
+        report=ai.get("report") or {},
+    )
     mimetype = "application/pdf" if filename.endswith(".pdf") else "text/plain"
     return send_file(
         io.BytesIO(data),

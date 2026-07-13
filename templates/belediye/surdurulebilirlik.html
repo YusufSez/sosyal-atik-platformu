@@ -4,7 +4,7 @@
   <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-start gap-3">
     <div>
       <h3 class="fw-bold"><i class="bi bi-leaf me-2"></i>Sustainability Scoring Engine</h3>
-      <small class="text-muted">100 puan · A+–F · lider tablosu · Türkiye karşılaştırması</small>
+      <small class="text-muted">Radar · kategori · geçmiş · sıralama · benzer belediyeler · AI raporu</small>
     </div>
     <a class="btn btn-outline-success"
        href="{{ url_for('belediye.surdurulebilirlik_pdf', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
@@ -15,6 +15,7 @@
   {% include "belediye/_filters.html" %}
 
   {% set cur = dash.current %}
+  {% set ranks = dash.rankings or {} %}
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card shadow-sm h-100 border-0" style="background:linear-gradient(135deg,#ecfdf5,#f0fdfa)">
@@ -24,8 +25,21 @@
           <small class="text-muted">
             {% if cur.belediye_adi %}{{ cur.belediye_adi }}{% else %}{{ cur.il or 'Türkiye' }}{% if cur.ilce %} / {{ cur.ilce }}{% endif %}{% endif %}
           </small>
-          {% if dash.my_rank %}
+          {% if ranks.turkey and ranks.turkey.sira %}
+          <div class="mt-2 small">Türkiye sıralaması: <strong>#{{ ranks.turkey.sira }}</strong> / {{ ranks.turkey.toplam }}</div>
+          {% elif dash.my_rank %}
           <div class="mt-2 small">Türkiye sırası: <strong>#{{ dash.my_rank }}</strong></div>
+          {% endif %}
+          {% if ranks.il_belediye and ranks.il_belediye.sira %}
+          <div class="small">İl sıralaması: <strong>#{{ ranks.il_belediye.sira }}</strong> / {{ ranks.il_belediye.toplam }}</div>
+          {% endif %}
+          {% if dash.history and dash.history.change_pct is not none %}
+          <div class="small mt-1">
+            6 ay değişim:
+            <strong class="{% if dash.history.change_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+              {{ '%+.1f'|format(dash.history.change_pct) }}%
+            </strong>
+          </div>
           {% endif %}
           {% if dash.comparison and dash.comparison.message %}
           <div class="mt-3 small px-2 text-teal fw-semibold">{{ dash.comparison.message }}</div>
@@ -36,41 +50,83 @@
         </div>
       </div>
     </div>
-    <div class="col-md-8">
+    <div class="col-md-4">
       <div class="card shadow-sm h-100">
-        <div class="card-header fw-bold">Kriterler</div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm mb-0 align-middle">
-              <thead><tr><th>Kriter</th><th class="text-end">Puan</th><th class="text-end">Ağırlık</th><th style="width:40%">Çubuk</th></tr></thead>
-              <tbody>
-                {% for c in cur.criteria %}
-                <tr>
-                  <td>{{ c.label }}{% if c.missing_data %} <span class="badge bg-light text-muted border">veri sınırlı</span>{% endif %}</td>
-                  <td class="text-end">{{ c.score }}</td>
-                  <td class="text-end">%{{ c.weight }}</td>
-                  <td>
-                    <div class="progress" style="height:8px">
-                      <div class="progress-bar {% if c.score >= 70 %}bg-success{% elif c.score >= 40 %}bg-warning{% else %}bg-secondary{% endif %}"
-                           style="width:{{ c.score }}%"></div>
-                    </div>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+        <div class="card-header fw-bold">Radar Chart</div>
+        <div class="card-body">
+          <canvas id="sustainabilityRadarChart" height="240"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold">Geçmiş Değişim</div>
+        <div class="card-body">
+          <canvas id="sustainabilityHistoryChart" height="240"></canvas>
         </div>
       </div>
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-bold">Kategori Puanları</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Kriter</th><th class="text-end">Puan</th><th class="text-end">Ağırlık</th><th style="width:40%">Çubuk</th></tr></thead>
+          <tbody>
+            {% for c in dash.category_scores or cur.criteria %}
+            <tr>
+              <td>{{ c.label }}{% if c.missing_data %} <span class="badge bg-light text-muted border">veri sınırlı</span>{% endif %}</td>
+              <td class="text-end">{{ c.score }}</td>
+              <td class="text-end">%{{ c.weight }}</td>
+              <td>
+                <div class="progress" style="height:8px">
+                  <div class="progress-bar {% if c.score >= 70 %}bg-success{% elif c.score >= 40 %}bg-warning{% else %}bg-secondary{% endif %}"
+                       style="width:{{ c.score }}%"></div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% include "belediye/_sustainability_report.html" %}
   {% include "belediye/_sustainability_suggestions.html" %}
+
+  {% if dash.similar_municipalities %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-header fw-bold">Benzer Belediyeler</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for s in dash.similar_municipalities %}
+        <div class="col-sm-6 col-lg-4">
+          <div class="border rounded p-3 h-100">
+            <div class="fw-semibold">{{ s.belediye_adi }}</div>
+            <div class="small text-muted">{{ s.il }}{% if s.ilce %} / {{ s.ilce }}{% endif %}</div>
+            <div class="mt-2">
+              <span class="badge text-bg-success">{{ s.puan }} · {{ s.grade }}</span>
+              <span class="small text-muted ms-1">
+                {% if s.puan_farki >= 0 %}+{% endif %}{{ s.puan_farki }}
+                {% if s.ayni_il %}· aynı il{% endif %}
+              </span>
+            </div>
+            {% if s.sira %}<div class="small text-muted mt-1">TR sıra #{{ s.sira }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="row g-4">
     <div class="col-lg-6">
       <div class="card shadow-sm">
-        <div class="card-header fw-bold">Türkiye Lider Tablosu</div>
+        <div class="card-header fw-bold">Türkiye Sıralaması</div>
         <div class="table-responsive">
           <table class="table table-hover mb-0 align-middle">
             <thead><tr><th>#</th><th>Belediye</th><th>İl</th><th class="text-end">Puan</th><th>Not</th></tr></thead>
@@ -99,7 +155,7 @@
             <thead><tr><th>#</th><th>İl</th><th class="text-end">Puan</th><th>Not</th><th class="text-end">Belediye</th></tr></thead>
             <tbody>
               {% for row in dash.province_ranking %}
-              <tr>
+              <tr {% if dash.focus_il and row.il == dash.focus_il %}class="table-success"{% endif %}>
                 <td>{{ row.sira }}</td>
                 <td>{{ row.il }}</td>
                 <td class="text-end">{{ row.puan }}</td>
@@ -137,6 +193,13 @@
     </div>
   </div>
 </div>
+
+<script type="application/json" id="sustainability-chart-config">{{ {
+  'radar': dash.radar or {},
+  'history': dash.history or {}
+}|tojson }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/sustainability-charts.js') }}"></script>
 <style>
 .badge.bg-teal { background:#ccfbf1 !important; }
 .text-teal { color:#0f766e !important; }
@@ -160,6 +223,10 @@
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.sustainability-report-card {
+  background: linear-gradient(160deg, #f0fdfa 0%, #fff 55%);
+  border: 1px solid rgba(15, 118, 110, 0.14) !important;
 }
 </style>
 {% endblock %}

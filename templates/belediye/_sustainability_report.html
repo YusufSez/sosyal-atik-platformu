@@ -1,0 +1,52 @@
+{# AI değerlendirme raporu: 3 güçlü · 3 geliştirme · 3 öneri · beklenen kazanım #}
+{% set report = ai_report or {} %}
+{% if report %}
+<div class="card shadow-sm mb-4 border-0 sustainability-report-card">
+  <div class="card-header bg-transparent fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-robot me-2"></i>AI Değerlendirmesi</span>
+    <span class="badge text-bg-secondary">{{ report.source or suggestion_source or 'rules' }}</span>
+  </div>
+  <div class="card-body">
+    {% if report.summary %}
+    <p class="mb-3">{{ report.summary }}</p>
+    {% endif %}
+    <div class="row g-3">
+      <div class="col-md-4">
+        <h6 class="text-success">3 Güçlü Yön</h6>
+        <ol class="small ps-3 mb-0">
+          {% for item in report.strengths or [] %}
+          <li class="mb-2">{{ item }}</li>
+          {% else %}
+          <li class="text-muted">—</li>
+          {% endfor %}
+        </ol>
+      </div>
+      <div class="col-md-4">
+        <h6 class="text-warning">3 Geliştirme Alanı</h6>
+        <ol class="small ps-3 mb-0">
+          {% for item in report.improvements or [] %}
+          <li class="mb-2">{{ item }}</li>
+          {% else %}
+          <li class="text-muted">—</li>
+          {% endfor %}
+        </ol>
+      </div>
+      <div class="col-md-4">
+        <h6 class="text-primary">3 Öneri</h6>
+        <ol class="small ps-3 mb-0">
+          {% for item in report.recommendations or [] %}
+          <li class="mb-2">{{ item }}</li>
+          {% else %}
+          <li class="text-muted">—</li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+    {% if report.expected_gains %}
+    <div class="alert alert-success mt-3 mb-0">
+      <strong>Beklenen kazanım:</strong> {{ report.expected_gains }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

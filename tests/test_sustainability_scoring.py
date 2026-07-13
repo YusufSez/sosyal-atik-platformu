@@ -260,6 +260,14 @@ def test_dashboard_bundle(app, sustainability_data):
         assert dash["comparison"].get("message")
         assert dash["current"]["belediye_id"] == muni.id
         assert dash["my_rank"] is not None
+        assert "radar" in dash
+        assert len(dash["radar"]["labels"]) == len(SUSTAINABILITY_WEIGHTS)
+        assert "category_scores" in dash
+        assert "history" in dash
+        assert len(dash["history"]["series"]) >= 3
+        assert "similar_municipalities" in dash
+        assert "rankings" in dash
+        assert dash["rankings"]["turkey"]["sira"] is not None
 
 
 def test_ai_suggestions_rule_based(app, sustainability_data):
@@ -275,6 +283,11 @@ def test_ai_suggestions_rule_based(app, sustainability_data):
         assert first.get("priority") in ("Kritik", "Yüksek", "Orta", "Düşük")
         assert first.get("duration") in ("Kısa", "Orta", "Uzun")
         assert first.get("reason")
+        report = result["report"]
+        assert len(report["strengths"]) == 3
+        assert len(report["improvements"]) == 3
+        assert len(report["recommendations"]) == 3
+        assert report["expected_gains"]
         text = " ".join(
             f"{s.get('title','')} {s.get('description','')} {s.get('reason','')}"
             for s in result["suggestions"]
@@ -286,8 +299,12 @@ def test_pdf_export(app, sustainability_data):
     with app.app_context():
         muni = db.session.get(User, sustainability_data["muni_a_id"])
         dash = sustainability_dashboard(belediye_user=muni)
+        with patch("services.sustainability_ai.get_client", return_value=None):
+            ai = generate_sustainability_suggestions(scored=dash["current"])
         data, filename = export_sustainability_pdf(
-            dash, ["Puanınızı artırmak için elektronik atık toplama oranını yükseltin."]
+            dash,
+            ai.get("suggestions") or [],
+            report=ai.get("report") or {},
         )
         assert filename.endswith(".pdf") or filename.endswith(".txt")
         assert len(data) > 50
@@ -304,7 +321,9 @@ def test_belediye_page_rbac(client, sustainability_data):
         resp = client.get("/belediye/surdurulebilirlik")
     assert resp.status_code == 200
     assert b"Sustainability Scoring" in resp.data
-    assert b"Lider Tablosu" in resp.data
+    assert b"Radar" in resp.data or b"radar" in resp.data
+    assert b"AI De" in resp.data or b"G" in resp.data  # AI Değerlendirmesi / Güçlü
+    assert b"S" in resp.data  # Sıralaması
 
 
 def test_belediye_api_and_pdf(client, sustainability_data):
@@ -316,6 +335,14 @@ def test_belediye_api_and_pdf(client, sustainability_data):
     assert "current" in body
     assert "turkey_ranking" in body
     assert "suggestions" in body
+    assert "radar" in body
+    assert "history" in body
+    assert "similar_municipalities" in body
+    assert "report" in body["suggestions"] or "suggestions" in body["suggestions"]
+    # suggestions key still wraps AI payload
+    ai = body["suggestions"]
+    assert "suggestions" in ai
+    assert "report" in ai
 
     pdf = client.get("/belediye/surdurulebilirlik/pdf")
     assert pdf.status_code == 200

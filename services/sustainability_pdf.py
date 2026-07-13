@@ -7,14 +7,23 @@ import io
 from utils import utc_now
 
 
-def export_sustainability_pdf(dashboard: dict, suggestions: list | None = None) -> tuple[bytes, str]:
-    """Skor kartı + lider tablosu PDF (reportlab)."""
+def export_sustainability_pdf(
+    dashboard: dict,
+    suggestions: list | None = None,
+    *,
+    report: dict | None = None,
+) -> tuple[bytes, str]:
+    """Skor + radar kriterleri + geçmiş + sıralama + AI raporu PDF."""
     from services.sustainability_ai import suggestion_cards_as_text
 
     current = dashboard.get("current") or {}
     leaders = dashboard.get("leaderboard") or []
     provinces = dashboard.get("province_ranking") or []
+    history = dashboard.get("history") or {}
+    similar = dashboard.get("similar_municipalities") or []
+    ranks = dashboard.get("rankings") or {}
     tip_lines = suggestion_cards_as_text(suggestions or [])
+    report = report or {}
     ts = utc_now().strftime("%Y%m%d_%H%M")
     filename = f"surdurulebilirlik_{ts}.pdf"
 
@@ -43,10 +52,26 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list | None = None) 
         comparison = (dashboard.get("comparison") or {}).get("message")
         if comparison:
             story.append(Paragraph(comparison, styles["Normal"]))
-            story.append(Spacer(1, 8))
+            story.append(Spacer(1, 6))
 
+        tr = ranks.get("turkey") or {}
+        ilr = ranks.get("il_belediye") or {}
+        if tr.get("sira"):
+            story.append(Paragraph(
+                f"Türkiye sıralaması: #{tr['sira']} / {tr.get('toplam', '—')}",
+                styles["Normal"],
+            ))
+        if ilr.get("sira"):
+            story.append(Paragraph(
+                f"İl sıralaması ({ilr.get('il') or ''}): #{ilr['sira']} / {ilr.get('toplam', '—')}",
+                styles["Normal"],
+            ))
+        story.append(Spacer(1, 10))
+
+        # Kategori puanları
+        story.append(Paragraph("Kategori Puanları", styles["Heading2"]))
         crit_rows = [["Kriter", "Puan", "Ağırlık", "Katkı"]]
-        for c in current.get("criteria") or []:
+        for c in current.get("criteria") or dashboard.get("category_scores") or []:
             crit_rows.append([
                 c.get("label", ""),
                 str(c.get("score", "")),
@@ -62,10 +87,79 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list | None = None) 
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f0fdfa")]),
         ]))
         story.append(t1)
-        story.append(Spacer(1, 16))
+        story.append(Spacer(1, 14))
+
+        # Geçmiş değişim
+        series = history.get("series") or []
+        if series:
+            story.append(Paragraph("Geçmiş Değişim", styles["Heading2"]))
+            story.append(Paragraph(
+                f"Trend: {history.get('trend', '—')} · Değişim: %{history.get('change_pct', '—')}",
+                styles["Normal"],
+            ))
+            hist_rows = [["Ay", "Puan", "Teslim %", "Geri dönüşüm", "CO₂ kg"]]
+            for s in series:
+                hist_rows.append([
+                    s.get("ay", ""),
+                    str(s.get("puan", "")),
+                    str(s.get("teslim_orani", "")),
+                    str(s.get("geri_donusum", "")),
+                    str(s.get("co2e_kg", "")),
+                ])
+            th = Table(hist_rows, repeatRows=1, colWidths=[70, 50, 70, 80, 70])
+            th.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#115e59")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ]))
+            story.append(th)
+            story.append(Spacer(1, 14))
+
+        # Benzer belediyeler
+        if similar:
+            story.append(Paragraph("Benzer Belediyeler", styles["Heading2"]))
+            sim_rows = [["Belediye", "İl", "Puan", "Fark"]]
+            for s in similar[:8]:
+                sim_rows.append([
+                    str(s.get("belediye_adi", ""))[:36],
+                    str(s.get("il", "")),
+                    str(s.get("puan", "")),
+                    str(s.get("puan_farki", "")),
+                ])
+            ts_table = Table(sim_rows, repeatRows=1, colWidths=[180, 90, 50, 50])
+            ts_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f766e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ]))
+            story.append(ts_table)
+            story.append(Spacer(1, 14))
+
+        # AI değerlendirme raporu
+        story.append(Paragraph("AI Değerlendirmesi", styles["Heading2"]))
+        if report.get("summary"):
+            story.append(Paragraph(report["summary"], styles["Normal"]))
+            story.append(Spacer(1, 6))
+        for title, key in (
+            ("3 Güçlü Yön", "strengths"),
+            ("3 Geliştirme Alanı", "improvements"),
+            ("3 Öneri", "recommendations"),
+        ):
+            items = report.get(key) or []
+            if items:
+                story.append(Paragraph(title, styles["Heading3"]))
+                for item in items:
+                    story.append(Paragraph(f"• {item}", styles["Normal"]))
+                story.append(Spacer(1, 6))
+        if report.get("expected_gains"):
+            story.append(Paragraph("Beklenen Kazanım", styles["Heading3"]))
+            story.append(Paragraph(report["expected_gains"], styles["Normal"]))
+            story.append(Spacer(1, 10))
 
         if tip_lines:
-            story.append(Paragraph("AI Önerileri", styles["Heading2"]))
+            story.append(Paragraph("AI Öneri Kartları", styles["Heading2"]))
             for tip in tip_lines[:8]:
                 story.append(Paragraph(f"• {tip}", styles["Normal"]))
             story.append(Spacer(1, 12))
@@ -116,7 +210,17 @@ def export_sustainability_pdf(dashboard: dict, suggestions: list | None = None) 
             "AtikPort Sustainability Scoring Engine",
             f"Puan: {current.get('puan')} Not: {current.get('grade')}",
             "",
+            "AI Rapor:",
+            str(report.get("summary") or ""),
         ]
+        for s in report.get("strengths") or []:
+            lines.append(f"+ {s}")
+        for s in report.get("improvements") or []:
+            lines.append(f"- {s}")
+        for s in report.get("recommendations") or []:
+            lines.append(f"* {s}")
+        if report.get("expected_gains"):
+            lines.append(f"Kazanım: {report['expected_gains']}")
         for c in current.get("criteria") or []:
             lines.append(f"- {c.get('label')}: {c.get('score')}")
         for tip in tip_lines:

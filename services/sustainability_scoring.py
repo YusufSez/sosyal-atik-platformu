@@ -365,13 +365,216 @@ def build_turkey_comparison(current_puan: float, board: list[dict] | None = None
     }
 
 
+def radar_chart_data(scored: dict) -> dict:
+    """Chart.js radar için etiket / değer paketleri."""
+    criteria = scored.get("criteria") or []
+    labels = [c.get("label") or c.get("key") for c in criteria]
+    values = [float(c.get("score") or 0) for c in criteria]
+    return {
+        "labels": labels,
+        "values": values,
+        "keys": [c.get("key") for c in criteria],
+    }
+
+
+def category_scores(scored: dict) -> list[dict]:
+    """Kategori (kriter) puanları — UI / PDF için sade liste."""
+    return [
+        {
+            "key": c.get("key"),
+            "label": c.get("label"),
+            "score": c.get("score"),
+            "weight": c.get("weight"),
+            "weighted": c.get("weighted"),
+            "missing_data": c.get("missing_data"),
+        }
+        for c in (scored.get("criteria") or [])
+    ]
+
+
+def _month_bounds(now, months_back: int) -> list[tuple[str, object, object]]:
+    """Son N ay için (label, start, end) — end exclusive."""
+    from calendar import monthrange
+    from datetime import datetime
+
+    from utils import utc_now
+
+    now = now or utc_now()
+    year, month = now.year, now.month
+    windows = []
+    for i in range(months_back - 1, -1, -1):
+        m = month - i
+        y = year
+        while m <= 0:
+            m += 12
+            y -= 1
+        start = datetime(y, m, 1)
+        last = monthrange(y, m)[1]
+        end = datetime(y, m, last, 23, 59, 59)
+        windows.append((f"{y:04d}-{m:02d}", start, end))
+    return windows
+
+
+def _count_in_window(model, geo, start, end, *, teslim_only: bool = False) -> int:
+    q = model.query.filter(model.tarih >= start, model.tarih <= end)
+    if teslim_only:
+        q = q.filter(model.ilan_durumu == "Teslim Edildi")
+    if geo:
+        q = q.join(User, model.user_id == User.id).filter(*geo)
+    return q.count()
+
+
+def score_history(
+    il: str | None = None,
+    ilce: str | None = None,
+    mahalle: str | None = None,
+    *,
+    months: int = 6,
+    now=None,
+) -> dict:
+    """
+    Aylık geçmiş değişim (şema değiştirmeden).
+    Her ay için o ayın aktivitesinden türetilmiş proxy puan.
+    """
+    months = max(3, min(12, int(months or 6)))
+    geo = _geo_filters(il, ilce, mahalle)
+    series = []
+    for label, start, end in _month_bounds(now, months):
+        kaynak_n = _count_in_window(Kaynak, geo, start, end)
+        atik_n = _count_in_window(Atik, geo, start, end)
+        kaynak_t = _count_in_window(Kaynak, geo, start, end, teslim_only=True)
+        atik_t = _count_in_window(Atik, geo, start, end, teslim_only=True)
+        total = kaynak_n + atik_n
+        teslim = kaynak_t + atik_t
+
+        etki_q = db.session.query(func.coalesce(func.sum(CevreselEtki.co2e_kg), 0)).filter(
+            CevreselEtki.timestamp >= start,
+            CevreselEtki.timestamp <= end,
+        )
+        if geo:
+            etki_q = etki_q.join(User, CevreselEtki.user_id == User.id).filter(*geo)
+        co2 = float(etki_q.scalar() or 0)
+
+        teslim_score, _ = _rate_score(teslim, total)
+        gd_score, _ = _rate_score(atik_t, atik_n)
+        karbon_score, _ = _carbon_score(co2, has_activity=bool(teslim or co2 > 0))
+        # Basit aylık bileşik: teslim %40 + geri dönüşüm %35 + karbon %25
+        puan = _clamp(0.40 * teslim_score + 0.35 * gd_score + 0.25 * karbon_score)
+        series.append({
+            "ay": label,
+            "puan": puan,
+            "teslim_orani": teslim_score,
+            "geri_donusum": gd_score,
+            "karbon": karbon_score,
+            "ilan": total,
+            "teslim": teslim,
+            "co2e_kg": round(co2, 2),
+        })
+
+    change = None
+    if len(series) >= 2:
+        first = series[0]["puan"]
+        last = series[-1]["puan"]
+        if first > 0:
+            change = round(((last - first) / first) * 100.0, 1)
+        else:
+            change = 100.0 if last > 0 else 0.0
+
+    return {
+        "months": months,
+        "series": series,
+        "labels": [s["ay"] for s in series],
+        "puanlar": [s["puan"] for s in series],
+        "change_pct": change,
+        "trend": (
+            "yukselis" if (change or 0) >= 5
+            else ("dusus" if (change or 0) <= -5 else "stabil")
+        ),
+    }
+
+
+def similar_municipalities(
+    current: dict,
+    board: list[dict] | None = None,
+    *,
+    limit: int = 5,
+    band: float = 12.0,
+) -> list[dict]:
+    """Benzer puan bandındaki belediyeler (aynı il öncelikli)."""
+    board = board if board is not None else municipality_leaderboard()
+    current_id = current.get("belediye_id")
+    current_puan = float(current.get("puan") or 0)
+    current_il = current.get("il")
+
+    peers = []
+    for row in board:
+        if current_id and row.get("belediye_id") == current_id:
+            continue
+        delta = abs(float(row.get("puan") or 0) - current_puan)
+        if delta > band:
+            continue
+        peers.append({
+            "belediye_id": row.get("belediye_id"),
+            "belediye_adi": row.get("belediye_adi"),
+            "il": row.get("il"),
+            "ilce": row.get("ilce"),
+            "puan": row.get("puan"),
+            "grade": row.get("grade"),
+            "sira": row.get("sira"),
+            "puan_farki": round(float(row.get("puan") or 0) - current_puan, 1),
+            "ayni_il": bool(current_il and row.get("il") == current_il),
+            "raw": row.get("raw"),
+        })
+
+    peers.sort(key=lambda p: (0 if p["ayni_il"] else 1, abs(p["puan_farki"]), p.get("sira") or 999))
+    return peers[:limit]
+
+
+def ranking_context(current: dict, full_board: list[dict], il_board: list[dict], provinces: list[dict]) -> dict:
+    """Türkiye / il sıralama özeti."""
+    turkey_sira = None
+    turkey_total = len(full_board)
+    if current.get("belediye_id"):
+        for row in full_board:
+            if row.get("belediye_id") == current["belediye_id"]:
+                turkey_sira = row.get("sira")
+                break
+    elif current.get("il") and not current.get("ilce"):
+        for row in provinces:
+            if row.get("il") == current.get("il"):
+                turkey_sira = row.get("sira")
+                break
+
+    il_sira = None
+    il_total = len(il_board)
+    if current.get("belediye_id"):
+        for idx, row in enumerate(il_board, start=1):
+            if row.get("belediye_id") == current["belediye_id"]:
+                il_sira = idx
+                break
+
+    province_sira = None
+    focus_il = current.get("il")
+    if focus_il:
+        for row in provinces:
+            if row.get("il") == focus_il:
+                province_sira = row.get("sira")
+                break
+
+    return {
+        "turkey": {"sira": turkey_sira, "toplam": turkey_total},
+        "il_belediye": {"sira": il_sira, "toplam": il_total, "il": focus_il},
+        "il_ortalama": {"sira": province_sira, "toplam": len(provinces), "il": focus_il},
+    }
+
+
 def sustainability_dashboard(
     *,
     il: str | None = None,
     ilce: str | None = None,
     belediye_user: User | None = None,
 ) -> dict:
-    """Dashboard paketi: skor + lider tablosu + Türkiye/il sıralaması."""
+    """Dashboard paketi: skor + radar + geçmiş + sıralamalar + benzer belediyeler."""
     if belediye_user and getattr(belediye_user, "role", None) == ROLE_MUNICIPALITY:
         current = score_municipality(belediye_user)
         focus_il = belediye_user.il
@@ -393,6 +596,16 @@ def sustainability_dashboard(
                 break
 
     comparison = build_turkey_comparison(current.get("puan") or 0, full_board)
+    history = score_history(
+        il=current.get("il") or il,
+        ilce=current.get("ilce") or ilce,
+        mahalle=current.get("mahalle"),
+        months=6,
+    )
+    similar = similar_municipalities(current, full_board, limit=5)
+    ranks = ranking_context(current, full_board, il_board, provinces)
+    radar = radar_chart_data(current)
+    cats = category_scores(current)
 
     return {
         "current": current,
@@ -403,4 +616,10 @@ def sustainability_dashboard(
         "il_ranking": il_board,
         "focus_il": focus_il,
         "comparison": comparison,
+        # Yeni alanlar (mevcut endpoint sözleşmesine additive)
+        "radar": radar,
+        "category_scores": cats,
+        "history": history,
+        "similar_municipalities": similar,
+        "rankings": ranks,
     }

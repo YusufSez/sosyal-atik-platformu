@@ -296,6 +296,135 @@ def suggestion_cards_as_text(cards: list) -> list[str]:
     return lines
 
 
+def _rule_ai_report(scored: dict) -> dict:
+    """3 güçlü · 3 geliştirme · 3 öneri · beklenen kazanım."""
+    criteria = sorted(
+        scored.get("criteria") or [],
+        key=lambda c: float(c.get("score") or 0),
+        reverse=True,
+    )
+    raw = scored.get("raw") or {}
+    metrics = scored.get("metrics") or {}
+
+    strengths = []
+    for c in criteria:
+        if float(c.get("score") or 0) >= 60 and not c.get("missing_data"):
+            strengths.append(
+                f"{c['label']}: {c['score']}/100 — göreli güçlü performans."
+            )
+        if len(strengths) >= 3:
+            break
+    while len(strengths) < 3:
+        if criteria:
+            c = criteria[len(strengths) % len(criteria)]
+            strengths.append(
+                f"{c.get('label')}: mevcut seviye {c.get('score')}/100 ile izleniyor."
+            )
+        else:
+            strengths.append("Veri biriktikçe güçlü yönler netleşecektir.")
+
+    weak = sorted(
+        scored.get("criteria") or [],
+        key=lambda c: float(c.get("score") or 0),
+    )
+    improvements = []
+    for c in weak:
+        if float(c.get("score") or 0) < 70:
+            improvements.append(
+                f"{c['label']}: {c['score']}/100 — öncelikli geliştirme alanı."
+            )
+        if len(improvements) >= 3:
+            break
+    while len(improvements) < 3:
+        improvements.append("Eksik veri alanlarının tamamlanması performans görünürlüğünü artırır.")
+
+    # Öneriler: zayıf kriter şablonlarından
+    suggestions = _rule_suggestions(scored)
+    recommendations = []
+    for s in suggestions[:3]:
+        recommendations.append(
+            f"{s.get('title')}: {s.get('description', '')[:180]}"
+        )
+    while len(recommendations) < 3:
+        recommendations.append(
+            "Mahalle bazlı mobil toplama ve vatandaş bilinci kampanyaları önerilir."
+        )
+
+    # Beklenen kazanım
+    weak_avg = (
+        sum(float(c.get("score") or 0) for c in weak[:3]) / max(len(weak[:3]), 1)
+        if weak else 45
+    )
+    lift = max(3.0, round((70 - weak_avg) * 0.25, 1)) if weak_avg < 70 else 2.0
+    expected = (
+        f"Önerilen 3 aksiyonun uygulanmasıyla genel skorda yaklaşık +{lift} puan, "
+        f"teslim oranında %{max(2, int(lift))} ve CO₂ tasarrufunda ölçülebilir artış beklenir. "
+        f"Mevcut puan {scored.get('puan')} ({scored.get('grade')})."
+    )
+
+    summary = (
+        f"Genel değerlendirme: {scored.get('puan')}/100 ({scored.get('grade')}). "
+        f"Teslim oranı %{metrics.get('teslim_orani', '—')}, "
+        f"katılım %{metrics.get('katilim_orani', '—')}."
+    )
+
+    return {
+        "summary": summary,
+        "strengths": strengths[:3],
+        "improvements": improvements[:3],
+        "recommendations": recommendations[:3],
+        "expected_gains": expected,
+        "source": "rules",
+    }
+
+
+def _parse_gemini_report(text: str) -> dict | None:
+    text = (text or "").strip()
+    if not text:
+        return None
+    match = re.search(r"\{[\s\S]*\}", text)
+    payload = match.group(0) if match else text
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    def _list3(key_aliases):
+        for k in key_aliases:
+            val = data.get(k)
+            if isinstance(val, list) and val:
+                return [str(x).strip() for x in val if str(x).strip()][:3]
+        return []
+
+    strengths = _list3(("strengths", "guclu_yonler", "güçlü_yönler"))
+    improvements = _list3(("improvements", "gelistirme", "geliştirme_alanlari"))
+    recommendations = _list3(("recommendations", "oneriler", "öneriler"))
+    expected = str(
+        data.get("expected_gains")
+        or data.get("beklenen_kazanim")
+        or data.get("expected_impact")
+        or ""
+    ).strip()
+    summary = str(data.get("summary") or data.get("ozet") or "").strip()
+    if not (strengths and improvements and recommendations and expected):
+        return None
+    while len(strengths) < 3:
+        strengths.append("Veri destekli güçlü yön izleniyor.")
+    while len(improvements) < 3:
+        improvements.append("Geliştirme alanı veri birikimiyle netleşecek.")
+    while len(recommendations) < 3:
+        recommendations.append("Operasyonel iyileştirme önerilir.")
+    return {
+        "summary": summary or "AI sürdürülebilirlik değerlendirmesi.",
+        "strengths": strengths[:3],
+        "improvements": improvements[:3],
+        "recommendations": recommendations[:3],
+        "expected_gains": expected[:500],
+    }
+
+
 def generate_sustainability_suggestions(
     *,
     il: str | None = None,
@@ -304,30 +433,57 @@ def generate_sustainability_suggestions(
 ) -> dict:
     scored = scored or score_region(il=il, ilce=ilce)
     rules = _rule_suggestions(scored)
+    report = _rule_ai_report(scored)
     source = "rules"
     suggestions = list(rules)
 
     client = get_client()
     if client:
-        prompt = _build_gemini_prompt(scored)
+        report_prompt = (
+            "Sen AtıkPort sürdürülebilirlik değerlendirme asistanısın.\n"
+            "Yalnızca JSON nesne döndür (markdown yok):\n"
+            '{"summary":"...","strengths":["...","...","..."],'
+            '"improvements":["...","...","..."],'
+            '"recommendations":["...","...","..."],'
+            '"expected_gains":"..."}\n'
+            "Her listede tam 3 madde. Sayı uydurma; verilen skorları kullan.\n"
+            f"Puan: {scored.get('puan')} ({scored.get('grade')}). "
+            f"Kriterler: {json.dumps(scored.get('raw') or {}, ensure_ascii=False)}. "
+            f"Metrikler: {json.dumps({k: (scored.get('metrics') or {}).get(k) for k in ('teslim_orani','katilim_orani','co2e_kg','geri_donusum_orani')}, ensure_ascii=False)}."
+        )
+        card_prompt = _build_gemini_prompt(scored)
         for model in (FREE_MODEL, FREE_MODEL_BACKUP):
             try:
                 from google.genai import types
 
                 result = client.models.generate_content(
                     model=model,
-                    contents=[types.Content(parts=[types.Part(text=prompt)])],
+                    contents=[types.Content(parts=[types.Part(text=report_prompt)])],
                 )
-                cards = _parse_gemini_cards(result.text or "")
+                parsed = _parse_gemini_report(result.text or "")
+                if parsed:
+                    report = {**parsed, "source": f"gemini:{model}"}
+                    source = f"gemini:{model}"
+
+                result2 = client.models.generate_content(
+                    model=model,
+                    contents=[types.Content(parts=[types.Part(text=card_prompt)])],
+                )
+                cards = _parse_gemini_cards(result2.text or "")
                 if cards:
                     suggestions = cards
                     source = f"gemini:{model}"
+                if parsed or cards:
                     break
             except Exception as exc:
                 logger.warning("Sustainability AI önerisi başarısız (%s): %s", model, exc)
 
+    report["source"] = report.get("source") or source
+
     return {
         "suggestions": suggestions,
+        "report": report,
+        "evaluation": report,  # alias
         "source": source,
         "puan": scored.get("puan"),
         "grade": scored.get("grade"),

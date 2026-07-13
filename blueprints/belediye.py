@@ -213,6 +213,7 @@ def surdurulebilirlik():
         dash=dash,
         suggestions=ai.get("suggestions") or [],
         suggestion_source=ai.get("source"),
+        ai_report=ai.get("report") or {},
         **_geo_context(),
     )
 
@@ -244,7 +245,11 @@ def surdurulebilirlik_pdf():
         belediye_user=belediye_user,
     )
     ai = generate_sustainability_suggestions(scored=dash["current"])
-    data, filename = export_sustainability_pdf(dash, ai.get("suggestions") or [])
+    data, filename = export_sustainability_pdf(
+        dash,
+        ai.get("suggestions") or [],
+        report=ai.get("report") or {},
+    )
     import io
 
     mimetype = "application/pdf" if filename.endswith(".pdf") else "text/plain"
