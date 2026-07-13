@@ -747,7 +747,7 @@ MARKETPLACE_ORGS = [
     {"ad": "Akdeniz Yağ Toplama", "il": "Antalya", "ilce": "Muratpaşa", "kategori": "Bitkisel yağ"},
     {"ad": "Çukurova Plastik", "il": "Adana", "ilce": "Seyhan", "kategori": "Plastik"},
     {"ad": "Toros Hurda", "il": "Mersin", "ilce": "Akdeniz", "kategori": "Metal"},
-    {"ad": "İç Anadolu Geri Dönüşüm", "il": "Konya", "ilce": "Selçuklu", "kategori": "Plastik"},
+    {"ad": "Anadolu Geri Dönüşüm", "il": "Konya", "ilce": "Selçuklu", "kategori": "Plastik"},
     {"ad": "Kapadokya Cam", "il": "Kayseri", "ilce": "Melikgazi", "kategori": "Cam"},
     {"ad": "Gaziantep Sanayi Geri", "il": "Gaziantep", "ilce": "Şehitkamil", "kategori": "Metal"},
     {"ad": "Samsun Liman Recycling", "il": "Samsun", "ilce": "İlkadım", "kategori": "Plastik"},

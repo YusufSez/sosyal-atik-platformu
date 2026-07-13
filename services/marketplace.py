@@ -77,12 +77,23 @@ def create_listing(publisher: User, data: dict) -> MarketplaceListing:
 
 
 def list_published(*, exclude_user_id: int | None = None):
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
     q = MarketplaceListing.query.filter_by(durum=MP_LISTING_YAYINDA).order_by(
         MarketplaceListing.created_at.desc()
     )
     if exclude_user_id:
         q = q.filter(MarketplaceListing.publisher_id != exclude_user_id)
-    return q.all()
+    rows = q.all()
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(rows),
+    ):
+        return demo_provider.marketplace_listings(
+            durum=MP_LISTING_YAYINDA, exclude_user_id=exclude_user_id
+        )
+    return rows
 
 
 def my_listings(user_id: int):
@@ -94,15 +105,29 @@ def my_listings(user_id: int):
 
 
 def my_offers(user_id: int):
-    return (
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    rows = (
         MarketplaceOffer.query.filter_by(offerer_id=user_id)
         .order_by(MarketplaceOffer.created_at.desc())
         .all()
     )
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        if rows:
+            return rows
+        return demo_provider.marketplace_offers()[:15]
+    return rows
 
 
 def transaction_history(user_id: int, limit: int = 50):
     """Kullanıcının yayıncı veya teklifçi olduğu işlem geçmişi."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
     listing_ids = [
         r[0]
         for r in db.session.query(MarketplaceListing.id)
@@ -118,6 +143,11 @@ def transaction_history(user_id: int, limit: int = 50):
     ]
     ids = set(listing_ids) | set(offer_listing_ids)
     if not ids:
+        if should_use_demo(
+            "marketplace",
+            real_data_sufficient=is_marketplace_catalog_sufficient(),
+        ):
+            return demo_provider.marketplace_history(limit=limit)
         return []
     return (
         MarketplaceEvent.query.filter(MarketplaceEvent.listing_id.in_(ids))
@@ -125,6 +155,22 @@ def transaction_history(user_id: int, limit: int = 50):
         .limit(limit)
         .all()
     )
+
+
+def resolve_listing(listing_id: int):
+    """Gerçek ilan veya (demo aktifken) MASTER katalog ilanı."""
+    listing = db.session.get(MarketplaceListing, listing_id)
+    if listing is not None:
+        return listing
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        return demo_provider.marketplace_listing_by_id(listing_id)
+    return None
 
 
 def submit_offer(listing: MarketplaceListing, offerer: User, data: dict) -> MarketplaceOffer:
@@ -255,6 +301,21 @@ def nearby_institutions(
     exclude_user_id: int | None = None,
 ) -> list[dict]:
     """Yakındaki company/institution/kurum kullanıcıları."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        return demo_provider.marketplace_nearest_orgs(
+            lat=listing.latitude,
+            lng=listing.longitude,
+            radius_km=radius_km,
+            limit=30,
+            exclude_id=exclude_user_id,
+        )
+
     q = User.query.filter(
         or_(
             User.role.in_(MARKETPLACE_ROLES),
@@ -363,15 +424,25 @@ def submit_rating(
 
 
 def marketplace_map_points(listings: list[MarketplaceListing] | None = None) -> list:
-    items = listings
-    if items is None:
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    if listings is None:
         items = MarketplaceListing.query.filter(
             MarketplaceListing.durum.in_(
                 [MP_LISTING_YAYINDA, MP_LISTING_REZERVE, MP_LISTING_ANLASILDI]
             )
         ).all()
+        if should_use_demo(
+            "marketplace",
+            real_data_sufficient=is_marketplace_catalog_sufficient(items),
+        ):
+            return demo_provider.marketplace_map_points_demo()
+    else:
+        items = listings
+
     points = []
-    for listing in items:
+    for listing in items or []:
         points.append({
             "id": listing.id,
             "baslik": listing.baslik,

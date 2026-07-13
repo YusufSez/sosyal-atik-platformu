@@ -67,6 +67,9 @@ def ratings_for_user(user_id: int) -> dict:
 
 def list_suppliers(*, il: str | None = None, limit: int = 100) -> list[dict]:
     """Tedarikçi / kurum dizini — company, institution, is_kurum."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
     q = User.query.filter(
         or_(
             User.role.in_(MARKETPLACE_ROLES),
@@ -76,6 +79,12 @@ def list_suppliers(*, il: str | None = None, limit: int = 100) -> list[dict]:
     if il:
         q = q.filter(User.il == il)
     users = q.order_by(User.username.asc()).limit(limit).all()
+
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        return demo_provider.marketplace_suppliers(il=il, limit=limit)
 
     listing_counts = dict(
         db.session.query(
@@ -132,6 +141,9 @@ def list_suppliers(*, il: str | None = None, limit: int = 100) -> list[dict]:
 
 def demand_pool(*, kategori: str | None = None, il: str | None = None) -> list[dict]:
     """Talep havuzu — yayındaki kurumsal ilanlar."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
     q = MarketplaceListing.query.filter_by(durum=MP_LISTING_YAYINDA).order_by(
         MarketplaceListing.created_at.desc()
     )
@@ -140,8 +152,15 @@ def demand_pool(*, kategori: str | None = None, il: str | None = None) -> list[d
     if il:
         q = q.filter(MarketplaceListing.il == il)
 
+    real_rows = q.limit(80).all()
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(real_rows),
+    ):
+        return demo_provider.marketplace_demand_pool(kategori=kategori, il=il)
+
     rows = []
-    for listing in q.limit(80).all():
+    for listing in real_rows:
         pending = sum(1 for o in listing.offers if o.durum == "bekliyor")
         rows.append({
             "id": listing.id,
@@ -163,6 +182,18 @@ def demand_pool(*, kategori: str | None = None, il: str | None = None) -> list[d
 
 def price_analysis() -> dict:
     """Kategori bazlı miktar / teklif analizi (fiyat vekili: miktar dağılımı)."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    real_count = MarketplaceListing.query.count()
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(
+            [1] if real_count else []
+        ),
+    ):
+        return demo_provider.marketplace_price_analysis()
+
     by_cat: dict[str, dict] = defaultdict(lambda: {
         "ilan_adet": 0,
         "miktarlar": [],
@@ -304,6 +335,21 @@ def nearest_orgs_for_user(
     limit: int = 30,
 ) -> list[dict]:
     """Kullanıcı konumuna göre en yakın kurumlar."""
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo
+    from services import demo_provider
+
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        return demo_provider.marketplace_nearest_orgs(
+            lat=user.latitude,
+            lng=user.longitude,
+            radius_km=radius_km,
+            limit=limit,
+            exclude_id=user.id,
+        )
+
     if user.latitude is None or user.longitude is None:
         return []
     q = User.query.filter(

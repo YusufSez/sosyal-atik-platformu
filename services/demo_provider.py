@@ -945,40 +945,553 @@ def sustainability_ai_report(scored: dict | None = None) -> dict:
     }
 
 
-def marketplace_matches(limit: int = 12, *, il=None) -> list[dict]:
-    city = _norm_city(il)
-    orgs = [o for o in MARKETPLACE_ORGS if o["il"] == city]
-    if len(orgs) < 5:
-        orgs = list(MARKETPLACE_ORGS)
-    samples = []
-    for i, o in enumerate(orgs[:limit]):
-        skor = round(88.5 - i * 2.3, 1)
-        dist = round(3.5 + i * 1.7, 1)
-        samples.append({
-            "id": -200 - i,
-            "ad": o["ad"],
-            "username": o["ad"].lower().replace(" ", "_")[:24],
-            "role": "company",
-            "il": o["il"],
-            "ilce": o["ilce"],
-            "lat": get_city(o["il"])["center"][0],
-            "lng": get_city(o["il"])["center"][1],
-            "mesafe_km": dist,
-            "eslesme_skoru": skor,
-            "nedenler": [f"{dist} km mesafede", f"{o['kategori']} kategorisinde deneyim"],
-            "skor_detay": {
-                "mesafe": round(90 - i * 3, 1),
-                "kategori": round(80 - i * 2, 1),
-                "puan": round(78 - i, 1),
-                "aktivite": round(70 - i * 1.5, 1),
-            },
-            "puan_ortalama": round(4.5 - i * 0.05, 2),
-        })
-    return samples
+# ---------------------------------------------------------------------------
+# Kurumsal Kaynak Pazarı — MASTER_DATASET / MARKETPLACE_ORGS kataloğu
+# ---------------------------------------------------------------------------
+
+_MP_CATALOG: dict[str, Any] | None = None
+
+_MP_WASTE_TO_LISTING = {
+    "Plastik": "Ambalaj",
+    "Elektronik": "Elektronik",
+    "Cam": "Ambalaj",
+    "Metal": "Hammadde",
+    "Organik": "Gıda Yan Ürün",
+    "Bitkisel yağ": "Gıda Yan Ürün",
+    "Diğer": "Diğer",
+}
+_MP_BIRIMLER = ("kg", "ton", "adet", "palet", "m3")
+_MP_TITLE_TMPL = (
+    "{kat} stok — {ad}",
+    "{miktar} {birim} {kat}",
+    "Acil {kat} tedarik ({ad})",
+    "{il} {kat} kaynağı",
+)
+
+
+def _mp_slug(name: str) -> str:
+    return (
+        name.lower()
+        .replace(" ", "_")
+        .replace("ı", "i")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ş", "s")
+        .replace("ö", "o")
+        .replace("ç", "c")
+        .replace(".", "")
+        .replace("ş", "s")[:24]
+    )
+
+
+def _build_marketplace_catalog() -> dict[str, Any]:
+    """Deterministik B2B katalog: ≥40 firma, ≥120 ilan, ≥80 teklif, ≥30 rezervasyon, ≥20 teslim."""
+    from types import SimpleNamespace
+
+    from constants import (
+        MP_EVENT_ANLASMA,
+        MP_EVENT_REZERVASYON,
+        MP_EVENT_TEKLIF,
+        MP_EVENT_TESLIM,
+        MP_EVENT_YAYINLA,
+        MP_LISTING_ANLASILDI,
+        MP_LISTING_REZERVE,
+        MP_LISTING_TESLIM,
+        MP_LISTING_YAYINDA,
+        MP_OFFER_BEKLIYOR,
+        MP_OFFER_KABUL,
+    )
+
+    now = utc_now()
+    firms: list[Any] = []
+    firm_by_id: dict[int, Any] = {}
+    for i, o in enumerate(MARKETPLACE_ORGS):
+        pkg = get_city(o["il"])
+        lat = float(pkg["center"][0]) + ((i % 7) - 3) * 0.018
+        lng = float(pkg["center"][1]) + ((i % 5) - 2) * 0.02
+        firm = SimpleNamespace(
+            id=9100000 + i,
+            ad=o["ad"],
+            soyad="",
+            username=_mp_slug(o["ad"]),
+            role="company",
+            il=o["il"],
+            ilce=o["ilce"],
+            latitude=lat,
+            longitude=lng,
+            is_kurum=True,
+            waste_kategori=o["kategori"],
+            puan_ortalama=round(4.6 - (i % 9) * 0.08, 2),
+        )
+        firms.append(firm)
+        firm_by_id[firm.id] = firm
+
+    listings: list[Any] = []
+    listing_by_id: dict[int, Any] = {}
+    offers: list[Any] = []
+    events: list[Any] = []
+    offer_seq = 0
+
+    def _add_offer(listing, offerer, *, durum, miktar, idx):
+        nonlocal offer_seq
+        offer_seq += 1
+        offer = SimpleNamespace(
+            id=9300000 + offer_seq,
+            listing_id=listing.id,
+            listing=listing,
+            offerer_id=offerer.id,
+            offerer=offerer,
+            mesaj=f"{offerer.ad} teklifi — {listing.kategori}",
+            miktar=miktar,
+            durum=durum,
+            created_at=now - timedelta(days=max(1, idx % 20), hours=idx % 12),
+            responded_at=now - timedelta(days=max(0, (idx % 10) - 2)) if durum == MP_OFFER_KABUL else None,
+        )
+        listing.offers.append(offer)
+        offers.append(offer)
+        return offer
+
+    def _add_event(listing_id, action, detail, *, offer_id=None, days=1, actor_id=None):
+        events.append(
+            SimpleNamespace(
+                listing_id=listing_id,
+                offer_id=offer_id,
+                action=action,
+                detail=detail,
+                actor_id=actor_id,
+                created_at=now - timedelta(days=days, hours=(abs(listing_id) % 18)),
+            )
+        )
+
+    # 120 ilan: 50 yayında · 30 rezerve · 20 anlaşılı · 20 teslim
+    status_plan = (
+        [MP_LISTING_YAYINDA] * 50
+        + [MP_LISTING_REZERVE] * 30
+        + [MP_LISTING_ANLASILDI] * 20
+        + [MP_LISTING_TESLIM] * 20
+    )
+    for i, durum in enumerate(status_plan):
+        publisher = firms[i % len(firms)]
+        partner = firms[(i + 7) % len(firms)]
+        waste = publisher.waste_kategori
+        kat = _MP_WASTE_TO_LISTING.get(waste, "Diğer")
+        birim = _MP_BIRIMLER[i % len(_MP_BIRIMLER)]
+        miktar = float(20 + (i * 7) % 480)
+        tmpl = _MP_TITLE_TMPL[i % len(_MP_TITLE_TMPL)]
+        baslik = tmpl.format(
+            kat=kat, ad=publisher.ad, miktar=int(miktar), birim=birim, il=publisher.il
+        )[:140]
+        listing = SimpleNamespace(
+            id=9200000 + i,            publisher_id=publisher.id,
+            publisher=publisher,
+            baslik=baslik,
+            aciklama=(
+                f"{publisher.ad} ({publisher.il}/{publisher.ilce}) — "
+                f"{waste} hattından {kat} kaynağı. MASTER_DATASET senaryosu."
+            ),
+            kategori=kat,
+            miktar=miktar,
+            birim=birim,
+            latitude=publisher.latitude + ((i % 3) - 1) * 0.004,
+            longitude=publisher.longitude + ((i % 4) - 1) * 0.005,
+            il=publisher.il,
+            ilce=publisher.ilce,
+            durum=durum,
+            accepted_offer_id=None,
+            created_at=now - timedelta(days=1 + (i % 45)),
+            updated_at=now - timedelta(days=(i % 10)),
+            offers=[],
+        )
+        listings.append(listing)
+        listing_by_id[listing.id] = listing
+        _add_event(
+            listing.id,
+            MP_EVENT_YAYINLA,
+            f"İlan yayınlandı: {baslik}",
+            days=2 + (i % 40),
+            actor_id=publisher.id,
+        )
+
+        if durum == MP_LISTING_YAYINDA:
+            # Bekleyen teklifler (hedef ≥80 teklif için yayındakilerden bol üret)
+            n_pending = 2 if i < 20 else 1
+            for j in range(n_pending):
+                offerer = firms[(i + 3 + j) % len(firms)]
+                if offerer.id == publisher.id:
+                    offerer = firms[(i + 11 + j) % len(firms)]
+                off = _add_offer(
+                    listing, offerer, durum=MP_OFFER_BEKLIYOR, miktar=miktar * 0.9, idx=i + j
+                )
+                _add_event(
+                    listing.id,
+                    MP_EVENT_TEKLIF,
+                    "Teklif gönderildi",
+                    offer_id=off.id,
+                    days=1 + (i % 15),
+                    actor_id=offerer.id,
+                )
+        else:
+            off = _add_offer(
+                listing, partner, durum=MP_OFFER_KABUL, miktar=miktar * 0.95, idx=i
+            )
+            listing.accepted_offer_id = off.id
+            _add_event(
+                listing.id,
+                MP_EVENT_TEKLIF,
+                "Teklif gönderildi",
+                offer_id=off.id,
+                days=5 + (i % 10),
+                actor_id=partner.id,
+            )
+            _add_event(
+                listing.id,
+                MP_EVENT_REZERVASYON,
+                f"Teklif #{off.id} kabul — rezervasyon",
+                offer_id=off.id,
+                days=4 + (i % 8),
+                actor_id=publisher.id,
+            )
+            if durum in (MP_LISTING_ANLASILDI, MP_LISTING_TESLIM):
+                _add_event(
+                    listing.id,
+                    MP_EVENT_ANLASMA,
+                    "Anlaşma onaylandı",
+                    offer_id=off.id,
+                    days=3 + (i % 6),
+                    actor_id=publisher.id,
+                )
+            if durum == MP_LISTING_TESLIM:
+                _add_event(
+                    listing.id,
+                    MP_EVENT_TESLIM,
+                    "Teslim tamamlandı",
+                    offer_id=off.id,
+                    days=1 + (i % 5),
+                    actor_id=publisher.id,
+                )
+
+    # Eksik teklif varsa doldur (garanti ≥80)
+    while len(offers) < 80:
+        listing = listings[len(offers) % 50]  # yayında bandı
+        offerer = firms[(len(offers) + 13) % len(firms)]
+        if offerer.id == listing.publisher_id:
+            offerer = firms[(len(offers) + 17) % len(firms)]
+        off = _add_offer(
+            listing,
+            offerer,
+            durum=MP_OFFER_BEKLIYOR,
+            miktar=(listing.miktar or 10) * 0.8,
+            idx=len(offers),
+        )
+        _add_event(
+            listing.id,
+            MP_EVENT_TEKLIF,
+            "Teklif gönderildi",
+            offer_id=off.id,
+            days=1,
+            actor_id=offerer.id,
+        )
+
+    events.sort(key=lambda e: e.created_at, reverse=True)
+
+    stats = {
+        "firma": len(firms),
+        "ilan": len(listings),
+        "teklif": len(offers),
+        "rezervasyon": sum(1 for l in listings if l.durum == MP_LISTING_REZERVE),
+        "teslim": sum(1 for l in listings if l.durum == MP_LISTING_TESLIM),
+        "yayinda": sum(1 for l in listings if l.durum == MP_LISTING_YAYINDA),
+        "anlasildi": sum(1 for l in listings if l.durum == MP_LISTING_ANLASILDI),
+    }
+    return {
+        "firms": firms,
+        "firm_by_id": firm_by_id,
+        "listings": listings,
+        "listing_by_id": listing_by_id,
+        "offers": offers,
+        "events": events,
+        "stats": stats,
+        "source": "demo",
+    }
+
+
+def get_marketplace_catalog() -> dict[str, Any]:
+    global _MP_CATALOG
+    if _MP_CATALOG is None:
+        _MP_CATALOG = _build_marketplace_catalog()
+    return _MP_CATALOG
+
+
+def marketplace_catalog_stats() -> dict[str, int]:
+    return dict(get_marketplace_catalog()["stats"])
 
 
 def marketplace_orgs(*, limit: int = 40) -> list[dict]:
     return deepcopy(MARKETPLACE_ORGS[:limit])
+
+
+def marketplace_firms(*, limit: int | None = None) -> list[Any]:
+    firms = get_marketplace_catalog()["firms"]
+    if limit is None:
+        return list(firms)
+    return list(firms[:limit])
+
+
+def marketplace_listings(*, durum: str | None = None, exclude_user_id: int | None = None) -> list[Any]:
+    rows = get_marketplace_catalog()["listings"]
+    out = []
+    for listing in rows:
+        if durum and listing.durum != durum:
+            continue
+        if exclude_user_id is not None and listing.publisher_id == exclude_user_id:
+            continue
+        out.append(listing)
+    return out
+
+
+def marketplace_listing_by_id(listing_id: int) -> Any | None:
+    return get_marketplace_catalog()["listing_by_id"].get(listing_id)
+
+
+def marketplace_offers(*, offerer_id: int | None = None) -> list[Any]:
+    rows = get_marketplace_catalog()["offers"]
+    if offerer_id is None:
+        return list(rows)
+    return [o for o in rows if o.offerer_id == offerer_id]
+
+
+def marketplace_history(*, limit: int = 50) -> list[Any]:
+    return list(get_marketplace_catalog()["events"][:limit])
+
+
+def marketplace_map_points_demo(listings: list[Any] | None = None) -> list[dict]:
+    items = listings if listings is not None else marketplace_listings()
+    points = []
+    for listing in items:
+        if listing.durum == "iptal":
+            continue
+        points.append({
+            "id": listing.id,
+            "baslik": listing.baslik,
+            "durum": listing.durum,
+            "lat": listing.latitude,
+            "lng": listing.longitude,
+            "kategori": listing.kategori,
+        })
+    return points
+
+
+def marketplace_suppliers(*, il: str | None = None, limit: int = 100) -> list[dict]:
+    cat = get_marketplace_catalog()
+    listing_counts: dict[int, int] = {}
+    delivery_counts: dict[int, int] = {}
+    offer_counts: dict[int, int] = {}
+    for listing in cat["listings"]:
+        listing_counts[listing.publisher_id] = listing_counts.get(listing.publisher_id, 0) + 1
+        if listing.durum == "teslim":
+            delivery_counts[listing.publisher_id] = delivery_counts.get(listing.publisher_id, 0) + 1
+    for offer in cat["offers"]:
+        offer_counts[offer.offerer_id] = offer_counts.get(offer.offerer_id, 0) + 1
+
+    rows = []
+    for firm in cat["firms"]:
+        if il and firm.il != il:
+            continue
+        rows.append({
+            "id": firm.id,
+            "ad": firm.ad,
+            "role": firm.role,
+            "il": firm.il,
+            "ilce": firm.ilce,
+            "lat": firm.latitude,
+            "lng": firm.longitude,
+            "ilan_sayisi": int(listing_counts.get(firm.id) or 0),
+            "teslim_sayisi": int(delivery_counts.get(firm.id) or 0),
+            "teklif_sayisi": int(offer_counts.get(firm.id) or 0),
+            "puan_ortalama": firm.puan_ortalama,
+            "puan_adet": 4 + (abs(firm.id) % 8),
+        })
+    rows.sort(key=lambda r: (-(r["puan_ortalama"] or 0), -r["teslim_sayisi"], -r["ilan_sayisi"]))
+    return rows[:limit]
+
+
+def marketplace_demand_pool(*, kategori: str | None = None, il: str | None = None) -> list[dict]:
+    rows = []
+    for listing in marketplace_listings(durum="yayinda"):
+        if kategori and listing.kategori != kategori:
+            continue
+        if il and listing.il != il:
+            continue
+        pending = sum(1 for o in listing.offers if o.durum == "bekliyor")
+        rows.append({
+            "id": listing.id,
+            "baslik": listing.baslik,
+            "kategori": listing.kategori,
+            "miktar": listing.miktar,
+            "birim": listing.birim,
+            "il": listing.il,
+            "ilce": listing.ilce,
+            "publisher": listing.publisher.ad,
+            "publisher_id": listing.publisher_id,
+            "teklif_bekleyen": pending,
+            "created_at": listing.created_at,
+            "lat": listing.latitude,
+            "lng": listing.longitude,
+        })
+    return rows[:80]
+
+
+def marketplace_price_analysis() -> dict:
+    from collections import defaultdict
+    from statistics import mean
+
+    by_cat: dict[str, dict] = defaultdict(lambda: {
+        "ilan_adet": 0,
+        "miktarlar": [],
+        "teklif_miktarlari": [],
+        "teslim_adet": 0,
+    })
+    for listing in get_marketplace_catalog()["listings"]:
+        cat = listing.kategori or "Diğer"
+        bucket = by_cat[cat]
+        bucket["ilan_adet"] += 1
+        if listing.miktar is not None:
+            bucket["miktarlar"].append(float(listing.miktar))
+        if listing.durum == "teslim":
+            bucket["teslim_adet"] += 1
+    for offer in get_marketplace_catalog()["offers"]:
+        listing = offer.listing
+        if listing is None or offer.miktar is None:
+            continue
+        by_cat[listing.kategori or "Diğer"]["teklif_miktarlari"].append(float(offer.miktar))
+
+    categories = []
+    for cat, b in sorted(by_cat.items(), key=lambda x: -x[1]["ilan_adet"]):
+        miktarlar = b["miktarlar"]
+        teklifler = b["teklif_miktarlari"]
+        categories.append({
+            "kategori": cat,
+            "ilan_adet": b["ilan_adet"],
+            "teslim_adet": b["teslim_adet"],
+            "ortalama_miktar": round(mean(miktarlar), 2) if miktarlar else None,
+            "medyan_miktar": round(sorted(miktarlar)[len(miktarlar) // 2], 2) if miktarlar else None,
+            "min_miktar": round(min(miktarlar), 2) if miktarlar else None,
+            "max_miktar": round(max(miktarlar), 2) if miktarlar else None,
+            "ortalama_teklif_miktar": round(mean(teklifler), 2) if teklifler else None,
+            "teklif_adet": len(teklifler),
+        })
+    return {
+        "kategoriler": categories,
+        "ozet": {
+            "kategori_sayisi": len(categories),
+            "toplam_ilan": sum(c["ilan_adet"] for c in categories),
+            "toplam_teslim": sum(c["teslim_adet"] for c in categories),
+        },
+    }
+
+
+def marketplace_nearest_orgs(
+    *,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float = 50,
+    limit: int = 30,
+    exclude_id: int | None = None,
+) -> list[dict]:
+    from utils import mesafe_hesapla
+
+    if lat is None or lng is None:
+        center = get_city(DEFAULT_CITY)["center"]
+        lat, lng = float(center[0]), float(center[1])
+
+    cat = get_marketplace_catalog()
+    listing_counts: dict[int, int] = {}
+    for listing in cat["listings"]:
+        listing_counts[listing.publisher_id] = listing_counts.get(listing.publisher_id, 0) + 1
+
+    results = []
+    for firm in cat["firms"]:
+        if exclude_id is not None and firm.id == exclude_id:
+            continue
+        dist = mesafe_hesapla(lat, lng, firm.latitude, firm.longitude)
+        # Demo: MASTER illerini göstermek için yarıçapı esnet — uzak olanları da sırala
+        results.append({
+            "id": firm.id,
+            "ad": firm.ad,
+            "role": firm.role,
+            "il": firm.il,
+            "ilce": firm.ilce,
+            "lat": firm.latitude,
+            "lng": firm.longitude,
+            "mesafe_km": round(dist, 1),
+            "puan_ortalama": firm.puan_ortalama,
+            "ilan_sayisi": int(listing_counts.get(firm.id) or 0),
+        })
+    results.sort(key=lambda x: x["mesafe_km"])
+    near = [r for r in results if r["mesafe_km"] <= radius_km]
+    return (near or results)[:limit]
+
+
+def marketplace_matches(limit: int = 12, *, il=None, listing=None) -> list[dict]:
+    """AI Match — kategori · mesafe · geçmiş başarı (puan) · aktivite."""
+    city = _norm_city(il or getattr(listing, "il", None))
+    origin = get_city(city)["center"]
+    listing_kat = getattr(listing, "kategori", None) if listing is not None else None
+    firms = get_marketplace_catalog()["firms"]
+    # Önce aynı il, yetmezse tüm MASTER firmalar
+    local = [f for f in firms if f.il == city]
+    pool = local if len(local) >= 5 else list(firms)
+
+    from utils import mesafe_hesapla
+
+    samples = []
+    for i, firm in enumerate(pool[: max(limit, 12)]):
+        dist = round(mesafe_hesapla(origin[0], origin[1], firm.latitude, firm.longitude), 1)
+        if dist < 1:
+            dist = round(3.5 + i * 1.7, 1)
+        mesafe_score = max(0.0, round(100.0 * (1.0 - min(dist, 50) / 50.0), 1))
+        waste_mp = _MP_WASTE_TO_LISTING.get(firm.waste_kategori, "Diğer")
+        kategori_score = 92.0 if listing_kat and waste_mp == listing_kat else (
+            78.0 if firm.waste_kategori else 55.0
+        )
+        kategori_score = round(kategori_score - i * 1.5, 1)
+        puan_score = round((firm.puan_ortalama / 5.0) * 100.0 - i * 0.8, 1)
+        aktivite_score = round(88.0 - i * 2.2, 1)
+        total = round(
+            0.40 * mesafe_score
+            + 0.25 * kategori_score
+            + 0.20 * puan_score
+            + 0.15 * aktivite_score,
+            1,
+        )
+        nedenler = [
+            f"{dist} km mesafede",
+            f"{firm.waste_kategori} / {waste_mp} uyumu",
+            f"geçmiş başarı ★{firm.puan_ortalama}",
+            "yüksek aktivite",
+        ]
+        samples.append({
+            "id": firm.id,
+            "ad": firm.ad,
+            "username": firm.username,
+            "role": firm.role,
+            "il": firm.il,
+            "ilce": firm.ilce,
+            "lat": firm.latitude,
+            "lng": firm.longitude,
+            "mesafe_km": dist,
+            "eslesme_skoru": total,
+            "nedenler": nedenler[:3],
+            "skor_detay": {
+                "mesafe": mesafe_score,
+                "kategori": max(0.0, kategori_score),
+                "puan": max(0.0, puan_score),
+                "aktivite": max(0.0, aktivite_score),
+            },
+            "puan_ortalama": firm.puan_ortalama,
+        })
+    samples.sort(key=lambda x: -x["eslesme_skoru"])
+    return samples[:limit]
 
 
 def municipality_ai_insights(dashboard: dict | None = None, *, il=None) -> dict:

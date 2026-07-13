@@ -17,6 +17,33 @@ def suggest_nearby_fit(listing: MarketplaceListing, *, radius_km: float = 50) ->
     Yakındaki kurum sayısına göre öneri üretir.
     Örnek: 'Bu kaynak yakınınızdaki 4 kurum için uygundur.'
     """
+    from services.demo_manager import is_marketplace_catalog_sufficient, should_use_demo, use_demo_ai
+    from services import demo_provider
+
+    if should_use_demo(
+        "marketplace",
+        real_data_sufficient=is_marketplace_catalog_sufficient(),
+    ):
+        nearby = demo_provider.marketplace_nearest_orgs(
+            lat=getattr(listing, "latitude", None),
+            lng=getattr(listing, "longitude", None),
+            radius_km=radius_km,
+            limit=10,
+            exclude_id=getattr(listing, "publisher_id", None),
+        )
+        count = len(nearby)
+        return {
+            "suggestion": (
+                f"Bu kaynak yakınınızdaki {count} kurum için uygundur."
+                if count > 0
+                else "Yakın çevrede uygun kurum bulunamadı; yarıçapı genişletmeyi deneyin."
+            ),
+            "source": "demo",
+            "nearby_count": count,
+            "nearby": nearby[:10],
+            "radius_km": radius_km,
+        }
+
     nearby = nearby_institutions(
         listing, radius_km=radius_km, exclude_user_id=listing.publisher_id
     )
@@ -29,6 +56,15 @@ def suggest_nearby_fit(listing: MarketplaceListing, *, radius_km: float = 50) ->
 
     source = "rules"
     suggestion = rule_text
+
+    if use_demo_ai():
+        return {
+            "suggestion": suggestion,
+            "source": "demo",
+            "nearby_count": count,
+            "nearby": nearby[:10],
+            "radius_km": radius_km,
+        }
 
     client = get_client()
     if client and count > 0:
@@ -98,7 +134,9 @@ def generate_match_report(
         "marketplace",
         real_data_sufficient=is_marketplace_data_sufficient(matches),
     ):
-        matches = demo_provider.marketplace_matches(limit=limit, il=getattr(listing, "il", None))
+        matches = demo_provider.marketplace_matches(
+            limit=limit, il=getattr(listing, "il", None), listing=listing
+        )
         explanation = (
             f"“{listing.baslik}” için demo kurum eşleşmeleri gösteriliyor "
             f"(en uygun: {matches[0]['ad']}, skor {matches[0]['eslesme_skoru']}/100)."
@@ -189,6 +227,7 @@ def generate_match_report(
 def platform_ai_overview(*, sample_listings: list[MarketplaceListing] | None = None) -> dict:
     """Platform genel AI açıklaması (sayfa için)."""
     from extensions import db
+    from services.demo_manager import is_demo_mode, use_demo_ai
     from services.marketplace_b2b import demand_pool, list_suppliers, price_analysis
 
     pool = demand_pool()
@@ -196,7 +235,9 @@ def platform_ai_overview(*, sample_listings: list[MarketplaceListing] | None = N
     prices = price_analysis()
     listings = list(sample_listings or [])
     if not listings and pool:
-        first = db.session.get(MarketplaceListing, pool[0]["id"])
+        from services.marketplace import resolve_listing
+
+        first = resolve_listing(pool[0]["id"])
         if first:
             listings = [first]
 
@@ -211,6 +252,16 @@ def platform_ai_overview(*, sample_listings: list[MarketplaceListing] | None = N
 
     source = "rules"
     explanation = " ".join(bullets)
+
+    if is_demo_mode() or use_demo_ai():
+        return {
+            "explanation": explanation,
+            "source": "demo",
+            "bullets": bullets,
+            "pool_count": len(pool),
+            "supplier_count": len(suppliers),
+            "price_summary": prices["ozet"],
+        }
 
     client = get_client()
     if client:

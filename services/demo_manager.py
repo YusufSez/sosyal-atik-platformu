@@ -168,6 +168,18 @@ def is_marketplace_data_sufficient(matches: list | None) -> bool:
     return bool(matches)
 
 
+def is_marketplace_catalog_sufficient(listings: list | None = None) -> bool:
+    """Gerçek ilan varsa demo katalog kullanılmaz (Demo Modu kapalıyken)."""
+    if listings is not None:
+        return len(listings) > 0
+    try:
+        from models import MarketplaceListing
+
+        return MarketplaceListing.query.count() > 0
+    except Exception:
+        return False
+
+
 def get_demo_settings() -> dict[str, bool]:
     """Admin formu ve testler için mevcut efektif ayarlar."""
     return {

@@ -21,6 +21,7 @@ from services.marketplace import (
     my_offers,
     nearby_institutions,
     post_message,
+    resolve_listing,
     submit_offer,
     submit_rating,
     transaction_history,
@@ -115,7 +116,7 @@ def eslesmeler():
     listing = None
     report = None
     if listing_id:
-        listing = db.session.get(MarketplaceListing, listing_id)
+        listing = resolve_listing(listing_id)
     elif candidates:
         listing = candidates[0]
     if listing:
@@ -161,7 +162,7 @@ def ai_aciklama():
     listing_id = request.args.get("listing_id", type=int)
     match_report = None
     if listing_id:
-        listing = db.session.get(MarketplaceListing, listing_id)
+        listing = resolve_listing(listing_id)
         if listing:
             match_report = generate_match_report(listing)
     return render_template(
@@ -187,7 +188,7 @@ def gecmis():
 @login_required
 @marketplace_required
 def detail(listing_id: int):
-    listing = db.session.get(MarketplaceListing, listing_id)
+    listing = resolve_listing(listing_id)
     if not listing:
         abort(404)
     nearby = nearby_institutions(
@@ -401,7 +402,7 @@ def rate(listing_id: int):
 @login_required
 @marketplace_required
 def api_nearby(listing_id: int):
-    listing = db.session.get(MarketplaceListing, listing_id) or abort(404)
+    listing = resolve_listing(listing_id) or abort(404)
     return jsonify(suggest_nearby_fit(listing))
 
 
@@ -409,7 +410,7 @@ def api_nearby(listing_id: int):
 @login_required
 @marketplace_required
 def api_matches(listing_id: int):
-    listing = db.session.get(MarketplaceListing, listing_id) or abort(404)
+    listing = resolve_listing(listing_id) or abort(404)
     return jsonify(generate_match_report(listing))
 
 
