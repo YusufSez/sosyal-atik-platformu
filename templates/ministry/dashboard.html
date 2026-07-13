@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% block content %}
+{% from "_ap_ui.html" import ap_empty %}
 <div class="content-section fade-in belediye-ops-center ministry-national-center">
   {# —— Başlık —— #}
   <div class="ops-hero mb-3">
@@ -134,7 +135,7 @@
             <span class="badge text-bg-success">{{ r.puan }}</span>
           </li>
           {% else %}
-          <li class="list-group-item text-muted">Veri yok</li>
+          <li class="list-group-item">{{ ap_empty(icon='bi-trophy', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Başarılı belediye sıralaması veri birikince dolacaktır.', compact=true) }}</li>
           {% endfor %}
         </ul>
       </div>
@@ -154,7 +155,7 @@
             <span class="badge text-bg-primary">+{{ "%.0f"|format(r.gelisim_yuzde) }}%</span>
           </li>
           {% else %}
-          <li class="list-group-item text-muted">Gelişim kaydı yok</li>
+          <li class="list-group-item">{{ ap_empty(icon='bi-graph-up-arrow', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Gelişim trendi oluşunca burada listelenir.', compact=true) }}</li>
           {% endfor %}
         </ul>
       </div>
@@ -174,7 +175,7 @@
             <span class="badge text-bg-danger">{{ r.puan }}</span>
           </li>
           {% else %}
-          <li class="list-group-item text-muted">Risk bandında belediye yok</li>
+          <li class="list-group-item">{{ ap_empty(icon='bi-shield-check', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Risk bandında birim yok veya veri henüz yetersiz.', compact=true) }}</li>
           {% endfor %}
         </ul>
       </div>
@@ -228,7 +229,7 @@
           </article>
         </div>
         {% else %}
-        <div class="col-12"><p class="text-muted mb-0">Özet henüz oluşmadı.</p></div>
+        <div class="col-12">{{ ap_empty(icon='bi-robot', title='Bu metrik için yeterli veri oluşmamıştır.', desc='AI ulusal özet veri birikince kartlar halinde görünecektir.') }}</div>
         {% endfor %}
       </div>
     </div>
@@ -493,6 +494,7 @@
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=true) }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script type="application/json" id="ministry-dashboard-config">{{ {
   'heat': map_data.heat,
   'il_merkezleri': map_data.il_merkezleri,

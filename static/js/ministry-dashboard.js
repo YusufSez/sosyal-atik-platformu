@@ -67,12 +67,20 @@
   function buildBar(canvasId, rows, color) {
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return;
+    var UI = window.AtikPortUI || null;
+    var DEMO = (UI && UI.DEMO) || {};
     var labels = (rows || []).map(function (r) {
       return r.il;
     });
     var values = (rows || []).map(function (r) {
       return r.puan;
     });
+    var demo = !labels.length;
+    if (demo) {
+      labels = (DEMO.bars && DEMO.bars.labels) || ["İl A", "İl B", "İl C", "İl D", "İl E"];
+      values = (DEMO.bars && DEMO.bars.values) || [88, 81, 76, 71, 65];
+      if (UI) UI.markDemo(canvas, true);
+    }
     new Chart(canvas, {
       type: "bar",
       data: {

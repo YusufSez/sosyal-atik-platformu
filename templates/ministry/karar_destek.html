@@ -1,5 +1,6 @@
 {% extends "layout.html" %}
 {% block content %}
+{% from "_ap_ui.html" import ap_empty %}
 <div class="content-section fade-in ds-center">
   <div class="ds-hero mb-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -51,7 +52,7 @@
     <div class="col-lg-6">
       <div class="ds-panel h-100">
         <div class="ds-panel-head">
-          <h5 class="mb-0">Haftalık rapor</h5>
+          <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Haftalık rapor</h5>
           <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='weekly') }}">PDF ↓</a>
         </div>
         <div class="ds-panel-body">
@@ -72,7 +73,7 @@
     <div class="col-lg-6">
       <div class="ds-panel h-100">
         <div class="ds-panel-head">
-          <h5 class="mb-0">Aylık rapor</h5>
+          <h5 class="mb-0"><i class="bi bi-calendar-month me-2"></i>Aylık rapor</h5>
           <a class="small" href="{{ url_for('admin_ministry.karar_destek_pdf', type='monthly') }}">PDF ↓</a>
         </div>
         <div class="ds-panel-body">
@@ -95,7 +96,7 @@
   <div class="row g-4 mb-4">
     <div class="col-lg-5">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Risk analizi</h5></div>
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Risk analizi</h5></div>
         <div class="ds-panel-body">
           <div class="mb-2">
             <span class="badge ds-risk-{{ center.risk_analysis.level }}">{{ center.risk_analysis.level }}</span>
@@ -125,8 +126,8 @@
     </div>
     <div class="col-lg-7">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Vatandaş katılım eğilimleri</h5></div>
-        <div class="ds-panel-body">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-people me-2"></i>Vatandaş katılım eğilimleri</h5></div>
+        <div class="ds-panel-body position-relative">
           <canvas id="dsParticipationChart" height="200"></canvas>
           <div class="small text-muted mt-2">
             Trend: {{ center.participation_trends.trend }} ·
@@ -140,16 +141,16 @@
   <div class="row g-4 mb-4">
     <div class="col-lg-6">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Kategori değişimleri</h5></div>
-        <div class="ds-panel-body">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Kategori değişimleri</h5></div>
+        <div class="ds-panel-body position-relative">
           <canvas id="dsCategoryChart" height="220"></canvas>
         </div>
       </div>
     </div>
     <div class="col-lg-6">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Belediye karşılaştırmaları</h5></div>
-        <div class="ds-panel-body">
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-building me-2"></i>Belediye karşılaştırmaları</h5></div>
+        <div class="ds-panel-body position-relative">
           <canvas id="dsCompareChart" height="180" class="mb-3"></canvas>
           <div class="row g-2">
             <div class="col-md-6">
@@ -173,7 +174,7 @@
   <div class="row g-4 mb-4">
     <div class="col-lg-6">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Yeni kampanya önerileri</h5></div>
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-megaphone me-2"></i>Yeni kampanya önerileri</h5></div>
         <div class="ds-panel-body">
           {% for c in center.campaigns %}
           <article class="ds-card-item mb-3">
@@ -183,14 +184,17 @@
             </div>
             <p class="small mb-0 mt-1">{{ c.description }}</p>
           </article>
+          {% else %}
+          {{ ap_empty(icon='bi-megaphone', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Kampanya önerileri veri birikince burada listelenir.', compact=true) }}
           {% endfor %}
         </div>
       </div>
     </div>
     <div class="col-lg-6">
       <div class="ds-panel h-100">
-        <div class="ds-panel-head"><h5 class="mb-0">Bakanlık aksiyon önerileri</h5></div>
+        <div class="ds-panel-head"><h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Bakanlık aksiyon önerileri</h5></div>
         <div class="ds-panel-body">
+          {% if center.ministry_actions %}
           <ol class="mb-0 ps-3">
             {% for a in center.ministry_actions %}
             <li class="mb-3">
@@ -200,6 +204,9 @@
             </li>
             {% endfor %}
           </ol>
+          {% else %}
+          {{ ap_empty(icon='bi-flag', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Aksiyon önerileri risk ve katılım verisiyle oluşur.', compact=true) }}
+          {% endif %}
         </div>
       </div>
     </div>
@@ -212,6 +219,7 @@
   'compare': center.municipality_comparisons.chart
 }|tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/decision-support.js') }}"></script>
 <style>
 .ds-center {

@@ -1,6 +1,9 @@
 {% extends "layout.html" %}
 {% block content %}
+{% from "_ap_ui.html" import ap_empty %}
 {% set c = ops.cards %}
+{% set locked_il = (current_user.il if current_user and current_user.il else none) or secili_il or '' %}
+{% set belediye_adi = (current_user.ad if current_user and current_user.ad else none) or (current_user.username if current_user else 'Belediye') %}
 <div class="content-section fade-in belediye-ops-center">
   {# —— Başlık —— #}
   <div class="ops-hero mb-3">
@@ -18,28 +21,20 @@
   </div>
   {% include "belediye/_nav.html" %}
 
-  {# —— Filtreler —— #}
+  {# Belediye → İlçe → Mahalle (il filtresi yok; il gizli kilitli) #}
+  <nav class="ops-breadcrumb" aria-label="Bölge hiyerarşisi">
+    <span><i class="bi bi-building me-1"></i>{{ belediye_adi }}{% if 'belediye' not in (belediye_adi|lower) %} Belediyesi{% endif %}</span>
+    {% if locked_il %}<span class="sep">↓</span><span class="text-muted">{{ locked_il }}</span>{% endif %}
+    {% if secili_ilce %}<span class="sep">↓</span><span>{{ secili_ilce }}</span>{% endif %}
+    {% if secili_mahalle %}<span class="sep">↓</span><span class="current">{{ secili_mahalle }}</span>{% endif %}
+  </nav>
+
   <div class="ops-filter-bar mb-4">
     <form method="GET" class="row g-2 align-items-end" id="belediyeFilterForm">
-      <div class="col-6 col-md-2">
-        <label class="form-label small mb-1">Tarih</label>
-        <select name="tarih" class="form-select form-select-sm" disabled title="Operasyon görünümü: bugün">
-          <option selected>Bugün</option>
-          <option>Son 7 gün</option>
-          <option>Son 30 gün</option>
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small mb-1">İl</label>
-        <select name="il" id="filtreIl" class="form-select form-select-sm">
-          <option value="">Tümü</option>
-          {% for il in iller %}
-          <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small mb-1">İlçe</label>
+      {# İl UI'da yok; heatmap/API kapsamı için belediye ili kilitli #}
+      <input type="hidden" name="il" id="filtreIl" value="{{ locked_il }}">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1"><i class="bi bi-geo me-1"></i>İlçe</label>
         <select name="ilce" id="filtreIlce" class="form-select form-select-sm">
           <option value="">Tümü</option>
           {% for ilce in ilceler %}
@@ -47,8 +42,8 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small mb-1">Mahalle</label>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1"><i class="bi bi-pin-map me-1"></i>Mahalle</label>
         <select name="mahalle" id="filtreMahalle" class="form-select form-select-sm">
           <option value="">Tümü</option>
           {% for m in mahalleler %}
@@ -56,22 +51,15 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label small mb-1">Kategori</label>
-        <select class="form-select form-select-sm" disabled title="Özet görünüm">
-          <option selected>Tümü</option>
-          <option>Plastik</option>
-          <option>Cam</option>
-          <option>Metal</option>
-          <option>Elektronik</option>
-          <option>Organik</option>
-          <option>Bitkisel Yağ</option>
-          <option>Diğer</option>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Tarih</label>
+        <select class="form-select form-select-sm" disabled title="Operasyon görünümü: bugün">
+          <option selected>Bugün</option>
         </select>
       </div>
-      <div class="col-6 col-md-2 d-flex gap-2">
+      <div class="col-6 col-md-3 d-flex gap-2">
         <button type="submit" class="btn btn-sm btn-success flex-grow-1">Uygula</button>
-        <a href="{{ url_for('belediye.dashboard') }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
+        <a href="{{ url_for('belediye.dashboard', il=locked_il) }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
       </div>
     </form>
   </div>
@@ -182,11 +170,12 @@
         <div class="col-lg-7">
           <div class="ops-panel h-100">
             <div class="ops-panel-head">
-              <span><i class="bi bi-thermometer-half me-2"></i>Heat Map</span>
-              <a class="small" href="{{ url_for('belediye.heatmap', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">Tam ekran →</a>
+              <span><i class="bi bi-thermometer-half me-2"></i>Heat Map · Belediye sınırı</span>
+              <a class="small" href="{{ url_for('belediye.heatmap', il=locked_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">Tam ekran →</a>
             </div>
-            <div class="ops-panel-body p-0">
+            <div class="ops-panel-body p-0 position-relative">
               <div id="opsHeatMap" class="ops-map"></div>
+              <div id="opsHeatMapEmpty" class="d-none p-3">{{ ap_empty(icon='bi-map', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Seçili ilçe / mahalle için ısı noktası henüz oluşmadı.', compact=true) }}</div>
             </div>
           </div>
         </div>
@@ -196,7 +185,7 @@
               <span><i class="bi bi-pie-chart me-2"></i>Kategori dağılımı</span>
               <a class="small" href="{{ url_for('belediye.kategori', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">Detay →</a>
             </div>
-            <div class="ops-panel-body">
+            <div class="ops-panel-body position-relative">
               <canvas id="opsCategoryChart" height="220"></canvas>
             </div>
           </div>
@@ -210,7 +199,7 @@
             <div class="ops-panel-head">
               <span><i class="bi bi-graph-up me-2"></i>Trend grafiği</span>
             </div>
-            <div class="ops-panel-body">
+            <div class="ops-panel-body position-relative">
               <canvas id="opsTrendChart" height="200"></canvas>
             </div>
           </div>
@@ -220,7 +209,7 @@
             <div class="ops-panel-head">
               <span><i class="bi bi-arrow-left-right me-2"></i>Teslim oranı</span>
             </div>
-            <div class="ops-panel-body d-flex flex-column align-items-center justify-content-center">
+            <div class="ops-panel-body d-flex flex-column align-items-center justify-content-center position-relative">
               <canvas id="opsDeliveryChart" height="180"></canvas>
               <div class="small text-muted mt-2 text-center" id="opsDeliveryCaption">—</div>
             </div>
@@ -270,7 +259,7 @@
               </div>
             </li>
             {% else %}
-            <li class="list-group-item text-muted text-center py-4">Henüz aktivite kaydı yok.</li>
+            <li class="list-group-item py-2">{{ ap_empty(icon='bi-activity', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Yeni ilan ve teslimler burada listelenecektir.', compact=true) }}</li>
             {% endfor %}
           </ul>
         </div>
@@ -311,10 +300,10 @@
               </article>
               {% endfor %}
             {% else %}
-              <p class="text-muted small mb-0">Şu an gösterilecek analiz bulunmuyor.</p>
+              {{ ap_empty(icon='bi-robot', title='Bu metrik için yeterli veri oluşmamıştır.', desc='AI Belediye Asistanı analizleri veri biriktikçe görünecektir.', compact=true) }}
             {% endif %}
             <a class="btn btn-sm btn-outline-success w-100 mt-3"
-               href="{{ url_for('belediye.ai_asistan', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
+               href="{{ url_for('belediye.ai_asistan', il=locked_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
               Tüm analizler
             </a>
           </div>
@@ -336,15 +325,21 @@
   </div>
 </div>
 
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=true) }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script type="application/json" id="ops-center-config">{{ {
   'heatmapUrl': url_for('belediye.api_heatmap'),
   'query': {
-    'il': secili_il or '',
+    'il': locked_il or '',
     'ilce': secili_ilce or '',
     'mahalle': secili_mahalle or ''
+  },
+  'mapCenter': {
+    'lat': current_user.latitude if current_user and current_user.latitude else 40.77,
+    'lng': current_user.longitude if current_user and current_user.longitude else 30.40,
+    'zoom': 11
   },
   'metrics': {
     'bugun': c.bugun_acilan,
@@ -360,15 +355,16 @@
 <script type="application/json" id="prediction-panel-config">{{ {
   'apiUrl': url_for('belediye.api_predictions'),
   'query': {
-    'il': secili_il or '',
+    'il': locked_il or '',
     'ilce': secili_ilce or '',
     'mahalle': secili_mahalle or ''
   }
 }|tojson }}</script>
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/belediye-ops-center.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prediction-panel.js') }}"></script>
 
-{# Cascade filter (mevcut davranış) #}
+{# İlçe → Mahalle kaskadı (il kilitli) #}
 <script>
 (function () {
   var il = document.getElementById("filtreIl");
@@ -398,7 +394,7 @@
       })
       .catch(function () {});
   }
-  il.addEventListener("change", function () { ilce.value = ""; mahalle.value = ""; loadGeo(); });
+  if (il.value) loadGeo();
   ilce.addEventListener("change", function () { mahalle.value = ""; loadGeo(); });
 })();
 </script>

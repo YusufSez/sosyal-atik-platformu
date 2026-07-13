@@ -9,6 +9,9 @@
     return;
   }
 
+  var UI = window.AtikPortUI || null;
+  var DEMO = (UI && UI.DEMO) || {};
+
   var updated = document.getElementById("opsLastUpdated");
   if (updated) {
     try {
@@ -24,7 +27,6 @@
     }
   }
 
-  // Activity filter tabs
   var tabs = document.getElementById("opsActivityTabs");
   var list = document.getElementById("opsActivityList");
   if (tabs && list) {
@@ -45,9 +47,9 @@
     });
   }
 
-  // Heat map via existing API
   function loadHeatMap() {
     var mapEl = document.getElementById("opsHeatMap");
+    var emptyEl = document.getElementById("opsHeatMapEmpty");
     if (!mapEl || typeof L === "undefined") return;
 
     var params = new URLSearchParams();
@@ -57,6 +59,8 @@
     if (q.mahalle) params.set("mahalle", q.mahalle);
     params.set("yogunluk", "atik");
 
+    var center = cfg.mapCenter || { lat: 40.77, lng: 30.4, zoom: 11 };
+
     fetch((cfg.heatmapUrl || "/belediye/api/heatmap") + "?" + params.toString(), {
       credentials: "same-origin",
     })
@@ -64,17 +68,22 @@
         return r.json();
       })
       .then(function (noktalar) {
-        var map = L.map(mapEl).setView([39.0, 35.0], 6);
+        var map = L.map(mapEl).setView(
+          [center.lat || 40.77, center.lng || 30.4],
+          center.zoom || 11
+        );
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "© OpenStreetMap",
         }).addTo(map);
 
         var pts = Array.isArray(noktalar) ? noktalar : [];
         if (pts.length && L.heatLayer) {
+          if (emptyEl) emptyEl.classList.add("d-none");
+          mapEl.classList.remove("d-none");
           L.heatLayer(pts, {
             radius: 22,
             blur: 18,
-            maxZoom: 12,
+            maxZoom: 14,
             gradient: {
               0.2: "#5eead4",
               0.5: "#14b8a6",
@@ -86,16 +95,19 @@
             pts.map(function (p) {
               return [p[0], p[1]];
             }),
-            { padding: [30, 30], maxZoom: 11 }
+            { padding: [30, 30], maxZoom: 13 }
           );
+        } else {
+          mapEl.classList.add("d-none");
+          if (emptyEl) emptyEl.classList.remove("d-none");
         }
         setTimeout(function () {
           map.invalidateSize();
         }, 120);
       })
       .catch(function () {
-        mapEl.innerHTML =
-          '<div class="p-4 text-muted small">Harita yüklenemedi. Isı Haritası sayfasını açın.</div>';
+        mapEl.classList.add("d-none");
+        if (emptyEl) emptyEl.classList.remove("d-none");
       });
   }
 
@@ -109,15 +121,19 @@
       counts[cfg.kritik] = Math.max(1, counts[cfg.kritik] || 0);
     }
     var labels = Object.keys(counts);
-    if (!labels.length) {
-      labels = ["Veri yok"];
-      return { labels: labels, values: [0] };
+    if (!labels.length || !(UI && UI.sum(Object.values(counts)))) {
+      return {
+        labels: (DEMO.category && DEMO.category.labels) || labels,
+        values: (DEMO.category && DEMO.category.values) || [0],
+        demo: true,
+      };
     }
     return {
       labels: labels,
       values: labels.map(function (k) {
         return counts[k];
       }),
+      demo: false,
     };
   }
 
@@ -138,6 +154,7 @@
     var cat = buildCategoryData();
     var catCanvas = document.getElementById("opsCategoryChart");
     if (catCanvas) {
+      if (UI) UI.markDemo(catCanvas, !!cat.demo);
       new Chart(catCanvas, {
         type: "doughnut",
         data: {
@@ -162,21 +179,37 @@
 
     var trendCanvas = document.getElementById("opsTrendChart");
     if (trendCanvas) {
+      var trendVals = [
+        m.bugun || 0,
+        m.ilan24 || 0,
+        m.teslim24 || 0,
+        m.aktif || 0,
+        m.teslim || 0,
+        m.bekleyen || 0,
+      ];
+      var trendDemo = !(UI && UI.hasNumericSeries(trendVals));
+      if (trendDemo) {
+        trendVals = (DEMO.trend && DEMO.trend.values) || [12, 15, 11, 18, 16, 9];
+      }
+      if (UI) UI.markDemo(trendCanvas, trendDemo);
       new Chart(trendCanvas, {
         type: "line",
         data: {
-          labels: ["Bugün", "Son 24s ilan", "Son 24s teslim", "Aktif", "Teslim", "Bekleyen"],
+          labels: trendDemo
+            ? (DEMO.trend && DEMO.trend.labels) || [
+                "Pzt",
+                "Sal",
+                "Çar",
+                "Per",
+                "Cum",
+                "Cmt",
+                "Paz",
+              ]
+            : ["Bugün", "Son 24s ilan", "Son 24s teslim", "Aktif", "Teslim", "Bekleyen"],
           datasets: [
             {
               label: "Operasyon hacmi",
-              data: [
-                m.bugun || 0,
-                m.ilan24 || 0,
-                m.teslim24 || 0,
-                m.aktif || 0,
-                m.teslim || 0,
-                m.bekleyen || 0,
-              ],
+              data: trendVals,
               borderColor: accent,
               backgroundColor: "rgba(15, 118, 110, 0.12)",
               fill: true,
@@ -199,18 +232,24 @@
       var teslim = Number(m.teslim || 0);
       var aktif = Number(m.aktif || 0);
       var bekleyen = Number(m.bekleyen || 0);
-      var denom = teslim + aktif;
-      var rate = denom > 0 ? Math.round((1000 * teslim) / denom) / 10 : 0;
+      var demo = teslim + aktif + bekleyen <= 0;
+      var data = demo
+        ? (DEMO.delivery && DEMO.delivery.values) || [62, 24, 14]
+        : [teslim, aktif, bekleyen];
+      if (UI) UI.markDemo(deliveryCanvas, demo);
+      var denom = data[0] + data[1];
+      var rate = denom > 0 ? Math.round((1000 * data[0]) / denom) / 10 : 0;
       if (caption) {
-        caption.textContent =
-          "Teslim oranı %" +
-          rate +
-          " · " +
-          teslim +
-          " teslim / " +
-          (aktif + teslim) +
-          " toplam · bekleyen " +
-          bekleyen;
+        caption.textContent = demo
+          ? "Örnek teslim oranı görünümü · gerçek veri birikince güncellenir"
+          : "Teslim oranı %" +
+            rate +
+            " · " +
+            teslim +
+            " teslim / " +
+            (aktif + teslim) +
+            " toplam · bekleyen " +
+            bekleyen;
       }
       new Chart(deliveryCanvas, {
         type: "doughnut",
@@ -218,7 +257,7 @@
           labels: ["Teslim", "Aktif", "Bekleyen"],
           datasets: [
             {
-              data: [teslim, aktif, bekleyen],
+              data: data,
               backgroundColor: ["#10b981", "#3b82f6", "#f59e0b"],
               borderWidth: 0,
             },

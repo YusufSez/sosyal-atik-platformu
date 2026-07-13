@@ -472,10 +472,49 @@
     renderCharts(currentPrimary);
   }
 
+  function showPredictionEmpty(msg) {
+    var cards = document.getElementById("predictionMetricCards");
+    var chartWrap = document.querySelector("#predictionPanel .pred-chart-wrap");
+    var title =
+      msg || "Henüz yeterli tahmin verisi oluşmadı";
+    var html =
+      '<div class="col-12"><div class="pred-empty-card">' +
+      '<div class="ap-empty-icon mx-auto mb-2"><i class="bi bi-graph-up-arrow"></i></div>' +
+      '<div class="ap-empty-title">' +
+      title +
+      "</div>" +
+      '<div class="ap-empty-desc">Prediction Engine veri biriktikçe ufuk kartları ve güven bandı burada görünecektir.</div>' +
+      "</div></div>";
+    if (cards) cards.innerHTML = html;
+    if (chartWrap && window.AtikPortUI) {
+      window.AtikPortUI.mountEmpty(chartWrap, {
+        icon: "bi-clipboard-data",
+        title: "Bu metrik için yeterli veri oluşmamıştır.",
+        desc: "Geçmiş ve tahmin serisi oluşunca grafik açılır.",
+      });
+      var canvas = document.getElementById("predictionHistoryChart");
+      if (canvas) canvas.classList.add("d-none");
+    }
+    var durumEl = document.getElementById("predAiDurum");
+    if (durumEl) durumEl.textContent = title;
+    ["predAiRisk", "predAiChange", "predAiOneri"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = "Bu metrik için yeterli veri oluşmamıştır.";
+    });
+  }
+
   function applyPrimary(data, months) {
     lastReport = data;
     currentPrimary =
       (data.lookbacks && data.lookbacks[String(months)]) || data.primary || data;
+    if (
+      !currentPrimary ||
+      !currentPrimary.forecasts ||
+      !Object.keys(currentPrimary.forecasts || {}).length
+    ) {
+      showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
+      return;
+    }
     renderMetricTable(currentPrimary);
     renderCharts(currentPrimary);
     renderAiCards(currentPrimary, data);
@@ -485,6 +524,11 @@
     var months = lookbackEl ? lookbackEl.value : "12";
     var params = new URLSearchParams(meta.query || {});
     params.set("lookback", months);
+    var cards = document.getElementById("predictionMetricCards");
+    if (cards) {
+      cards.innerHTML =
+        '<div class="col-12"><div class="ap-skeleton"><div class="ap-skeleton-line" style="width:90%"></div><div class="ap-skeleton-line" style="width:70%"></div><div class="ap-skeleton-line" style="width:80%"></div></div></div>';
+    }
     fetch(meta.apiUrl + "?" + params.toString(), { credentials: "same-origin" })
       .then(function (r) {
         return r.json();
@@ -493,10 +537,9 @@
         applyPrimary(data, months);
       })
       .catch(function () {
-        var durumEl = document.getElementById("predAiDurum");
-        if (durumEl) durumEl.textContent = "Tahmin yüklenemedi";
+        showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
         var ul = document.getElementById("predictionNarratives");
-        if (ul) ul.innerHTML = '<li class="text-danger">Tahmin yüklenemedi</li>';
+        if (ul) ul.innerHTML = '<li class="text-muted">Tahmin yüklenemedi</li>';
       });
   }
 

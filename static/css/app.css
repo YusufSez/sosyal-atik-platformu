@@ -1348,3 +1348,207 @@ body.ilan-lightbox-open {
     .mp-ai-panel { position: static; }
     .mp-nearby-body { max-height: none; }
 }
+
+/* =========================================================
+   AtıkPort Yönetim Panelleri — ortak tasarım sistemi (UI)
+   ========================================================= */
+:root {
+  --ap-blue: #1d4ed8;
+  --ap-green: #15803d;
+  --ap-red: #b91c1c;
+  --ap-orange: #c2410c;
+  --ap-teal: #0f766e;
+  --ap-violet: #6d28d9;
+  --ap-gray: #64748b;
+  --ap-ink: #0f3d36;
+  --ap-soft: #e7f5f2;
+  --ap-line: rgba(15, 61, 54, 0.12);
+  --ap-shadow: 0 10px 28px rgba(15, 61, 54, 0.10);
+  --ap-shadow-hover: 0 16px 36px rgba(15, 61, 54, 0.14);
+}
+[data-bs-theme="dark"] {
+  --ap-ink: #e8f5f2;
+  --ap-soft: rgba(45, 212, 191, 0.1);
+  --ap-line: rgba(232, 245, 242, 0.14);
+  --ap-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.belediye-ops-center,
+.ministry-national-center,
+.ds-center,
+.ss-dash,
+.pred-dash {
+  --ops-ink: var(--ap-ink);
+  --ops-accent: var(--ap-teal);
+  --ops-soft: var(--ap-soft);
+  --ops-line: var(--ap-line);
+}
+
+.ops-hero, .ds-hero, .mp-b2b-hero {
+  box-shadow: var(--ap-shadow);
+}
+.ops-title, .ds-title, .mp-b2b-title, .ss-dash .ops-title {
+  font-size: clamp(1.5rem, 2.6vw, 2.05rem) !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ap-ink);
+}
+.ops-kicker, .ds-kicker { color: var(--ap-teal); }
+
+.ops-kpi, .ds-stat, .ss-cat-card, .pred-metric-card, .ss-rank-card, .ss-similar-card {
+  box-shadow: var(--ap-shadow) !important;
+  border: 1px solid var(--ap-line) !important;
+  min-height: 7.25rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.ops-kpi:hover, .ds-stat:hover, .ss-cat-card:hover, .pred-metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ap-shadow-hover) !important;
+  border-color: rgba(15, 118, 110, 0.35) !important;
+}
+.ops-kpi-row > [class*="col-"] > .ops-kpi,
+.ops-equal-row > [class*="col-"] > .ops-panel {
+  height: 100%;
+}
+.ops-panel, .ds-panel, .mp-map-shell, .mp-timeline-shell, .ss-score-panel, .ss-radar-panel {
+  box-shadow: var(--ap-shadow) !important;
+  border: 1px solid var(--ap-line) !important;
+  border-radius: 1rem !important;
+  background:
+    linear-gradient(180deg, rgba(231, 245, 242, 0.35), transparent 48%),
+    var(--bs-body-bg) !important;
+}
+.ops-panel:hover, .ds-panel:hover {
+  box-shadow: var(--ap-shadow-hover) !important;
+}
+.ops-panel-head, .ds-panel-head, .mp-section-head {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--ap-ink);
+}
+.ops-filter-bar, .mp-filter-bar {
+  box-shadow: var(--ap-shadow);
+  background:
+    radial-gradient(circle at 8% 20%, rgba(29, 78, 216, 0.06), transparent 40%),
+    var(--ap-soft) !important;
+  border: 1px solid var(--ap-line);
+  border-radius: 1rem;
+  padding: 1rem 1.15rem;
+}
+
+.ops-kpi-blue .ops-kpi-icon, .ap-tone-blue { background: #dbeafe; color: var(--ap-blue); }
+.ops-kpi-green .ops-kpi-icon, .ap-tone-green { background: #dcfce7; color: var(--ap-green); }
+.ops-kpi-red .ops-kpi-icon, .ap-tone-red { background: #fee2e2; color: var(--ap-red); }
+.ops-kpi-orange .ops-kpi-icon, .ops-kpi-amber .ops-kpi-icon, .ap-tone-orange { background: #ffedd5; color: var(--ap-orange); }
+.ops-kpi-teal .ops-kpi-icon, .ap-tone-teal { background: #ccfbf1; color: var(--ap-teal); }
+
+.ap-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.45rem;
+  min-height: 180px;
+  padding: 1.25rem 1rem;
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(15, 118, 110, 0.08), transparent 55%),
+    rgba(148, 163, 184, 0.06);
+  border: 1px dashed rgba(15, 118, 110, 0.22);
+}
+.ap-empty-state.is-compact { min-height: 120px; padding: 0.9rem; }
+.ap-empty-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ccfbf1;
+  color: var(--ap-teal);
+  font-size: 1.25rem;
+}
+.ap-empty-title {
+  font-weight: 800;
+  color: var(--ap-ink);
+  font-size: 0.95rem;
+  max-width: 22rem;
+  line-height: 1.35;
+}
+.ap-empty-desc {
+  font-size: 0.82rem;
+  color: var(--ap-gray);
+  max-width: 24rem;
+  line-height: 1.4;
+}
+
+.ap-skeleton { display: grid; gap: 0.65rem; padding: 0.5rem 0; }
+.ap-skeleton-line {
+  height: 0.75rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: apShimmer 1.4s ease-in-out infinite;
+}
+@keyframes apShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.ap-demo-badge {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  z-index: 2;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.ops-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ap-ink);
+  margin-bottom: 0.85rem;
+}
+.ops-breadcrumb .sep { color: var(--ap-gray); font-weight: 500; }
+.ops-breadcrumb .current { color: var(--ap-teal); }
+
+.ss-ai-strength { border-left: 4px solid var(--ap-green) !important; }
+.ss-ai-improve { border-left: 4px solid var(--ap-orange) !important; }
+.ss-ai-reco { border-left: 4px solid var(--ap-blue) !important; }
+.ss-ai-gain { border-left: 4px solid var(--ap-violet) !important; background: linear-gradient(160deg, #f5f3ff 0%, #fff 70%) !important; }
+
+.ds-stat { min-height: 6.5rem; }
+.ds-panel { min-height: 100%; }
+.ministry-rank-list { min-height: 12rem; }
+.ops-map-tall, #ministryIsiHaritasi.ops-map-tall { min-height: 480px !important; }
+
+.pred-empty-card {
+  border: 1px dashed rgba(15, 118, 110, 0.25);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--ap-soft);
+}
+
+@media (max-width: 991.98px) {
+  .ops-map-tall, #ministryIsiHaritasi.ops-map-tall { min-height: 300px !important; }
+  .ops-title, .ds-title { font-size: 1.45rem !important; }
+}
+@media (min-width: 1400px) {
+  .content-section.belediye-ops-center,
+  .content-section.ministry-national-center,
+  .content-section.ds-center { max-width: 1600px; margin-left: auto; margin-right: auto; }
+}

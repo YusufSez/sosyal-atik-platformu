@@ -114,9 +114,9 @@
   <h6 class="ops-section-title">Radar Chart</h6>
   <div class="ops-panel ss-radar-panel mb-4">
     <div class="ops-panel-head">
-      <span><i class="bi bi-radar me-2"></i>Kategori radar görünümü</span>
+      <span><i class="bi bi-radar me-2"></i>Radar Chart</span>
     </div>
-    <div class="ops-panel-body ss-radar-body">
+    <div class="ops-panel-body ss-radar-body position-relative">
       <div class="ss-radar-wrap">
         <canvas id="sustainabilityRadarChart"></canvas>
       </div>
@@ -172,7 +172,7 @@
       {% endif %}
     </div>
     <div class="ops-panel-body">
-      <div class="ss-history-wrap">
+      <div class="ss-history-wrap position-relative">
         <canvas id="sustainabilityHistoryChart"></canvas>
       </div>
     </div>
@@ -565,4 +565,5 @@
   'history': dash.history or {}
 }|tojson }}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sustainability-charts.js') }}"></script>
