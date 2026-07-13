@@ -1,0 +1,148 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in">
+  <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <h3 class="fw-bold"><i class="bi bi-leaf me-2"></i>Sustainability Scoring Engine</h3>
+      <small class="text-muted">100 puan · A+ / A / B / C / D · lider tablosu · Türkiye &amp; il sıralaması</small>
+    </div>
+    <a class="btn btn-outline-success"
+       href="{{ url_for('belediye.surdurulebilirlik_pdf', il=secili_il, ilce=secili_ilce, mahalle=secili_mahalle) }}">
+      <i class="bi bi-file-earmark-pdf me-1"></i>PDF Rapor
+    </a>
+  </div>
+  {% include "belediye/_nav.html" %}
+  {% include "belediye/_filters.html" %}
+
+  {% set cur = dash.current %}
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm h-100 border-0" style="background:linear-gradient(135deg,#ecfdf5,#f0fdfa)">
+        <div class="card-body text-center py-4">
+          <div class="display-4 fw-bold text-success">{{ cur.puan }}</div>
+          <div class="fs-3 fw-semibold">{{ cur.grade }}</div>
+          <small class="text-muted">
+            {% if cur.belediye_adi %}{{ cur.belediye_adi }}{% else %}{{ cur.il or 'Türkiye' }}{% if cur.ilce %} / {{ cur.ilce }}{% endif %}{% endif %}
+          </small>
+          {% if dash.my_rank %}
+          <div class="mt-2 small">Türkiye sırası: <strong>#{{ dash.my_rank }}</strong></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-header fw-bold">Kriterler</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+              <thead><tr><th>Kriter</th><th class="text-end">Puan</th><th class="text-end">Ağırlık</th><th style="width:40%">Çubuk</th></tr></thead>
+              <tbody>
+                {% for c in cur.criteria %}
+                <tr>
+                  <td>{{ c.label }}</td>
+                  <td class="text-end">{{ c.score }}</td>
+                  <td class="text-end">%{{ c.weight }}</td>
+                  <td>
+                    <div class="progress" style="height:8px">
+                      <div class="progress-bar {% if c.score >= 70 %}bg-success{% elif c.score >= 40 %}bg-warning{% else %}bg-secondary{% endif %}"
+                           style="width:{{ c.score }}%"></div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-success">
+    <div class="fw-bold mb-2"><i class="bi bi-stars me-1"></i>AI Önerileri
+      <span class="badge bg-secondary">{{ suggestion_source }}</span>
+    </div>
+    <ul class="mb-0">
+      {% for tip in suggestions %}
+      <li>{{ tip }}</li>
+      {% else %}
+      <li class="text-muted">Öneri yok</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header fw-bold">Türkiye Lider Tablosu</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead><tr><th>#</th><th>Belediye</th><th>İl</th><th class="text-end">Puan</th><th>Not</th></tr></thead>
+            <tbody>
+              {% for row in dash.turkey_ranking[:15] %}
+              <tr {% if dash.current.belediye_id and row.belediye_id == dash.current.belediye_id %}class="table-success"{% endif %}>
+                <td>{{ row.sira }}</td>
+                <td>{{ row.belediye_adi }}</td>
+                <td>{{ row.il }}</td>
+                <td class="text-end">{{ row.puan }}</td>
+                <td><span class="badge bg-teal text-dark border">{{ row.grade }}</span></td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-muted text-center py-3">Belediye skoru yok</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold">İl Sıralaması</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead><tr><th>#</th><th>İl</th><th class="text-end">Puan</th><th>Not</th><th class="text-end">Belediye</th></tr></thead>
+            <tbody>
+              {% for row in dash.province_ranking %}
+              <tr>
+                <td>{{ row.sira }}</td>
+                <td>{{ row.il }}</td>
+                <td class="text-end">{{ row.puan }}</td>
+                <td>{{ row.grade }}</td>
+                <td class="text-end">{{ row.belediye_sayisi }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="text-muted text-center py-3">İl skoru yok</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% if dash.il_ranking %}
+      <div class="card shadow-sm">
+        <div class="card-header fw-bold">İl İçi Belediye Sıralaması{% if dash.focus_il %} — {{ dash.focus_il }}{% endif %}</div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>#</th><th>Belediye</th><th class="text-end">Puan</th><th>Not</th></tr></thead>
+            <tbody>
+              {% for row in dash.il_ranking %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ row.belediye_adi }}</td>
+                <td class="text-end">{{ row.puan }}</td>
+                <td>{{ row.grade }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<style>
+.badge.bg-teal { background:#ccfbf1 !important; }
+</style>
+{% endblock %}

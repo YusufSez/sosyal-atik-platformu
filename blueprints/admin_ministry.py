@@ -1,6 +1,6 @@
 """Bakanlık paneli — ROLE_MINISTRY (tüm belediyeleri görür)."""
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, send_file
 from flask_login import login_required
 
 from decorators import ministry_required
@@ -11,6 +11,10 @@ from services.ministry_analytics import (
     ministry_statistics,
     top_bottom_provinces,
 )
+from services.sustainability_ai import generate_sustainability_suggestions
+from services.sustainability_pdf import export_sustainability_pdf
+from services.sustainability_scoring import sustainability_dashboard
+
 
 admin_ministry_bp = Blueprint("admin_ministry", __name__, url_prefix="/minister")
 
@@ -129,3 +133,39 @@ def api_predictions():
     if str(lookback) in (report.get("lookbacks") or {}):
         report["primary"] = report["lookbacks"][str(lookback)]
     return jsonify(report)
+
+
+@admin_ministry_bp.route("/surdurulebilirlik")
+@login_required
+@ministry_required
+def surdurulebilirlik():
+    filters = _filters()
+    dash = sustainability_dashboard(il=filters["il"], ilce=filters["ilce"])
+    ai = generate_sustainability_suggestions(scored=dash["current"])
+    return render_template(
+        "ministry/surdurulebilirlik.html",
+        title="Sustainability Scoring",
+        dash=dash,
+        suggestions=ai.get("suggestions") or [],
+        suggestion_source=ai.get("source"),
+        **_page_context(),
+    )
+
+
+@admin_ministry_bp.route("/surdurulebilirlik/pdf")
+@login_required
+@ministry_required
+def surdurulebilirlik_pdf():
+    import io
+
+    filters = _filters()
+    dash = sustainability_dashboard(il=filters["il"], ilce=filters["ilce"])
+    ai = generate_sustainability_suggestions(scored=dash["current"])
+    data, filename = export_sustainability_pdf(dash, ai.get("suggestions") or [])
+    mimetype = "application/pdf" if filename.endswith(".pdf") else "text/plain"
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename,
+    )

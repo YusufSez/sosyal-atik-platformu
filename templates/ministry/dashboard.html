@@ -1,9 +1,14 @@
 {% extends "layout.html" %}
 {% block content %}
 <div class="content-section fade-in">
-  <div class="page-header mb-3">
-    <h3 class="fw-bold"><i class="bi bi-globe2 me-2"></i>Bakanlık Yönetim Paneli</h3>
-    <small class="text-muted">Türkiye → İl → İlçe → Belediye → Kurum drill-down</small>
+  <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div>
+      <h3 class="fw-bold"><i class="bi bi-globe2 me-2"></i>Bakanlık Yönetim Paneli</h3>
+      <small class="text-muted">Türkiye → İl → İlçe → Belediye → Kurum drill-down</small>
+    </div>
+    <a href="{{ url_for('admin_ministry.surdurulebilirlik') }}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-leaf me-1"></i>Sustainability Scoring
+    </a>
   </div>
 
   {% include "ministry/_filters.html" %}

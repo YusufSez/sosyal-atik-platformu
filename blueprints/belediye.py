@@ -1,8 +1,9 @@
 """Belediye Yönetim Modülü — ROLE_MUNICIPALITY paneli."""
 
-from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask import Blueprint, jsonify, render_template, request, send_file
+from flask_login import current_user, login_required
 
+from constants import ROLE_MUNICIPALITY
 from decorators import municipality_required
 from services.municipality_ai import generate_municipality_insights
 from services.municipality_analytics import (
@@ -13,6 +14,10 @@ from services.municipality_analytics import (
     mahalle_analizi,
     municipality_dashboard,
 )
+from services.sustainability_ai import generate_sustainability_suggestions
+from services.sustainability_pdf import export_sustainability_pdf
+from services.sustainability_scoring import sustainability_dashboard
+
 
 belediye_bp = Blueprint("belediye", __name__, url_prefix="/belediye")
 
@@ -182,3 +187,65 @@ def api_predictions():
     if str(lookback) in (report.get("lookbacks") or {}):
         report["primary"] = report["lookbacks"][str(lookback)]
     return jsonify(report)
+
+
+@belediye_bp.route("/surdurulebilirlik")
+@login_required
+@municipality_required
+def surdurulebilirlik():
+    """Sustainability Scoring Engine dashboard."""
+    filters = _filters_from_request()
+    belediye_user = current_user if getattr(current_user, "role", None) == ROLE_MUNICIPALITY else None
+    dash = sustainability_dashboard(
+        il=filters["il"] or (belediye_user.il if belediye_user else None),
+        ilce=filters["ilce"] or (belediye_user.ilce if belediye_user else None),
+        belediye_user=belediye_user,
+    )
+    ai = generate_sustainability_suggestions(scored=dash["current"])
+    return render_template(
+        "belediye/surdurulebilirlik.html",
+        title="Sustainability Scoring",
+        dash=dash,
+        suggestions=ai.get("suggestions") or [],
+        suggestion_source=ai.get("source"),
+        **_geo_context(),
+    )
+
+
+@belediye_bp.route("/api/sustainability")
+@login_required
+@municipality_required
+def api_sustainability():
+    filters = _filters_from_request()
+    belediye_user = current_user if getattr(current_user, "role", None) == ROLE_MUNICIPALITY else None
+    dash = sustainability_dashboard(
+        il=filters["il"] or (belediye_user.il if belediye_user else None),
+        ilce=filters["ilce"] or (belediye_user.ilce if belediye_user else None),
+        belediye_user=belediye_user,
+    )
+    ai = generate_sustainability_suggestions(scored=dash["current"])
+    return jsonify({**dash, "suggestions": ai})
+
+
+@belediye_bp.route("/surdurulebilirlik/pdf")
+@login_required
+@municipality_required
+def surdurulebilirlik_pdf():
+    filters = _filters_from_request()
+    belediye_user = current_user if getattr(current_user, "role", None) == ROLE_MUNICIPALITY else None
+    dash = sustainability_dashboard(
+        il=filters["il"] or (belediye_user.il if belediye_user else None),
+        ilce=filters["ilce"] or (belediye_user.ilce if belediye_user else None),
+        belediye_user=belediye_user,
+    )
+    ai = generate_sustainability_suggestions(scored=dash["current"])
+    data, filename = export_sustainability_pdf(dash, ai.get("suggestions") or [])
+    import io
+
+    mimetype = "application/pdf" if filename.endswith(".pdf") else "text/plain"
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename,
+    )

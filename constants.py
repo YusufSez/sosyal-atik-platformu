@@ -49,6 +49,39 @@ MP_KATEGORILER = (
 
 MP_NEARBY_RADIUS_KM = 50
 
+# Sustainability Scoring Engine (100 puan)
+SUSTAINABILITY_WEIGHTS = {
+    "geri_donusum": 18,
+    "teslim": 18,
+    "katilim": 14,
+    "kaynak_paylasimi": 14,
+    "karbon": 14,
+    "teslim_suresi": 12,
+    "ai_dogruluk": 10,
+}
+SUSTAINABILITY_CRITERION_LABELS = {
+    "geri_donusum": "Geri dönüşüm oranı",
+    "teslim": "Teslim oranı",
+    "katilim": "Vatandaş katılımı",
+    "kaynak_paylasimi": "Kaynak paylaşımı",
+    "karbon": "Karbon azaltımı",
+    "teslim_suresi": "Teslim süresi",
+    "ai_dogruluk": "AI doğruluk oranı",
+}
+# Harf notu eşikleri (puan alt sınırı)
+SUSTAINABILITY_GRADES = (
+    (90, "A+"),
+    (80, "A"),
+    (65, "B"),
+    (50, "C"),
+    (0, "D"),
+)
+# Karbon: bölge başına bu kg CO₂e tasarrufu ≈ 100 puan
+SUSTAINABILITY_CO2_BENCHMARK_KG = 50.0
+# Teslim süresi: ideal gün / sıfır puan gün
+SUSTAINABILITY_DELIVERY_IDEAL_DAYS = 3.0
+SUSTAINABILITY_DELIVERY_MAX_DAYS = 30.0
+
 # CO₂e → tahmini enerji tasarrufu (kWh). TR şebeke yoğunluğu ~0.4 kg CO₂e/kWh.
 CO2E_KG_PER_KWH = 0.4
 
