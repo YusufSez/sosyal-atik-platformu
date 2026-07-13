@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 from flask_login import current_user
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -11,8 +10,10 @@ from flask_socketio import SocketIO
 
 from constants import RATE_AI_ANALIZ
 from production_config import resolve_rate_limit_storage_uri
+from utils.env import load_app_dotenv
 
-load_dotenv()
+# factory.py ile aynı politika (çakışan ikinci kör load_dotenv yok)
+load_app_dotenv()
 
 
 def rate_limit_user_or_ip():

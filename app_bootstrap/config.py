@@ -167,6 +167,9 @@ def configure_app(app, config_overrides=None):
     if app.config.get("TESTING"):
         app.config["MAIL_SUPPRESS_SEND"] = True
         app.config["EMAIL_VERIFICATION_REQUIRED"] = False
+        # Kişisel .env / shell DEMO_MODE=True sızıntısını kes (test override hariç)
+        if not (config_overrides and "DEMO_MODE" in config_overrides):
+            app.config["DEMO_MODE"] = False
 
     site_url = os.getenv("SITE_URL", "").strip().rstrip("/")
     app.config["SITE_URL"] = site_url

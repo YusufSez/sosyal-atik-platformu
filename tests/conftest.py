@@ -1,6 +1,15 @@
+"""Pytest bootstrap — kişisel .env asla test sürecine sızmamalı."""
+
 import os
 
+# factory / extensions import edilmeden ÖNCE test runtime bayrakları
+os.environ["TESTING"] = "True"
+os.environ["FLASK_ENV"] = "testing"
 os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
+# Geliştirici shell veya önceki load_dotenv kalıntılarına karşı sabitler
+os.environ["DEMO_MODE"] = "False"
+os.environ["USE_POSTGRES"] = "False"
+os.environ["MAIL_SUPPRESS_SEND"] = "True"
 
 import pytest
 from sqlalchemy.pool import StaticPool
@@ -13,6 +22,7 @@ from extensions import db
 def app():
     app = create_app({
         "TESTING": True,
+        "DEMO_MODE": False,
         "SQLALCHEMY_DATABASE_URI": "sqlite://",
         "SQLALCHEMY_ENGINE_OPTIONS": {
             "poolclass": StaticPool,

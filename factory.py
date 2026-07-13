@@ -1,7 +1,9 @@
-from dotenv import load_dotenv
 from flask import Flask
 
-load_dotenv()
+from utils.env import load_app_dotenv
+
+# Test runtime'ta (.env sızıntısı yok); prod/dev/Docker/VPS'te .env yüklenir.
+load_app_dotenv()
 
 import models  # noqa: F401 — Alembic tüm modelleri keşfetsin
 
