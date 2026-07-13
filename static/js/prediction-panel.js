@@ -496,9 +496,22 @@
     renderCharts(currentPrimary);
   }
 
+  function hasForecastPayload(data) {
+    if (!data) return false;
+    var primary =
+      (data.lookbacks && data.lookbacks[String(lookbackEl ? lookbackEl.value : "12")]) ||
+      data.primary ||
+      data;
+    return !!(
+      primary &&
+      primary.forecasts &&
+      Object.keys(primary.forecasts || {}).length
+    );
+  }
+
   function showPredictionEmpty(msg) {
     // Demo / bootstrap varken placeholder gösterme
-    if (meta.demoSource || (meta.bootstrap && meta.bootstrap.primary)) {
+    if (meta.demoSource || hasForecastPayload(meta.bootstrap)) {
       return;
     }
     var cards = document.getElementById("predictionMetricCards");
@@ -551,16 +564,13 @@
   function load() {
     var months = lookbackEl ? lookbackEl.value : "12";
     // SSR bootstrap (MASTER) — API'den önce
-    if (
-      meta.bootstrap &&
-      (meta.bootstrap.primary || meta.bootstrap.lookbacks)
-    ) {
+    if (hasForecastPayload(meta.bootstrap)) {
       applyPrimary(meta.bootstrap, months);
     }
     var params = new URLSearchParams(meta.query || {});
     params.set("lookback", months);
     var cards = document.getElementById("predictionMetricCards");
-    if (cards && !(meta.bootstrap && meta.bootstrap.primary)) {
+    if (cards && !hasForecastPayload(meta.bootstrap)) {
       cards.innerHTML =
         '<div class="col-12"><div class="ap-skeleton"><div class="ap-skeleton-line" style="width:90%"></div><div class="ap-skeleton-line" style="width:70%"></div><div class="ap-skeleton-line" style="width:80%"></div></div></div>';
     }
@@ -569,16 +579,29 @@
         return r.json();
       })
       .then(function (data) {
-        applyPrimary(data, months);
-      })
-      .catch(function () {
-        if (meta.bootstrap && meta.bootstrap.primary) {
+        // Boş live yanıt, dolu MASTER bootstrap'i ezmesin
+        if (hasForecastPayload(data)) {
+          applyPrimary(data, months);
+          return;
+        }
+        if (hasForecastPayload(meta.bootstrap)) {
           applyPrimary(meta.bootstrap, months);
           return;
         }
-        showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
-        var ul = document.getElementById("predictionNarratives");
-        if (ul) ul.innerHTML = '<li class="text-muted">Tahmin yüklenemedi</li>';
+        if (!meta.demoSource) {
+          showPredictionEmpty("Tahmin verisi alınamadı");
+        }
+      })
+      .catch(function () {
+        if (hasForecastPayload(meta.bootstrap)) {
+          applyPrimary(meta.bootstrap, months);
+          return;
+        }
+        if (!meta.demoSource) {
+          showPredictionEmpty("Henüz yeterli tahmin verisi oluşmadı");
+          var ul = document.getElementById("predictionNarratives");
+          if (ul) ul.innerHTML = '<li class="text-muted">Tahmin yüklenemedi</li>';
+        }
       });
   }
 

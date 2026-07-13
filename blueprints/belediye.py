@@ -57,7 +57,15 @@ def _geo_context(**extra):
 @municipality_required
 def dashboard():
     filters = _filters_from_request()
+    from services.demo_manager import is_demo_mode, use_demo_dashboard
+
+    demo_active = bool(is_demo_mode() or use_demo_dashboard())
     ops = municipality_ops_center(**filters)
+    # Demo açıkken live boş paket asla dönmemeli (veri akışı güvenlik ağı)
+    if demo_active and ops.get("source") != "demo":
+        from services import demo_provider
+
+        ops = demo_provider.ops_center(**filters)
     ozet = ops["ozet"]
     with_ai = generate_municipality_insights(**filters)
     return render_template(
@@ -65,6 +73,7 @@ def dashboard():
         title="Belediye Operasyon Merkezi",
         ozet=ozet,
         ops=ops,
+        demo_active=demo_active,
         insights=with_ai.get("insights") or [],
         **_geo_context(),
     )

@@ -12,7 +12,7 @@
   var UI = window.AtikPortUI || null;
   var DEMO = (UI && UI.DEMO) || {};
   var charts = cfg.charts || {};
-  var demoSource = !!cfg.demoSource;
+  var demoSource = !!(cfg.demoSource || cfg.demoActive);
   var hasServerCharts = !!(
     charts &&
     (charts.category ||
@@ -22,6 +22,31 @@
       charts.teslim_history ||
       charts.delivery_history)
   );
+
+  function normalizeSeries(raw) {
+    if (!raw) return null;
+    if (Array.isArray(raw.labels) && Array.isArray(raw.values)) {
+      return { labels: raw.labels, values: raw.values };
+    }
+    // MASTER waste_categories düz map: { Plastik: 29, ... }
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      var labels = Object.keys(raw).filter(function (k) {
+        return (
+          k !== "labels" &&
+          k !== "values" &&
+          typeof raw[k] !== "object"
+        );
+      });
+      if (!labels.length) return null;
+      return {
+        labels: labels,
+        values: labels.map(function (k) {
+          return Number(raw[k]) || 0;
+        }),
+      };
+    }
+    return null;
+  }
 
   var updated = document.getElementById("opsLastUpdated");
   if (updated) {
@@ -216,11 +241,10 @@
   }
 
   function pickCategory() {
-    var cat = charts.category || charts.waste_categories;
+    var cat = normalizeSeries(charts.category || charts.waste_categories);
     if (cat && seriesOk(cat.labels, cat.values)) {
       return { labels: cat.labels, values: cat.values, fromServer: true };
     }
-    // Sunucu yoksa aktiviteler; DEMO yalnızca en son çare ve demoSource değilken
     var counts = {};
     (cfg.activities || []).forEach(function (a) {
       var k = (a && a.kategori) || "Diğer";
@@ -233,7 +257,8 @@
     if (seriesOk(labels, values)) {
       return { labels: labels, values: values, fromServer: false };
     }
-    if (!demoSource && DEMO.category) {
+    // Sunucu veri yoksa: AtikPortUI.DEMO yalnızca Demo Mode açıkken (empty yasak)
+    if (demoSource && DEMO.category) {
       return {
         labels: DEMO.category.labels || [],
         values: DEMO.category.values || [],
@@ -245,11 +270,11 @@
   }
 
   function pickTrend() {
-    var tr = charts.monthly_trend || charts.trend;
+    var tr = normalizeSeries(charts.monthly_trend || charts.trend);
     if (tr && seriesOk(tr.labels, tr.values)) {
       return { labels: tr.labels, values: tr.values, fromServer: true };
     }
-    if (!demoSource && DEMO.trend) {
+    if (demoSource && DEMO.trend) {
       return {
         labels: DEMO.trend.labels || [],
         values: DEMO.trend.values || [],
@@ -261,7 +286,7 @@
   }
 
   function pickDelivery() {
-    var hist = charts.delivery_history || charts.teslim_history;
+    var hist = normalizeSeries(charts.delivery_history || charts.teslim_history);
     if (hist && seriesOk(hist.labels, hist.values)) {
       return { type: "line", labels: hist.labels, values: hist.values, fromServer: true };
     }
@@ -274,7 +299,7 @@
         fromServer: true,
       };
     }
-    if (!demoSource && DEMO.delivery) {
+    if (demoSource && DEMO.delivery) {
       return {
         type: "doughnut",
         labels: ["Teslim", "Aktif", "Bekleyen"],
@@ -286,8 +311,31 @@
     return { type: "line", labels: [], values: [], fromServer: false };
   }
 
+  function markChartEmpty(canvas, hasData) {
+    if (!canvas || !UI || !UI.wrapChartOrEmpty) return;
+    if (demoSource || hasServerCharts) {
+      UI.wrapChartOrEmpty(canvas, true, {});
+      return;
+    }
+    UI.wrapChartOrEmpty(canvas, hasData, {
+      icon: "bi-clipboard-data",
+      title: "Bu metrik için yeterli veri oluşmamıştır.",
+      desc: "Veri oluşunca grafik burada görünür.",
+      compact: true,
+    });
+  }
+
   function renderCharts() {
-    if (typeof Chart === "undefined") return;
+    if (typeof Chart === "undefined") {
+      if (!demoSource) {
+        ["opsCategoryChart", "opsTrendChart", "opsDeliveryChart"].forEach(
+          function (id) {
+            markChartEmpty(document.getElementById(id), false);
+          }
+        );
+      }
+      return;
+    }
     if (UI && UI.applyChartTheme) UI.applyChartTheme();
     var accent = "#0f766e";
     var palette = [
@@ -302,68 +350,43 @@
 
     var cat = pickCategory();
     var catCanvas = document.getElementById("opsCategoryChart");
-    if (catCanvas && cat.labels.length) {
-      if (UI) UI.markDemo(catCanvas, !!(demoSource || cat.clientDemo));
-      new Chart(catCanvas, {
-        type: "doughnut",
-        data: {
-          labels: cat.labels,
-          datasets: [
-            { data: cat.values, backgroundColor: palette, borderWidth: 0 },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: {
-            legend: { position: "bottom", labels: { boxWidth: 12 } },
+    if (catCanvas) {
+      markChartEmpty(catCanvas, !!cat.labels.length);
+      if (cat.labels.length) {
+        if (UI) UI.markDemo(catCanvas, !!(demoSource || cat.clientDemo));
+        new Chart(catCanvas, {
+          type: "doughnut",
+          data: {
+            labels: cat.labels,
+            datasets: [
+              { data: cat.values, backgroundColor: palette, borderWidth: 0 },
+            ],
           },
-        },
-      });
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: { position: "bottom", labels: { boxWidth: 12 } },
+            },
+          },
+        });
+      }
     }
 
     var trend = pickTrend();
     var trendCanvas = document.getElementById("opsTrendChart");
-    if (trendCanvas && trend.labels.length) {
-      if (UI) UI.markDemo(trendCanvas, !!(demoSource || trend.clientDemo));
-      new Chart(trendCanvas, {
-        type: "line",
-        data: {
-          labels: trend.labels,
-          datasets: [
-            {
-              label: "Operasyon hacmi",
-              data: trend.values,
-              borderColor: accent,
-              backgroundColor: "rgba(15, 118, 110, 0.12)",
-              fill: true,
-              tension: 0.35,
-              pointRadius: 3,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-        },
-      });
-    }
-
-    var delivery = pickDelivery();
-    var deliveryCanvas = document.getElementById("opsDeliveryChart");
-    var caption = document.getElementById("opsDeliveryCaption");
-    if (deliveryCanvas && delivery.labels.length) {
-      if (UI) UI.markDemo(deliveryCanvas, !!(demoSource || delivery.clientDemo));
-      if (delivery.type === "line") {
-        new Chart(deliveryCanvas, {
+    if (trendCanvas) {
+      markChartEmpty(trendCanvas, !!trend.labels.length);
+      if (trend.labels.length) {
+        if (UI) UI.markDemo(trendCanvas, !!(demoSource || trend.clientDemo));
+        new Chart(trendCanvas, {
           type: "line",
           data: {
-            labels: delivery.labels,
+            labels: trend.labels,
             datasets: [
               {
-                label: "Teslim oranı %",
-                data: delivery.values,
+                label: "Operasyon hacmi",
+                data: trend.values,
                 borderColor: accent,
                 backgroundColor: "rgba(15, 118, 110, 0.12)",
                 fill: true,
@@ -375,44 +398,78 @@
           options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: {
-              y: { beginAtZero: true, max: 100, ticks: { precision: 0 } },
-            },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
           },
         });
-        if (caption) {
-          var last = delivery.values[delivery.values.length - 1];
-          caption.textContent = "Son dönem teslim oranı: %" + last;
-        }
-      } else {
-        new Chart(deliveryCanvas, {
-          type: "doughnut",
-          data: {
-            labels: delivery.labels,
-            datasets: [
-              {
-                data: delivery.values,
-                backgroundColor: [accent, "#3b82f6", "#f59e0b"],
-                borderWidth: 0,
+      }
+    }
+
+    var delivery = pickDelivery();
+    var deliveryCanvas = document.getElementById("opsDeliveryChart");
+    var caption = document.getElementById("opsDeliveryCaption");
+    if (deliveryCanvas) {
+      markChartEmpty(deliveryCanvas, !!delivery.labels.length);
+      if (delivery.labels.length) {
+        if (UI) UI.markDemo(deliveryCanvas, !!(demoSource || delivery.clientDemo));
+        if (delivery.type === "line") {
+          new Chart(deliveryCanvas, {
+            type: "line",
+            data: {
+              labels: delivery.labels,
+              datasets: [
+                {
+                  label: "Teslim oranı %",
+                  data: delivery.values,
+                  borderColor: accent,
+                  backgroundColor: "rgba(15, 118, 110, 0.12)",
+                  fill: true,
+                  tension: 0.35,
+                  pointRadius: 3,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: true, max: 100, ticks: { precision: 0 } },
               },
-            ],
-          },
-          options: {
-            responsive: true,
-            cutout: "68%",
-            plugins: {
-              legend: { position: "bottom", labels: { boxWidth: 12 } },
             },
-          },
-        });
-        if (caption) {
-          var sum = delivery.values.reduce(function (a, b) {
-            return a + Number(b || 0);
-          }, 0);
-          var pct = sum
-            ? Math.round((Number(delivery.values[0] || 0) / sum) * 100)
-            : 0;
-          caption.textContent = "Teslim payı ≈ %" + pct;
+          });
+          if (caption) {
+            var last = delivery.values[delivery.values.length - 1];
+            caption.textContent = "Son dönem teslim oranı: %" + last;
+          }
+        } else {
+          new Chart(deliveryCanvas, {
+            type: "doughnut",
+            data: {
+              labels: delivery.labels,
+              datasets: [
+                {
+                  data: delivery.values,
+                  backgroundColor: [accent, "#3b82f6", "#f59e0b"],
+                  borderWidth: 0,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              cutout: "68%",
+              plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 12 } },
+              },
+            },
+          });
+          if (caption) {
+            var sum = delivery.values.reduce(function (a, b) {
+              return a + Number(b || 0);
+            }, 0);
+            var pct = sum
+              ? Math.round((Number(delivery.values[0] || 0) / sum) * 100)
+              : 0;
+            caption.textContent = "Teslim payı ≈ %" + pct;
+          }
         }
       }
     }

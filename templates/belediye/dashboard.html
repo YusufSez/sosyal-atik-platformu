@@ -166,7 +166,7 @@
             </div>
             <div class="ops-panel-body p-0 position-relative">
               <div id="opsHeatMap" class="ops-map"></div>
-              {% if ops.get('source') == 'demo' %}
+              {% if (demo_active if demo_active is defined else false) or ops.get('source') == 'demo' %}
               <div id="opsHeatMapEmpty" class="d-none" hidden></div>
               {% else %}
               <div id="opsHeatMapEmpty" class="d-none p-3">{{ ap_empty(icon='bi-map', title='Bu metrik için yeterli veri oluşmamıştır.', desc='Seçili ilçe / mahalle için ısı noktası henüz oluşmadı.', compact=true) }}</div>
@@ -352,7 +352,7 @@
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=true) }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chart.js/4.4.1/chart.umd.min.js') }}"></script>
 <script type="application/json" id="ops-center-config">{{ {
   'heatmapUrl': url_for('belediye.api_heatmap'),
   'query': {
@@ -378,7 +378,8 @@
   'charts': ops.get('charts') or {},
   'heatmap': ops.get('heatmap') or ops.get('heat_points') or [],
   'heat_points': ops.get('heat_points') or ops.get('heatmap') or [],
-  'demoSource': ops.get('source') == 'demo'
+  'demoSource': (demo_active if demo_active is defined else false) or (ops.get('source') == 'demo'),
+  'demoActive': (demo_active if demo_active is defined else false) or (ops.get('source') == 'demo')
 }|tojson }}</script>
 <script type="application/json" id="prediction-panel-config">{{ {
   'apiUrl': url_for('belediye.api_predictions'),
@@ -387,7 +388,7 @@
     'ilce': secili_ilce or '',
     'mahalle': secili_mahalle or ''
   },
-  'demoSource': ops.get('source') == 'demo',
+  'demoSource': (demo_active if demo_active is defined else false) or (ops.get('source') == 'demo'),
   'bootstrap': ops.get('prediction')
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='js/belediye-ops-center.js') }}"></script>

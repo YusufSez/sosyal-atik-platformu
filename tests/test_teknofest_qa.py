@@ -170,6 +170,23 @@ def test_ops_and_ministry_http_demo(client, app):
     assert b"waste_categories" in dash.data or b"monthly_trend" in dash.data
     assert b"prediction-panel-config" in dash.data
     assert b"bootstrap" in dash.data
+    assert b"vendor/chart.js" in dash.data
+    # MASTER serileri HTML bootstrap'ta dolu olmalı
+    import json
+    import re
+
+    html = dash.data.decode("utf-8")
+    cfg = json.loads(re.search(r'id="ops-center-config">(.*?)</script>', html, re.S).group(1))
+    assert cfg["demoSource"] is True
+    assert len(cfg.get("heatmap") or cfg.get("heat_points") or []) >= 5
+    charts = cfg.get("charts") or {}
+    assert (charts.get("category") or charts.get("waste_categories") or {}).get("labels")
+    assert (charts.get("monthly_trend") or charts.get("trend") or {}).get("values")
+    assert (charts.get("delivery_history") or charts.get("teslim_history") or {}).get("values")
+    pcfg = json.loads(
+        re.search(r'id="prediction-panel-config">(.*?)</script>', html, re.S).group(1)
+    )
+    assert (pcfg.get("bootstrap") or {}).get("primary", {}).get("forecasts")
     heat = client.get("/belediye/api/heatmap?il=Sakarya&ilce=Serdivan")
     assert heat.status_code == 200
     assert len(heat.get_json()) >= 5
