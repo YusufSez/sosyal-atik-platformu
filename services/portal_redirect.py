@@ -39,6 +39,19 @@ def post_login_endpoint(user) -> str:
 
 
 def post_login_url(user) -> str:
-    from flask import url_for
+    """Giriş sonrası göreli URL — request context dışında da güvenli."""
+    from flask import current_app, has_request_context, url_for
 
-    return url_for(post_login_endpoint(user))
+    endpoint = post_login_endpoint(user)
+
+    if has_request_context():
+        return url_for(endpoint)
+
+    server_name = current_app.config.get("SERVER_NAME")
+    if server_name:
+        scheme = current_app.config.get("PREFERRED_URL_SCHEME") or "http"
+        with current_app.test_request_context(base_url=f"{scheme}://{server_name}/"):
+            return url_for(endpoint)
+
+    with current_app.test_request_context(base_url="http://localhost"):
+        return url_for(endpoint)
