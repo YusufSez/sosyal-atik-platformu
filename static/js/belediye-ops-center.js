@@ -79,14 +79,57 @@
     var emptyEl = document.getElementById("opsHeatMapEmpty");
     if (!mapEl || typeof L === "undefined") return;
 
+    var center = cfg.mapCenter || { lat: 40.77, lng: 30.4, zoom: 11 };
+
+    function paint(pts) {
+      if (UI && UI.applyChartTheme) UI.applyChartTheme();
+      var map = L.map(mapEl).setView(
+        [center.lat || 40.77, center.lng || 30.4],
+        center.zoom || 11
+      );
+      L.tileLayer(
+        (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
+            "© OpenStreetMap",
+        }
+      ).addTo(map);
+
+      pts = Array.isArray(pts) ? pts : [];
+      if (!pts.length) {
+        mapEl.classList.add("d-none");
+        if (emptyEl) emptyEl.classList.remove("d-none");
+        return;
+      }
+      if (emptyEl) emptyEl.classList.add("d-none");
+      mapEl.classList.remove("d-none");
+      var ok = addHeatLayer(map, pts);
+      if (!ok && emptyEl) {
+        mapEl.classList.add("d-none");
+        emptyEl.classList.remove("d-none");
+        emptyEl.textContent =
+          "Isı katmanı yüklenemedi. Sayfayı yenileyin veya leaflet-heat eklentisini kontrol edin.";
+      }
+      if (fromMaster && UI && UI.markDemo) UI.markDemo(mapEl, true);
+      setTimeout(function () {
+        map.invalidateSize();
+      }, 120);
+    }
+
+    var embedded = cfg.heatmap || [];
+    if (Array.isArray(embedded) && embedded.length) {
+      paint(embedded);
+      return;
+    }
+
     var params = new URLSearchParams();
     var q = cfg.query || {};
     if (q.il) params.set("il", q.il);
     if (q.ilce) params.set("ilce", q.ilce);
     if (q.mahalle) params.set("mahalle", q.mahalle);
     params.set("yogunluk", "atik");
-
-    var center = cfg.mapCenter || { lat: 40.77, lng: 30.4, zoom: 11 };
 
     fetch((cfg.heatmapUrl || "/belediye/api/heatmap") + "?" + params.toString(), {
       credentials: "same-origin",
@@ -95,41 +138,7 @@
         return r.json();
       })
       .then(function (noktalar) {
-        if (UI && UI.applyChartTheme) UI.applyChartTheme();
-        var map = L.map(mapEl).setView(
-          [center.lat || 40.77, center.lng || 30.4],
-          center.zoom || 11
-        );
-        L.tileLayer(
-          (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          {
-            attribution:
-              (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
-              "© OpenStreetMap",
-          }
-        ).addTo(map);
-
-        var pts = Array.isArray(noktalar) ? noktalar : [];
-        // İstemci tarafında sahte heat üretme — yalnızca sunucu (MASTER/gerçek) verisi
-        if (!pts.length) {
-          mapEl.classList.add("d-none");
-          if (emptyEl) emptyEl.classList.remove("d-none");
-          return;
-        }
-        if (emptyEl) emptyEl.classList.add("d-none");
-        mapEl.classList.remove("d-none");
-        var ok = addHeatLayer(map, pts);
-        if (!ok && emptyEl) {
-          mapEl.classList.add("d-none");
-          emptyEl.classList.remove("d-none");
-          emptyEl.textContent =
-            "Isı katmanı yüklenemedi. Sayfayı yenileyin veya leaflet-heat eklentisini kontrol edin.";
-        }
-        if (fromMaster && UI && UI.markDemo) UI.markDemo(mapEl, true);
-        setTimeout(function () {
-          map.invalidateSize();
-        }, 120);
+        paint(noktalar);
       })
       .catch(function () {
         mapEl.classList.add("d-none");
@@ -283,6 +292,48 @@
     var deliveryCanvas = document.getElementById("opsDeliveryChart");
     var caption = document.getElementById("opsDeliveryCaption");
     if (deliveryCanvas) {
+      var teslimHist =
+        masterCharts && masterCharts.teslim_history
+          ? masterCharts.teslim_history
+          : null;
+      if (
+        teslimHist &&
+        (teslimHist.labels || []).length &&
+        (teslimHist.values || []).length
+      ) {
+        if (UI) UI.markDemo(deliveryCanvas, !!fromMaster);
+        new Chart(deliveryCanvas, {
+          type: "line",
+          data: {
+            labels: teslimHist.labels,
+            datasets: [
+              {
+                label: "Teslim oranı %",
+                data: teslimHist.values,
+                borderColor: accent,
+                backgroundColor: "rgba(15, 118, 110, 0.12)",
+                fill: true,
+                tension: 0.35,
+                pointRadius: 3,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, max: 100, ticks: { precision: 0 } },
+            },
+          },
+        });
+        if (caption) {
+          var last =
+            teslimHist.values[teslimHist.values.length - 1] != null
+              ? teslimHist.values[teslimHist.values.length - 1]
+              : "—";
+          caption.textContent = "Son dönem teslim oranı: %" + last;
+        }
+      } else {
       var teslim = Number(m.teslim || 0);
       var aktif = Number(m.aktif || 0);
       var bekleyen = Number(m.bekleyen || 0);
@@ -298,40 +349,34 @@
           : [teslim, aktif, bekleyen];
       }
       if (UI) UI.markDemo(deliveryCanvas, demo);
-      var denom = data[0] + data[1];
-      var rate = denom > 0 ? Math.round((1000 * data[0]) / denom) / 10 : 0;
-      if (caption) {
-        caption.textContent = demo
-          ? "MASTER_DATASET teslim görünümü · Demo Modu"
-          : "Teslim oranı %" +
-            rate +
-            " · " +
-            data[0] +
-            " teslim / " +
-            (data[1] + data[0]) +
-            " toplam · bekleyen " +
-            data[2];
-      }
       new Chart(deliveryCanvas, {
         type: "doughnut",
         data: {
-          labels: ["Teslim", "Aktif", "Bekleyen"],
+          labels:
+            (masterCharts &&
+              masterCharts.delivery &&
+              masterCharts.delivery.labels) || ["Teslim", "Aktif", "Bekleyen"],
           datasets: [
             {
               data: data,
-              backgroundColor: ["#10b981", "#3b82f6", "#f59e0b"],
+              backgroundColor: [accent, "#3b82f6", "#f59e0b"],
               borderWidth: 0,
             },
           ],
         },
         options: {
           responsive: true,
-          cutout: "68%",
-          plugins: {
-            legend: { position: "bottom", labels: { boxWidth: 12 } },
-          },
+          plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
         },
       });
+      if (caption) {
+        var sum = data.reduce(function (a, b) {
+          return a + Number(b || 0);
+        }, 0);
+        var pct = sum ? Math.round((Number(data[0] || 0) / sum) * 100) : 0;
+        caption.textContent = "Teslim payı ≈ %" + pct;
+      }
+      }
     }
   }
 

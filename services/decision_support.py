@@ -413,16 +413,18 @@ def build_decision_support_center(*, now=None) -> dict:
     """Ulusal Karar Destek Merkezi dashboard paketi."""
     from services.demo_manager import is_demo_mode, should_use_demo
     from services import demo_provider
+    from services.ministry_analytics import _use_ministry_demo
 
     now = now or utc_now()
-    if is_demo_mode():
+    if is_demo_mode() or _use_ministry_demo():
+        return demo_provider.decision_support_center()
+
+    # Gerçek ilan sayısı — demo KPI'yi "yeterli veri" sanma
+    real_ilan = _count_listings(Kaynak) + _count_listings(Atik)
+    if should_use_demo("dashboard", real_data_sufficient=real_ilan > 0):
         return demo_provider.decision_support_center()
 
     kpi = ministry_kpi()
-    kpi_ok = bool((kpi or {}).get("toplam_ilan") or (kpi or {}).get("etki_adet"))
-    if should_use_demo("dashboard", real_data_sufficient=kpi_ok):
-        return demo_provider.decision_support_center()
-
     weekly = period_snapshot("weekly", now=now)
     monthly = period_snapshot("monthly", now=now)
     shifts = category_shifts(days=30, now=now)

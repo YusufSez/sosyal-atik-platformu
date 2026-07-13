@@ -357,7 +357,7 @@ def kategori_analizi(il=None, ilce=None, mahalle=None) -> dict:
     if _demo_dashboard_active(il, ilce, mahalle):
         from services import demo_provider
 
-        return demo_provider.kategori_analizi(il=il)
+        return demo_provider.kategori_analizi(il=il, ilce=ilce, mahalle=mahalle)
 
     geo = _geo_filters(il, ilce, mahalle)
     counts = {g: 0 for g in MUNICIPALITY_CATEGORY_GROUPS}

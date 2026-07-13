@@ -102,11 +102,16 @@
     });
     var demo = !labels.length;
     if (demo) {
-      // Sunucu boşsa boş bırak — istemci sahte il üretmesin
+      labels = ((UI && UI.DEMO && UI.DEMO.bars && UI.DEMO.bars.labels) || []).slice();
+      values = ((UI && UI.DEMO && UI.DEMO.bars && UI.DEMO.bars.values) || []).slice();
+      if (!labels.length) {
+        if (UI) UI.markDemo(canvas, true);
+        return;
+      }
       if (UI) UI.markDemo(canvas, true);
-      return;
+    } else if (config.demoSource && UI) {
+      UI.markDemo(canvas, true);
     }
-    if (config.demoSource && UI) UI.markDemo(canvas, true);
     new Chart(canvas, {
       type: "bar",
       data: {

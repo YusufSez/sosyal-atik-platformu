@@ -236,6 +236,36 @@ def _build_district_stats(seed: dict, districts: dict) -> list[dict]:
     return sorted(rows, key=lambda r: (-r["ilan_sayisi"], r["bolge"]))
 
 
+def _city_growth_pct(city: str, history: list[dict], trends: dict) -> float:
+    """6–12 aylık hacim + kategori trendlerinden şehir bazlı gelişim % (puandan bağımsız)."""
+    if len(history) >= 2:
+        first = float(history[0].get("atik_kg") or 1)
+        last = float(history[-1].get("atik_kg") or first)
+        vol = ((last - first) / max(first, 1.0)) * 100.0
+    else:
+        vol = 5.0
+    boost = 0.0
+    for t in (trends or {}).values():
+        if t == "artan":
+            boost += 4.5
+        elif t == "kampanya_yukselen":
+            boost += 9.0
+        elif t == "azalan":
+            boost -= 3.5
+    offset = (sum(ord(c) for c in city) % 17) - 8
+    return round(vol * 0.55 + boost + offset * 0.35, 1)
+
+
+def _risk_score(puan: float, teslim_orani: float, gelisim: float) -> float:
+    """Yüksek = daha riskli (düşük skor + zayıf teslim + negatif gelişim)."""
+    return round(
+        max(0.0, 100.0 - float(puan))
+        + max(0.0, 75.0 - float(teslim_orani)) * 0.35
+        + max(0.0, -float(gelisim)) * 0.8,
+        1,
+    )
+
+
 def _build_city_package(city: str) -> dict:
     seed = _CITY_SEEDS[city]
     districts = _DISTRICTS.get(city) or {}
@@ -320,9 +350,12 @@ def _build_city_package(city: str) -> dict:
 
     # 6 aylık sustainability history — monthly_history ile uyumlu
     hist6 = history[-6:]
+    gelisim = _city_growth_pct(city, history, seed["trends"])
     sus_series = []
+    start_p = round(puan - max(3.0, abs(gelisim) * 0.35), 1)
     for i, row in enumerate(hist6):
-        p = round(puan - 6 + i * 1.1, 1)
+        t = i / max(len(hist6) - 1, 1)
+        p = round(start_p + (puan - start_p) * t, 1)
         sus_series.append({
             "ay": row["ay"],
             "puan": p,
@@ -355,13 +388,11 @@ def _build_city_package(city: str) -> dict:
             "series": sus_series,
             "labels": [s["ay"] for s in sus_series],
             "puanlar": [s["puan"] for s in sus_series],
-            "change_pct": round(
-                ((sus_series[-1]["puan"] - sus_series[0]["puan"]) / max(sus_series[0]["puan"], 1))
-                * 100.0,
-                1,
-            ),
-            "trend": "yukselis",
+            "change_pct": gelisim,
+            "trend": "yukselis" if gelisim >= 0 else "dusus",
         },
+        "gelisim_yuzde": gelisim,
+        "risk_skoru": _risk_score(puan, seed["delivery_pct"], gelisim),
         "heatmap": _build_heatmap(
             city, count=48 if city in ("İstanbul", "Ankara", "İzmir") else 36
         ),
@@ -451,18 +482,116 @@ def national_leaderboard() -> list[dict]:
 # --- Panel API (mevcut şemalar) ---
 
 
+def _district_share(pkg: dict, ilce: str | None = None, mahalle: str | None = None) -> float:
+    """İlçe/mahalle seçilince MASTER toplamına göre ölçek (0.05–1)."""
+    if not ilce:
+        return 1.0
+    stats = pkg.get("district_stats") or []
+    total = sum(int(r.get("ilan_sayisi") or 0) for r in stats) or 1
+    key = str(ilce).strip()
+    row = next((r for r in stats if r.get("bolge") == key), None)
+    if row is None:
+        row = next(
+            (
+                r
+                for r in stats
+                if key.casefold() in str(r.get("bolge") or "").casefold()
+                or str(r.get("bolge") or "").casefold() in key.casefold()
+            ),
+            None,
+        )
+    if row is None:
+        share = 1.0 / max(len(stats), 1)
+    else:
+        share = float(row.get("ilan_sayisi") or 0) / total
+    if mahalle and key in (pkg.get("districts") or {}):
+        mahs = pkg["districts"][key]
+        if mahalle in mahs and mahs:
+            share = share / len(mahs)
+    return max(0.05, min(1.0, round(share, 4)))
+
+
+def _scale_number(value, share: float):
+    if share >= 0.999:
+        return value
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return max(0, int(round(value * share)))
+    if isinstance(value, float):
+        return round(value * share, 1)
+    return value
+
+
+def _scale_dashboard(data: dict, share: float) -> dict:
+    if share >= 0.999:
+        return data
+    skip = {"teslim_orani", "vatandas_katilim_orani", "ortalama_teslim_gun", "filtre"}
+    out = deepcopy(data)
+    for k, v in list(out.items()):
+        if k in skip:
+            continue
+        out[k] = _scale_number(v, share)
+    return out
+
+
 def dashboard_kpis(*, il=None, ilce=None, mahalle=None) -> dict:
     city = _norm_city(il)
-    data = deepcopy(get_city(city)["dashboard"])
+    pkg = get_city(city)
+    share = _district_share(pkg, ilce, mahalle)
+    data = _scale_dashboard(deepcopy(pkg["dashboard"]), share)
     data["filtre"] = {"il": il or city, "ilce": ilce, "mahalle": mahalle}
+    data["_district_share"] = share
     return data
 
 
 def heat_map_points(*, il=None, ilce=None, mahalle=None, yogunluk="atik") -> list:
-    pts = deepcopy(get_city(il)["heatmap"])
-    # yogunluk yalnızca intensity ölçeği (şema aynı)
+    pkg = get_city(il)
+    pts = deepcopy(pkg["heatmap"])
     scale = {"kaynak": 0.85, "teslim": 1.1}.get((yogunluk or "atik").lower(), 1.0)
-    return [[p[0], p[1], round(min(1.0, p[2] * scale), 3)] for p in pts]
+    pts = [[p[0], p[1], round(min(1.0, p[2] * scale), 3)] for p in pts]
+
+    if ilce:
+        key = str(ilce).strip().casefold()
+        hotspots = pkg.get("hotspots") or []
+        anchors = []
+        for h in hotspots:
+            if isinstance(h, (list, tuple)) and len(h) >= 3:
+                name = str(h[0] or "").casefold()
+                lat_h, lng_h = float(h[1]), float(h[2])
+            elif isinstance(h, dict):
+                name = str(h.get("name") or h.get("label") or "").casefold()
+                lat_h, lng_h = float(h["lat"]), float(h["lng"])
+            else:
+                continue
+            if key in name or name in key or any(
+                part and part in name for part in key.split()
+            ):
+                anchors.append((lat_h, lng_h))
+        # İlçe adıyla eşleşen hotspot yoksa district sırasına göre merkez kaydır
+        if not anchors and pkg.get("center"):
+            lat0, lng0 = pkg["center"]
+            districts = list((pkg.get("districts") or {}).keys())
+            idx = next(
+                (i for i, d in enumerate(districts) if d.casefold() == key),
+                0,
+            )
+            anchors = [(lat0 + (idx % 5 - 2) * 0.04, lng0 + (idx % 3 - 1) * 0.05)]
+
+        filtered = []
+        for p in pts:
+            for alat, alng in anchors:
+                if abs(p[0] - alat) <= 0.09 and abs(p[1] - alng) <= 0.11:
+                    filtered.append(p)
+                    break
+        if len(filtered) >= 5:
+            pts = filtered
+        else:
+            share = _district_share(pkg, ilce, mahalle)
+            n = max(8, int(len(pts) * share))
+            pts = pts[:n]
+
+    return pts
 
 
 def mahalle_rows(*, il=None, ilce=None, mahalle=None) -> list[dict]:
@@ -481,6 +610,8 @@ def mahalle_rows(*, il=None, ilce=None, mahalle=None) -> list[dict]:
                 "kaynak_adet": max(1, int(total * share * 0.4)),
                 "kullanici_yogunlugu": max(5, int(30 * share * 10)),
             })
+        if mahalle:
+            rows = [r for r in rows if r["bolge"] == mahalle] or rows
         return sorted(rows, key=lambda r: (-r["ilan_sayisi"], r["bolge"]))
     return deepcopy(pkg["district_stats"])
 
@@ -501,16 +632,17 @@ def geography_options(*, il=None, ilce=None) -> dict:
     }
 
 
-def kategori_analizi(*, il=None) -> dict:
+def kategori_analizi(*, il=None, ilce=None, mahalle=None) -> dict:
     """Belediye kategori grafik şeması — MASTER waste_categories."""
     from constants import MUNICIPALITY_CATEGORY_GROUPS
 
     pkg = get_city(il)
+    share = _district_share(pkg, ilce, mahalle)
     raw = pkg["waste_categories"]
     # MASTER "Bitkisel yağ" → UI grubu "Bitkisel Yağ"
     alias = {"Bitkisel yağ": "Bitkisel Yağ", "Elektronik": "Elektronik"}
     counts = {g: 0 for g in MUNICIPALITY_CATEGORY_GROUPS}
-    total_listings = pkg["dashboard"]["toplam_aktif_ilan"]
+    total_listings = int(round(pkg["dashboard"]["toplam_aktif_ilan"] * share))
     for name, pct in raw.items():
         key = alias.get(name, name)
         if key not in counts:
@@ -529,33 +661,76 @@ def kategori_analizi(*, il=None) -> dict:
 
 def ops_center(*, il=None, ilce=None, mahalle=None) -> dict:
     pkg = get_city(il)
+    share = _district_share(pkg, ilce, mahalle)
     ozet = dashboard_kpis(il=il, ilce=ilce, mahalle=mahalle)
-    charts = chart_demo_bundle(il=il)
-    # Trend serisini ops metrikleriyle hizala
+    cat = kategori_analizi(il=il, ilce=ilce, mahalle=mahalle)
+    hist = pkg["monthly_history"][-12:]
+    month_labels = [
+        _MONTH_LABELS_TR[int(str(row["ay"]).split("-")[1]) - 1] for row in hist
+    ]
     cards = deepcopy(pkg["ops_cards"])
-    charts["trend"] = {
-        "labels": ["Bugün", "Son 24s ilan", "Son 24s teslim", "Aktif", "Teslim", "Bekleyen"],
-        "values": [
-            cards["bugun_acilan"],
-            cards["son_24_saat"]["ilan"],
-            cards["son_24_saat"]["teslim"],
-            ozet["toplam_aktif_ilan"],
-            ozet["toplam_teslim"],
-            cards["bekleyen_teslimler"],
-        ],
+    if share < 0.999:
+        cards["bugun_acilan"] = _scale_number(cards["bugun_acilan"], share)
+        cards["bekleyen_teslimler"] = _scale_number(cards["bekleyen_teslimler"], share)
+        cards["son_24_saat"] = {
+            "ilan": _scale_number(cards["son_24_saat"]["ilan"], share),
+            "teslim": _scale_number(cards["son_24_saat"]["teslim"], share),
+        }
+        if cards.get("en_yogun_mahalle") and ilce:
+            cards["en_yogun_mahalle"] = {
+                **cards["en_yogun_mahalle"],
+                "bolge": ilce,
+                "ilan_sayisi": _scale_number(
+                    cards["en_yogun_mahalle"].get("ilan_sayisi") or 10, share
+                ),
+            }
+
+    charts = {
+        "category": {
+            "labels": cat["labels"],
+            "values": cat["values"],
+        },
+        "trend": {
+            "labels": month_labels,
+            "values": [round(float(row["atik_kg"]) * share, 1) for row in hist],
+        },
+        "teslim_history": {
+            "labels": month_labels,
+            "values": [float(row["teslim_orani"]) for row in hist],
+        },
+        "delivery": {
+            "labels": ["Teslim", "Aktif", "Bekleyen"],
+            "values": [
+                ozet["toplam_teslim"],
+                ozet["toplam_aktif_ilan"],
+                cards["bekleyen_teslimler"],
+            ],
+            "oran": ozet.get("teslim_orani"),
+        },
+        "radar": {
+            "labels": [c["label"] for c in pkg["sustainability"]["criteria"]],
+            "values": [c["score"] for c in pkg["sustainability"]["criteria"]],
+        },
+        "history": {
+            "labels": [
+                _MONTH_LABELS_TR[int(a.split("-")[1]) - 1]
+                for a in pkg["sustainability_history"]["labels"]
+            ],
+            "values": pkg["sustainability_history"]["puanlar"],
+        },
     }
-    charts["delivery"] = {
-        "labels": ["Teslim", "Aktif", "Bekleyen"],
-        "values": [
-            ozet["toplam_teslim"],
-            ozet["toplam_aktif_ilan"],
-            cards["bekleyen_teslimler"],
-        ],
-    }
+    acts = deepcopy(pkg["activities"][:12])
+    if ilce:
+        # İlçe adını meta'ya yansıt (liste boş kalmasın)
+        for a in acts:
+            meta = dict(a.get("meta") or {})
+            meta["ilce"] = ilce
+            a["meta"] = meta
+
     return {
         "ozet": ozet,
         "cards": cards,
-        "aktiviteler": deepcopy(pkg["activities"][:12]),
+        "aktiviteler": acts,
         "filtre": ozet["filtre"],
         "charts": charts,
         "map_center": deepcopy(pkg["map_center"]),
@@ -737,7 +912,13 @@ def prediction_payload(
     if lookback_months not in LOOKBACK_MONTHS:
         lookback_months = 12
     pkg = get_city(il)
+    share = _district_share(pkg, ilce, mahalle)
     history = deepcopy(pkg["monthly_history"][-lookback_months:])
+    if share < 0.999:
+        for row in history:
+            for key in ("atik_kg", "co2_kg", "kaynak_adet", "elektronik_index"):
+                if key in row and row[key] is not None:
+                    row[key] = _scale_number(row[key], share)
     trends = pkg["trends"]
     forecasts = {
         str(d): _forecast_from_history(history, d, trends) for d in FORECAST_HORIZONS_DAYS
@@ -871,6 +1052,11 @@ def sustainability_dashboard_overlay(*, il=None, ilce=None) -> dict:
         },
         "radar": radar,
         "category_scores": current["criteria"],
+        "sustainability_categories": {
+            "labels": radar["labels"],
+            "values": radar["values"],
+            "keys": radar["keys"],
+        },
         "history": deepcopy(pkg["sustainability_history"]),
         "similar_municipalities": similar,
         "rankings": {
@@ -1930,8 +2116,9 @@ def _municipality_board() -> list[dict]:
     for city in list_cities():
         pkg = MASTER_DATASET[city]
         puan = float(pkg["sustainability"]["puan"])
-        gelisim = float(pkg["sustainability_history"].get("change_pct") or 0)
+        gelisim = float(pkg.get("gelisim_yuzde") or pkg["sustainability_history"].get("change_pct") or 0)
         teslim = float(pkg["dashboard"]["teslim_orani"])
+        risk = float(pkg.get("risk_skoru") or _risk_score(puan, teslim, gelisim))
         renk = "yesil" if puan >= 70 else "sari" if puan >= 40 else "kirmizi"
         rows.append({
             "id": -2000 - len(rows),
@@ -1944,6 +2131,7 @@ def _municipality_board() -> list[dict]:
             "teslim_orani": teslim,
             "puan": puan,
             "gelisim_yuzde": gelisim,
+            "risk_skoru": risk,
             "renk": renk,
         })
     return rows
@@ -2002,13 +2190,10 @@ def ministry_national_center(
     if il:
         board = [r for r in board if r["il"] == _norm_city(il)]
 
-    en_basarili = board[:10]
-    gelisim = sorted(
-        [r for r in board if r["gelisim_yuzde"] > 0],
-        key=lambda r: -r["gelisim_yuzde"],
-    )[:10]
-    # Risk = en düşük sürdürülebilirlik skorları (jüri senaryosu)
-    riskli = sorted(board, key=lambda r: r["puan"])[:10]
+    # Üç liste farklı metriklerle — aynı sıralama olmamalı
+    en_basarili = sorted(board, key=lambda r: -r["puan"])[:10]
+    gelisim = sorted(board, key=lambda r: -r["gelisim_yuzde"])[:10]
+    riskli = sorted(board, key=lambda r: -r.get("risk_skoru", 0))[:10]
 
     return {
         "kpi": kpi,
@@ -2019,6 +2204,7 @@ def ministry_national_center(
         "gelisim_gosteren": gelisim,
         "riskli_belediyeler": riskli,
         "ai_ozeti": ministry_ai_summary(),
+        "charts": chart_demo_bundle(il=il or "İzmir"),
         "filtre": {
             "il": il,
             "ilce": ilce,
@@ -2050,15 +2236,23 @@ def chart_demo_bundle(*, il=None) -> dict:
     pkg = get_city(il)
     cats = pkg["waste_categories"]
     hist = pkg["sustainability_history"]
+    monthly = pkg["monthly_history"][-12:]
     board = national_leaderboard()
+    month_labels = [
+        _MONTH_LABELS_TR[int(str(row["ay"]).split("-")[1]) - 1] for row in monthly
+    ]
     return {
         "category": {
             "labels": list(cats.keys()),
             "values": list(cats.values()),
         },
         "trend": {
-            "labels": ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"],
-            "values": [12, 15, 14, 18, 17, 11, 16],
+            "labels": month_labels,
+            "values": [float(row["atik_kg"]) for row in monthly],
+        },
+        "teslim_history": {
+            "labels": month_labels,
+            "values": [float(row["teslim_orani"]) for row in monthly],
         },
         "delivery": {
             "labels": ["Teslim", "Aktif", "Bekleyen"],
@@ -2071,6 +2265,11 @@ def chart_demo_bundle(*, il=None) -> dict:
         "radar": {
             "labels": [c["label"] for c in pkg["sustainability"]["criteria"]],
             "values": [c["score"] for c in pkg["sustainability"]["criteria"]],
+        },
+        "sustainability_categories": {
+            "labels": [c["label"] for c in pkg["sustainability"]["criteria"]],
+            "values": [c["score"] for c in pkg["sustainability"]["criteria"]],
+            "keys": [c["key"] for c in pkg["sustainability"]["criteria"]],
         },
         "history": {
             "labels": [

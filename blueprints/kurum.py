@@ -5,6 +5,7 @@ from services.kurum_analytics import (
     ilce_kirilimi,
     isi_haritasi_noktalari,
     kategori_dagilimi,
+    kurum_eslesme_onerileri,
     kurum_ozet,
     mevcut_iller,
 )
@@ -42,6 +43,7 @@ def analiz_paneli():
         secili_il=il_filtre,
         secili_tur=tur,
         isi_noktalari=isi_haritasi_noktalari(il_filtre, tur),
+        eslesmeler=kurum_eslesme_onerileri(il_filtre),
         title="Kurum Analiz Paneli",
     )
 

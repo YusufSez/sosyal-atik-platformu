@@ -144,6 +144,42 @@ def ministry_kpi(il=None, ilce=None, belediye_id=None, kurum_id=None) -> dict:
 
 def ministry_drilldown_options(il=None, ilce=None, belediye_id=None) -> dict:
     """Basamaklı seçenekler: iller / ilçeler / belediyeler / kurumlar."""
+    if _use_ministry_demo():
+        from services import demo_provider
+        from services.demo_provider import MARKETPLACE_ORGS
+
+        geo = demo_provider.geography_options(il=il, ilce=ilce)
+        board = demo_provider._municipality_board()
+        city = (il or "").strip()
+        belediyeler = [
+            {
+                "id": r["id"],
+                "ad": r["ad"],
+                "il": r["il"],
+                "ilce": r.get("ilce"),
+            }
+            for r in board
+            if not city or r["il"] == demo_provider._norm_city(city)
+        ]
+        kurumlar = [
+            {
+                "id": -(3000 + i),
+                "ad": o["ad"],
+                "il": o["il"],
+                "ilce": o.get("ilce"),
+            }
+            for i, o in enumerate(MARKETPLACE_ORGS)
+            if not city or o["il"] == demo_provider._norm_city(city)
+        ]
+        if ilce:
+            kurumlar = [k for k in kurumlar if (k.get("ilce") or "") == ilce]
+        return {
+            "iller": geo["iller"],
+            "ilceler": geo["ilceler"],
+            "belediyeler": belediyeler,
+            "kurumlar": kurumlar,
+        }
+
     iller = [
         r[0]
         for r in db.session.query(User.il)

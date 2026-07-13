@@ -9,6 +9,15 @@ from models import Atik, CevreselEtki, Kaynak, User
 from utils import is_varsayilan_konum
 
 
+def _use_kurum_demo(il_filtre=None) -> bool:
+    from services.demo_manager import is_demo_mode, should_use_demo
+
+    if is_demo_mode():
+        return True
+    probe = Kaynak.query.count() + Atik.query.count()
+    return should_use_demo("dashboard", real_data_sufficient=probe > 0)
+
+
 def _aktif_kaynak_query(il_filtre=None):
     q = public_ilan_base_filter(Kaynak.query, Kaynak)
     if il_filtre:
@@ -24,6 +33,44 @@ def _aktif_atik_query(il_filtre=None):
 
 
 def kurum_ozet(il_filtre=None):
+    if _use_kurum_demo(il_filtre):
+        from services import demo_provider
+
+        if il_filtre:
+            pkg = demo_provider.get_city(il_filtre)
+            d = pkg["dashboard"]
+            return {
+                "kullanici": int(pkg["population"] * d["vatandas_katilim_orani"] / 100 / 40),
+                "aktif_kaynak": d["aktif_kaynak"],
+                "aktif_atik": d["aktif_atik"],
+                "teslim": d["toplam_teslim"],
+                "co2e_kg": float(d["co2e_kg"]),
+                "atik_kg": float(d["geri_kazanilan_atik_kg"]),
+                "teslim_etki": int(d["etki_adet"]),
+                "il_filtre": il_filtre,
+                "teslim_orani": d["teslim_orani"],
+                "katilim": d["vatandas_katilim_orani"],
+                "ai_ozeti": list(pkg["ai_summary"][:4]),
+                "charts": demo_provider.chart_demo_bundle(il=il_filtre),
+                "source": "demo",
+            }
+        kpi = demo_provider.ministry_kpi()
+        return {
+            "kullanici": kpi["vatandas_sayisi"],
+            "aktif_kaynak": int(kpi["toplam_ilan"] * 0.45),
+            "aktif_atik": int(kpi["toplam_ilan"] * 0.55),
+            "teslim": int(kpi["etki_adet"]),
+            "co2e_kg": float(kpi["co2_tasarrufu_kg"]),
+            "atik_kg": float(kpi["toplam_geri_kazanim_kg"]),
+            "teslim_etki": int(kpi["etki_adet"]),
+            "il_filtre": None,
+            "teslim_orani": round(kpi["vatandas_katilim_orani"], 1),
+            "katilim": kpi["vatandas_katilim_orani"],
+            "ai_ozeti": demo_provider.ministry_ai_summary()[:4],
+            "charts": demo_provider.chart_demo_bundle(il="Sakarya"),
+            "source": "demo",
+        }
+
     kaynak_q = _aktif_kaynak_query(il_filtre)
     atik_q = _aktif_atik_query(il_filtre)
     teslim_kaynak = Kaynak.query.filter_by(ilan_durumu="Teslim Edildi")
@@ -54,10 +101,18 @@ def kurum_ozet(il_filtre=None):
         "atik_kg": float(atik_kg or 0),
         "teslim_etki": int(teslim_etki or 0),
         "il_filtre": il_filtre,
+        "source": "live",
     }
 
 
 def ilce_kirilimi(il_filtre=None):
+    if _use_kurum_demo(il_filtre):
+        from services import demo_provider
+
+        city = il_filtre or "Sakarya"
+        rows = demo_provider.mahalle_rows(il=city)
+        return [{"ilce": r["bolge"], "adet": r["ilan_sayisi"]} for r in rows][:15]
+
     from collections import defaultdict
 
     counts = defaultdict(int)
@@ -78,6 +133,15 @@ def ilce_kirilimi(il_filtre=None):
 
 
 def kategori_dagilimi(il_filtre=None, tur="kaynak"):
+    if _use_kurum_demo(il_filtre):
+        from services import demo_provider
+
+        cat = demo_provider.kategori_analizi(il=il_filtre or "Sakarya")
+        rows = [{"kategori": r["kategori"], "adet": r["adet"]} for r in cat["rows"]]
+        if tur == "atik":
+            return [{"kategori": r["kategori"], "adet": max(1, int(r["adet"] * 0.55))} for r in rows]
+        return [{"kategori": r["kategori"], "adet": max(1, int(r["adet"] * 0.45))} for r in rows]
+
     if tur == "atik":
         q = db.session.query(Atik.kategori, func.count(Atik.id)).group_by(Atik.kategori)
         if il_filtre:
@@ -90,6 +154,11 @@ def kategori_dagilimi(il_filtre=None, tur="kaynak"):
 
 
 def mevcut_iller():
+    if _use_kurum_demo():
+        from services import demo_provider
+
+        return demo_provider.list_cities()
+
     rows = (
         db.session.query(User.il)
         .filter(User.il.isnot(None), User.il != "")
@@ -102,6 +171,14 @@ def mevcut_iller():
 
 def isi_haritasi_noktalari(il_filtre=None, tur=None):
     """Leaflet heat için [lat, lng, yogunluk] listesi."""
+    if _use_kurum_demo(il_filtre):
+        from services import demo_provider
+
+        if il_filtre:
+            return demo_provider.heat_map_points(il=il_filtre, yogunluk=tur or "atik")
+        mmap = demo_provider.ministry_map_data()
+        return mmap.get("heat") or []
+
     noktalar = []
 
     def _ekle(ilanlar, agirlik=1.0):
@@ -118,11 +195,20 @@ def isi_haritasi_noktalari(il_filtre=None, tur=None):
     etki_q = CevreselEtki.query
     if il_filtre:
         etki_q = etki_q.join(User).filter(User.il == il_filtre)
-    for etki in etki_q.all():
-        ilan = etki.kaynak or etki.atik
+    for etki in etki_q.limit(200).all():
+        ilan = etki.atik or etki.kaynak
         if not ilan or is_varsayilan_konum(ilan.latitude, ilan.longitude):
             continue
-        yogunluk = min(2.0, 0.5 + (etki.co2e_kg or 0) / 30)
-        noktalar.append([ilan.latitude, ilan.longitude, yogunluk])
+        yog = min(2.0, 0.5 + (etki.atik_kg or 0) / 20)
+        noktalar.append([ilan.latitude, ilan.longitude, yog])
 
     return noktalar
+
+
+def kurum_eslesme_onerileri(il_filtre=None, limit: int = 8) -> list[dict]:
+    """Kurumsal eşleştirme özeti — marketplace MASTER skorları."""
+    if not _use_kurum_demo(il_filtre):
+        return []
+    from services import demo_provider
+
+    return demo_provider.marketplace_matches(limit=limit, il=il_filtre)

@@ -1,104 +1,213 @@
 {% extends "layout.html" %}
 {% block content %}
+{% from "_ap_ui.html" import ap_empty %}
 
-<div class="content-section fade-in">
-    <div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-start gap-3">
-        <div>
-            <h3 class="fw-bold"><i class="bi bi-building me-2"></i>Kurum Analiz Paneli</h3>
-            <small class="text-muted">Belediye ve kurumlar için bölgesel istatistikler ve ısı haritası</small>
-        </div>
-        <form method="GET" class="d-flex gap-2 flex-wrap">
-            <select name="il" class="form-select form-select-sm">
-                <option value="">Tüm Türkiye</option>
-                {% for il in iller %}
-                <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
-                {% endfor %}
-            </select>
-            <select name="tur" class="form-select form-select-sm">
-                <option value="">Tümü</option>
-                <option value="kaynak" {% if secili_tur == 'kaynak' %}selected{% endif %}>Kaynak</option>
-                <option value="atik" {% if secili_tur == 'atik' %}selected{% endif %}>Atık</option>
-            </select>
-            <button class="btn btn-sm btn-success">Filtrele</button>
-        </form>
+<div class="content-section fade-in belediye-ops-center kurum-ops">
+  <div class="ops-hero mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="ops-kicker mb-1">AtıkPort · Kurum</p>
+        <h2 class="ops-title mb-2">Kurum Analiz Paneli</h2>
+        <p class="ops-lead mb-0">
+          MASTER bölgesel KPI · ısı haritası · kategori · trend · AI eşleştirme
+        </p>
+      </div>
+      <form method="GET" class="d-flex gap-2 flex-wrap">
+        <select name="il" class="form-select form-select-sm">
+          <option value="">Tüm Türkiye</option>
+          {% for il in iller %}
+          <option value="{{ il }}" {% if secili_il == il %}selected{% endif %}>{{ il }}</option>
+          {% endfor %}
+        </select>
+        <select name="tur" class="form-select form-select-sm">
+          <option value="">Tümü</option>
+          <option value="kaynak" {% if secili_tur == 'kaynak' %}selected{% endif %}>Kaynak</option>
+          <option value="atik" {% if secili_tur == 'atik' %}selected{% endif %}>Atık</option>
+        </select>
+        <button class="btn btn-sm btn-success">Filtrele</button>
+      </form>
     </div>
+  </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.kullanici }}</h5><small class="text-muted">Kullanıcı</small></div></div>
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.kullanici }}</div><div class="ops-kpi-label">Kullanıcı</div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.aktif_kaynak }}</div><div class="ops-kpi-label">Aktif kaynak</div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.aktif_atik }}</div><div class="ops-kpi-label">Aktif atık</div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.teslim }}</div><div class="ops-kpi-label">Teslim</div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.co2e_kg|format_etki("kg") }}</div><div class="ops-kpi-label">CO₂e</div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="ops-kpi"><div class="ops-kpi-value">{{ ozet.atik_kg|format_etki("kg") }}</div><div class="ops-kpi-label">Atık yönlendirme</div></div></div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head">
+          <span><i class="bi bi-thermometer-half me-2"></i>Paylaşım yoğunluk haritası</span>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.aktif_kaynak }}</h5><small class="text-muted">Aktif Kaynak</small></div></div>
+        <div class="ops-panel-body p-0">
+          <div id="kurumIsiHaritasi" class="ops-map ops-map-tall"></div>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.aktif_atik }}</h5><small class="text-muted">Aktif Atık</small></div></div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.teslim }}</h5><small class="text-muted">Teslim</small></div></div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.co2e_kg|format_etki("kg") }}</h5><small class="text-muted">CO₂e</small></div></div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="card stat-card shadow-sm"><div class="card-body py-3"><h5>{{ ozet.atik_kg|format_etki("kg") }}</h5><small class="text-muted">Atık Yönlendirme</small></div></div>
-        </div>
+      </div>
     </div>
-
-    <div class="card shadow-sm mb-4">
-        <div class="card-header fw-bold"><i class="bi bi-thermometer-half me-2"></i>Paylaşım Yoğunluk Haritası (Isı Haritası)</div>
-        <div class="card-body p-0">
-            <div id="kurumIsiHaritasi" class="map-container map-container-tall"></div>
+    <div class="col-lg-4">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span><i class="bi bi-stars me-2"></i>AI kurum analizi</span></div>
+        <div class="ops-panel-body">
+          {% if ozet.ai_ozeti %}
+            {% for tip in ozet.ai_ozeti %}
+            <article class="ops-ai-card mb-2">
+              <p class="ops-ai-card-text mb-0">{{ tip }}</p>
+            </article>
+            {% endfor %}
+          {% else %}
+            {{ ap_empty(icon='bi-robot', title='Bu metrik için yeterli veri oluşmamıştır.', desc='AI özeti veri birikince görünür.', compact=true) }}
+          {% endif %}
         </div>
-        <div class="card-footer small text-muted">
-            Koyu renkler daha yoğun paylaşım ve teslim bölgelerini gösterir.
-            {% if secili_il %}Filtre: <strong>{{ secili_il }}</strong>{% endif %}
-        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="row g-4">
-        <div class="col-lg-4">
-            <h5>İlçe Kırılımı</h5>
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead><tr><th>İlçe</th><th>İlan</th></tr></thead>
-                    <tbody>
-                    {% for row in ilceler %}
-                    <tr><td>{{ row.ilce }}</td><td>{{ row.adet }}</td></tr>
-                    {% else %}
-                    <tr><td colspan="2" class="text-muted">Veri yok</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+  <div class="row g-3 mb-4">
+    <div class="col-lg-4">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span>İlçe kırılımı</span></div>
+        <div class="ops-panel-body">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>İlçe</th><th class="text-end">İlan</th></tr></thead>
+              <tbody>
+              {% for row in ilceler %}
+              <tr>
+                <td>{{ row.ilce }}</td>
+                <td class="text-end">
+                  <div class="progress ds-progress d-inline-flex" style="width:70px;height:.45rem;vertical-align:middle">
+                    {% set max_adet = ilceler[0].adet if ilceler else 1 %}
+                    <div class="progress-bar bg-success" style="width:{{ (100 * row.adet / max_adet)|int }}%"></div>
+                  </div>
+                  <strong class="ms-1">{{ row.adet }}</strong>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="2" class="text-muted">Veri yok</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span>Kategori dağılımı</span></div>
+        <div class="ops-panel-body position-relative">
+          <canvas id="kurumCategoryChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="ops-panel h-100">
+        <div class="ops-panel-head"><span>Trend</span></div>
+        <div class="ops-panel-body position-relative">
+          <canvas id="kurumTrendChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ops-panel mb-4">
+    <div class="ops-panel-head"><span><i class="bi bi-diagram-3 me-2"></i>AI eşleştirme önerileri</span></div>
+    <div class="ops-panel-body">
+      <div class="row g-3">
+        {% for m in eslesmeler %}
+        <div class="col-md-6 col-xl-3">
+          <div class="ops-ai-card h-100">
+            <div class="fw-semibold">{{ m.ad }}</div>
+            <div class="small text-muted mb-2">{{ m.il }} / {{ m.ilce }} · {{ m.mesafe_km }} km</div>
+            <div class="mb-2"><span class="badge text-bg-success">Skor {{ m.eslesme_skoru }}</span></div>
+            <div class="small">
+              Kategori {{ m.skor_detay.kategori }} · Mesafe {{ m.skor_detay.mesafe }} ·
+              Puan {{ m.skor_detay.puan }} · Aktivite {{ m.skor_detay.aktivite }}
             </div>
+          </div>
         </div>
-        <div class="col-lg-4">
-            <h5>Kaynak Kategorileri</h5>
-            <ul class="list-group list-group-flush">
-                {% for row in kaynak_kategoriler %}
-                <li class="list-group-item d-flex justify-content-between"><span>{{ row.kategori }}</span><span class="badge bg-primary">{{ row.adet }}</span></li>
-                {% else %}
-                <li class="list-group-item text-muted">Veri yok</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="col-lg-4">
-            <h5>Atık Kategorileri</h5>
-            <ul class="list-group list-group-flush">
-                {% for row in atik_kategoriler %}
-                <li class="list-group-item d-flex justify-content-between"><span>{{ row.kategori }}</span><span class="badge bg-success">{{ row.adet }}</span></li>
-                {% else %}
-                <li class="list-group-item text-muted">Veri yok</li>
-                {% endfor %}
-            </ul>
-        </div>
+        {% else %}
+        <div class="col-12">{{ ap_empty(icon='bi-link-45deg', title='Eşleşme yok', desc='Demo veya gerçek eşleşmeler burada listelenir.', compact=true) }}</div>
+        {% endfor %}
+      </div>
     </div>
+  </div>
 </div>
 
 {% from '_leaflet_assets.html' import leaflet_assets %}
 {{ leaflet_assets(heat=true) }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
 <script type="application/json" id="kurum-analiz-config">{{ {
-    'isi_noktalari': isi_noktalari
-} | tojson }}</script>
+  'isi_noktalari': isi_noktalari,
+  'charts': ozet.get('charts') or {},
+  'demoSource': ozet.get('source') == 'demo',
+  'kategoriler': kaynak_kategoriler if secili_tur != 'atik' else atik_kategoriler
+}|tojson }}</script>
 <script src="{{ url_for('static', filename='js/kurum-analiz-map.js') }}"></script>
-
+<script>
+(function () {
+  var el = document.getElementById("kurum-analiz-config");
+  if (!el || typeof Chart === "undefined") return;
+  var cfg = {};
+  try { cfg = JSON.parse(el.textContent); } catch (e) { return; }
+  var UI = window.AtikPortUI || null;
+  if (UI && UI.applyChartTheme) UI.applyChartTheme();
+  var accent = "#0f766e";
+  var cats = cfg.kategoriler || [];
+  var catCanvas = document.getElementById("kurumCategoryChart");
+  if (catCanvas) {
+    var labels = cats.map(function (r) { return r.kategori; });
+    var values = cats.map(function (r) { return r.adet; });
+    if (!labels.length && cfg.charts && cfg.charts.category) {
+      labels = cfg.charts.category.labels || [];
+      values = cfg.charts.category.values || [];
+    }
+    if (labels.length) {
+      if (cfg.demoSource && UI) UI.markDemo(catCanvas, true);
+      new Chart(catCanvas, {
+        type: "doughnut",
+        data: { labels: labels, datasets: [{ data: values, backgroundColor: ["#0f766e","#14b8a6","#3b82f6","#8b5cf6","#f59e0b","#ef4444","#64748b"], borderWidth: 0 }] },
+        options: { plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } } }
+      });
+    }
+  }
+  var trendCanvas = document.getElementById("kurumTrendChart");
+  if (trendCanvas && cfg.charts && cfg.charts.trend) {
+    if (cfg.demoSource && UI) UI.markDemo(trendCanvas, true);
+    new Chart(trendCanvas, {
+      type: "line",
+      data: {
+        labels: cfg.charts.trend.labels || [],
+        datasets: [{ label: "Hacim", data: cfg.charts.trend.values || [], borderColor: accent, fill: true, backgroundColor: "rgba(15,118,110,.12)", tension: 0.35 }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+})();
+</script>
+<style>
+.kurum-ops .ops-hero {
+  background: linear-gradient(135deg, #0b3f39 0%, #0f766e 55%, #115e59 100%);
+  color: #f0fdfa; border-radius: 1.4rem; padding: 1.4rem 1.6rem;
+}
+.kurum-ops .ops-kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .85; font-weight: 700; }
+.kurum-ops .ops-title { font-weight: 800; }
+.kurum-ops .ops-kpi {
+  border: 1px solid rgba(15,61,54,.12); border-radius: 1rem; padding: 1rem; background: var(--bs-body-bg); height: 100%;
+}
+.kurum-ops .ops-kpi-value { font-size: 1.35rem; font-weight: 800; color: #0f3d36; }
+.kurum-ops .ops-kpi-label { font-size: .8rem; color: var(--bs-secondary-color); }
+.kurum-ops .ops-panel { border: 1px solid rgba(15,61,54,.12); border-radius: 1rem; background: var(--bs-body-bg); }
+.kurum-ops .ops-panel-head { display:flex; justify-content:space-between; padding:.85rem 1.1rem; border-bottom:1px solid rgba(15,61,54,.12); font-weight:700; }
+.kurum-ops .ops-panel-body { padding: 1rem 1.1rem; }
+.kurum-ops .ops-map-tall { min-height: 360px; }
+.kurum-ops .ops-ai-card { border: 1px solid rgba(15,118,110,.2); border-radius: .85rem; padding: .85rem; background: #e7f5f2; }
+.kurum-ops .ds-progress { background: rgba(15,61,54,.08); border-radius: 999px; overflow: hidden; }
+.kurum-ops .ds-progress .progress-bar { border-radius: 999px; }
+</style>
 {% endblock %}

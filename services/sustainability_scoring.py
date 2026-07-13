@@ -634,13 +634,24 @@ def sustainability_dashboard(
         "similar_municipalities": similar,
         "rankings": ranks,
     }
-    from services.demo_manager import is_sustainability_data_sufficient, should_use_demo
+    from services.demo_manager import is_demo_mode, should_use_demo
     from services import demo_provider
 
-    if should_use_demo(
-        "sustainability",
-        real_data_sufficient=is_sustainability_data_sufficient(current),
-    ):
+    # Demo Mode açıkken her zaman MASTER overlay (radar/history dolu)
+    if is_demo_mode():
+        return demo_provider.sustainability_dashboard_overlay(
+            il=current.get("il") or il, ilce=current.get("ilce") or ilce
+        )
+
+    real_ok = False
+    try:
+        from models import Atik, Kaynak
+
+        real_ok = (Kaynak.query.count() + Atik.query.count()) > 0
+    except Exception:
+        real_ok = False
+
+    if should_use_demo("sustainability", real_data_sufficient=real_ok):
         return demo_provider.sustainability_dashboard_overlay(
             il=current.get("il") or il, ilce=current.get("ilce") or ilce
         )

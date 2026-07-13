@@ -388,6 +388,7 @@
   'activities': ops.aktiviteler,
   'kritik': (c.kritik_kategori.kategori if c.kritik_kategori else None),
   'charts': ops.get('charts'),
+  'heatmap': ops.get('heatmap') or [],
   'demoSource': ops.get('source') == 'demo'
 }|tojson }}</script>
 <script type="application/json" id="prediction-panel-config">{{ {
