@@ -49,6 +49,17 @@ MP_KATEGORILER = (
 
 MP_NEARBY_RADIUS_KM = 50
 
+# Marketplace işlem geçmişi action'ları (MarketplaceEvent.action — şema değişmez)
+MP_EVENT_YAYINLA = "yayinla"
+MP_EVENT_TEKLIF = "teklif"
+MP_EVENT_REZERVASYON = "rezervasyon"
+MP_EVENT_ANLASMA = "anlasma"
+MP_EVENT_TESLIM = "teslim"
+MP_EVENT_IPTAL = "iptal"
+MP_EVENT_TEKLIF_IPTAL = "teklif_iptal"
+MP_EVENT_MESAJ = "mesaj"
+MP_EVENT_PUAN = "puan"
+
 # Sustainability Scoring Engine (100 puan)
 SUSTAINABILITY_WEIGHTS = {
     "geri_donusum": 18,

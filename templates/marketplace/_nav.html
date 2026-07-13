@@ -1,0 +1,21 @@
+{# B2B marketplace alt navigasyon #}
+<nav class="mp-b2b-nav mb-4" aria-label="B2B menü">
+  <div class="mp-b2b-nav-scroll">
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.panel' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.panel') }}">Panel</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.tedarikciler' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.tedarikciler') }}">Tedarikçiler</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.talep_havuzu' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.talep_havuzu') }}">Talep Havuzu</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.eslesmeler' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.eslesmeler') }}">Eşleşmeler</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.fiyat_analizi' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.fiyat_analizi') }}">Fiyat Analizi</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.yakin_kurumlar' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.yakin_kurumlar') }}">Yakın Kurumlar</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.ai_aciklama' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.ai_aciklama') }}">AI Açıklama</a>
+    <a class="mp-b2b-nav-link {% if request.endpoint == 'marketplace.gecmis' %}is-active{% endif %}"
+       href="{{ url_for('marketplace.gecmis') }}">Geçmiş</a>
+  </div>
+</nav>

@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="content-section fade-in">
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+
   <div class="page-header mb-3">
-    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">
-      ← Marketplace
-    </a>
+    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">← B2B Panel</a>
     <h3 class="fw-bold mt-1">{{ listing.baslik }}</h3>
     <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge bg-primary">{{ listing.kategori }}</span>
-      <span class="badge bg-secondary">{{ listing.durum }}</span>
+      <span class="badge text-bg-primary">{{ listing.kategori }}</span>
+      <span class="badge text-bg-secondary">{{ listing.durum }}</span>
       {% if listing.miktar %}
       <span class="small text-muted">{{ listing.miktar }} {{ listing.birim or '' }}</span>
       {% endif %}
@@ -17,33 +17,39 @@
 
   <div class="row g-4">
     <div class="col-lg-7">
-      <div class="card shadow-sm mb-3">
-        <div class="card-body">
-          <p class="mb-2">{{ listing.aciklama }}</p>
-          <div class="small text-muted">
-            Yayıncı: {{ listing.publisher.display_name or listing.publisher.username }}
-            · {{ listing.il or '—' }} / {{ listing.ilce or '—' }}
-          </div>
+      <div class="mp-side-block mb-3">
+        <p class="mb-2">{{ listing.aciklama }}</p>
+        <div class="small text-muted">
+          Yayıncı: {{ listing.publisher.display_name or listing.publisher.username }}
+          · {{ listing.il or '—' }} / {{ listing.ilce or '—' }}
         </div>
       </div>
 
-      <div class="alert alert-success">
+      <div class="mp-ai-banner mb-3">
         <i class="bi bi-stars me-1"></i>
         <strong>AI önerisi:</strong> {{ ai_suggestion.suggestion }}
-        <span class="badge bg-secondary ms-1">{{ ai_suggestion.source }}</span>
+        <span class="badge text-bg-secondary ms-1">{{ ai_suggestion.source }}</span>
+        {% if match_report and match_report.matches %}
+        <div class="small mt-2 mb-0">
+          En uygun: <strong>{{ match_report.matches[0].ad }}</strong>
+          (skor {{ match_report.matches[0].eslesme_skoru }})
+          · <a href="{{ url_for('marketplace.eslesmeler', listing_id=listing.id) }}">Tüm eşleşmeler</a>
+        </div>
+        {% endif %}
       </div>
 
       {% if is_owner %}
-      <div class="card shadow-sm mb-3">
-        <div class="card-header fw-bold">Gelen Teklifler</div>
-        <ul class="list-group list-group-flush">
+      <div class="mp-side-block mb-3">
+        <h6>Gelen teklifler</h6>
+        <ul class="list-unstyled mb-0">
           {% for o in listing.offers %}
-          <li class="list-group-item">
+          <li class="border-bottom py-2">
             <div class="d-flex justify-content-between align-items-start gap-2">
               <div>
                 <strong>{{ o.offerer.display_name or o.offerer.username }}</strong>
-                <span class="badge bg-light text-dark border">{{ o.durum }}</span>
+                <span class="badge text-bg-light border">{{ o.durum }}</span>
                 <div class="small">{{ o.mesaj or '—' }}</div>
+                {% if o.miktar %}<div class="small text-muted">Miktar: {{ o.miktar }}</div>{% endif %}
               </div>
               {% if o.durum == 'bekliyor' and listing.durum == 'yayinda' %}
               <form method="POST" action="{{ url_for('marketplace.offer_accept', offer_id=o.id) }}">
@@ -54,12 +60,12 @@
             </div>
           </li>
           {% else %}
-          <li class="list-group-item text-muted">Henüz teklif yok.</li>
+          <li class="text-muted">Henüz teklif yok.</li>
           {% endfor %}
         </ul>
       </div>
 
-      <div class="d-flex flex-wrap gap-2">
+      <div class="d-flex flex-wrap gap-2 mb-3">
         {% if listing.durum == 'rezerve' %}
         <form method="POST" action="{{ url_for('marketplace.agreement', listing_id=listing.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -89,22 +95,20 @@
             </form>
           </div>
           {% else %}
-          <div class="card shadow-sm">
-            <div class="card-header fw-bold">Teklif Ver</div>
-            <div class="card-body">
-              <form method="POST" action="{{ url_for('marketplace.offer', listing_id=listing.id) }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-2">
-                  <label class="form-label">Mesaj</label>
-                  <textarea name="mesaj" class="form-control" rows="3" required></textarea>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Talep miktarı (opsiyonel)</label>
-                  <input type="number" step="any" name="miktar" class="form-control">
-                </div>
-                <button class="btn btn-success">Teklif Gönder</button>
-              </form>
-            </div>
+          <div class="mp-side-block mb-3">
+            <h6>Teklif ver</h6>
+            <form method="POST" action="{{ url_for('marketplace.offer', listing_id=listing.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="mb-2">
+                <label class="form-label">Mesaj</label>
+                <textarea name="mesaj" class="form-control" rows="3" required></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Talep miktarı (opsiyonel)</label>
+                <input type="number" step="any" name="miktar" class="form-control">
+              </div>
+              <button class="btn btn-success">Teklif Gönder</button>
+            </form>
           </div>
           {% endif %}
         {% endif %}
@@ -112,7 +116,7 @@
         {% if listing.durum == 'rezerve' and listing.accepted_offer_id %}
         {% set acc = listing.offers|selectattr('id', 'equalto', listing.accepted_offer_id)|list %}
         {% if acc and acc[0].offerer_id == current_user.id %}
-        <form method="POST" action="{{ url_for('marketplace.agreement', listing_id=listing.id) }}" class="mt-3">
+        <form method="POST" action="{{ url_for('marketplace.agreement', listing_id=listing.id) }}" class="mb-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-primary">Anlaşmayı Onayla</button>
         </form>
@@ -122,7 +126,7 @@
         {% if listing.durum == 'anlasildi' and listing.accepted_offer_id %}
         {% set acc2 = listing.offers|selectattr('id', 'equalto', listing.accepted_offer_id)|list %}
         {% if acc2 and acc2[0].offerer_id == current_user.id %}
-        <form method="POST" action="{{ url_for('marketplace.deliver', listing_id=listing.id) }}" class="mt-3">
+        <form method="POST" action="{{ url_for('marketplace.deliver', listing_id=listing.id) }}" class="mb-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-success">Teslim Onayla</button>
         </form>
@@ -130,11 +134,70 @@
         {% endif %}
       {% endif %}
 
-      <h5 class="mt-4">İşlem Geçmişi</h5>
+      <div class="mp-side-block mb-3" id="mesajlar">
+        <h6>Mesajlaşma</h6>
+        <div class="mp-chat mb-3">
+          {% for m in messages %}
+          <div class="mp-chat-bubble {% if m.actor_id == current_user.id %}is-mine{% endif %}">
+            <div class="small text-muted">
+              {% if m.actor %}{{ m.actor.display_name or m.actor.username }}{% else %}Sistem{% endif %}
+            </div>
+            <div>{{ m.detail }}</div>
+          </div>
+          {% else %}
+          <p class="small text-muted mb-0">Henüz mesaj yok.</p>
+          {% endfor %}
+        </div>
+        {% if can_message and listing.durum != 'iptal' %}
+        <form method="POST" action="{{ url_for('marketplace.message', listing_id=listing.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="input-group">
+            <input type="text" name="mesaj" class="form-control" placeholder="Mesaj yazın…" required maxlength="480">
+            <button class="btn btn-success">Gönder</button>
+          </div>
+        </form>
+        {% elif not can_message %}
+        <p class="small text-muted mb-0">Mesajlaşmak için önce teklif verin veya ilanın yayıncısı olun.</p>
+        {% endif %}
+      </div>
+
+      {% if listing.durum == 'teslim' and counterparty_id %}
+      <div class="mp-side-block mb-3" id="puanlama">
+        <h6>Puanlama</h6>
+        <form method="POST" action="{{ url_for('marketplace.rate', listing_id=listing.id) }}" class="row g-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="hedef_id" value="{{ counterparty_id }}">
+          <div class="col-auto">
+            <select name="puan" class="form-select" required>
+              <option value="5">5 ★</option>
+              <option value="4">4 ★</option>
+              <option value="3">3 ★</option>
+              <option value="2">2 ★</option>
+              <option value="1">1 ★</option>
+            </select>
+          </div>
+          <div class="col">
+            <input type="text" name="yorum" class="form-control" placeholder="Yorum (opsiyonel)" maxlength="200">
+          </div>
+          <div class="col-auto">
+            <button class="btn btn-warning">Puanla</button>
+          </div>
+        </form>
+        {% if ratings %}
+        <ul class="list-unstyled mt-3 mb-0 small">
+          {% for r in ratings %}
+          <li>★ {{ r.puan }} — {{ r.yorum or 'Yorum yok' }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <h6 class="mt-2">İşlem geçmişi</h6>
       <ul class="list-group list-group-flush shadow-sm rounded">
         {% for e in listing.events %}
         <li class="list-group-item small">
-          <span class="badge bg-light text-dark border">{{ e.action }}</span>
+          <span class="badge text-bg-light border">{{ e.action }}</span>
           {{ e.detail or '' }}
         </li>
         {% else %}
@@ -144,18 +207,19 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="card shadow-sm mb-3">
-        <div class="card-header fw-bold">Yakındaki Kurumlar ({{ nearby|length }})</div>
-        <ul class="list-group list-group-flush">
+      <div class="mp-side-block mb-3">
+        <h6>Yakındaki kurumlar ({{ nearby|length }})</h6>
+        <ul class="list-unstyled mb-0">
           {% for n in nearby[:8] %}
-          <li class="list-group-item d-flex justify-content-between">
+          <li class="d-flex justify-content-between py-1">
             <span>{{ n.ad }} <small class="text-muted">({{ n.role }})</small></span>
             <span class="small">{{ n.mesafe_km }} km</span>
           </li>
           {% else %}
-          <li class="list-group-item text-muted">Yakın kurum yok</li>
+          <li class="text-muted">Yakın kurum yok</li>
           {% endfor %}
         </ul>
+        <a class="small" href="{{ url_for('marketplace.yakin_kurumlar') }}">Tüm yakın kurumlar →</a>
       </div>
       <div id="marketplaceDetailMap" class="map-container rounded shadow-sm" style="min-height:280px"></div>
     </div>

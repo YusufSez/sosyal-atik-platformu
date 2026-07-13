@@ -1,80 +1,143 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="content-section fade-in">
-  <div class="page-header mb-3 d-flex flex-wrap justify-content-between align-items-start gap-3">
-    <div>
-      <h3 class="fw-bold"><i class="bi bi-shop me-2"></i>Kurumsal Marketplace</h3>
-      <small class="text-muted">Kurumlar arası kaynak paylaşımı · teklif · rezervasyon · anlaşma · teslim</small>
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+
+  <div class="mp-b2b-hero mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+      <div>
+        <p class="mp-b2b-kicker mb-1">Kurumsal Kaynak Pazarı</p>
+        <h2 class="mp-b2b-title mb-2">B2B Kaynak Platformu</h2>
+        <p class="mp-b2b-lead mb-0">
+          Teklif · rezervasyon · anlaşma · teslim · puanlama · mesajlaşma · AI eşleştirme
+        </p>
+      </div>
+      <a href="{{ url_for('marketplace.create') }}" class="btn btn-success btn-lg">
+        <i class="bi bi-plus-lg me-1"></i>Kaynak Yayınla
+      </a>
     </div>
-    <a href="{{ url_for('marketplace.create') }}" class="btn btn-success">
-      <i class="bi bi-plus-lg me-1"></i>Kaynak Yayınla
-    </a>
   </div>
 
-  <div class="card shadow-sm mb-4">
-    <div class="card-header fw-bold"><i class="bi bi-geo-alt me-2"></i>Yakın Kurumsal Kaynaklar</div>
-    <div class="card-body p-0">
-      <div id="marketplaceMap" class="map-container map-container-tall"></div>
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ published|length }}</div>
+        <div class="mp-stat-label">Açık ilan</div>
+      </div>
     </div>
+    <div class="col-6 col-md-3">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ suppliers_preview|length }}+</div>
+        <div class="mp-stat-label">Tedarikçi</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ price_ozet.toplam_teslim }}</div>
+        <div class="mp-stat-label">Teslim</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ price_ozet.kategori_sayisi }}</div>
+        <div class="mp-stat-label">Kategori</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <a class="mp-quick-link" href="{{ url_for('marketplace.talep_havuzu') }}">
+        <span class="mp-quick-title">Talep Havuzu</span>
+        <span class="mp-quick-sub">{{ pool_preview|length }} aktif talep</span>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a class="mp-quick-link" href="{{ url_for('marketplace.eslesmeler') }}">
+        <span class="mp-quick-title">En uygun eşleşmeler</span>
+        <span class="mp-quick-sub">AI skorlu eşleştirme</span>
+      </a>
+    </div>
+    <div class="col-md-4">
+      <a class="mp-quick-link" href="{{ url_for('marketplace.ai_aciklama') }}">
+        <span class="mp-quick-title">AI açıklaması</span>
+        <span class="mp-quick-sub">Gemini / kural motoru</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="mp-map-shell mb-4">
+    <div class="mp-section-head">
+      <h5 class="mb-0">Canlı harita</h5>
+      <a href="{{ url_for('marketplace.yakin_kurumlar') }}" class="small">Yakın kurumlar →</a>
+    </div>
+    <div id="marketplaceMap" class="map-container map-container-tall"></div>
   </div>
 
   <div class="row g-4">
     <div class="col-lg-7">
-      <h5 class="mb-3">Açık İlanlar</h5>
-      {% for item in published %}
-      <div class="card shadow-sm mb-2">
-        <div class="card-body d-flex justify-content-between align-items-start gap-2">
-          <div>
-            <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}" class="fw-semibold text-decoration-none">
-              {{ item.baslik }}
-            </a>
-            <div class="small text-muted">{{ item.kategori }} · {{ item.il or '—' }} / {{ item.ilce or '—' }}</div>
-            <div class="small">{{ item.aciklama[:120] }}{% if item.aciklama|length > 120 %}…{% endif %}</div>
-          </div>
-          <span class="badge bg-success">{{ item.durum }}</span>
-        </div>
+      <div class="mp-section-head">
+        <h5 class="mb-0">Açık ilanlar</h5>
+        <a href="{{ url_for('marketplace.talep_havuzu') }}" class="small">Tümü →</a>
       </div>
+      {% for item in published[:8] %}
+      <article class="mp-listing-row">
+        <div>
+          <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}" class="mp-listing-title">
+            {{ item.baslik }}
+          </a>
+          <div class="small text-muted">{{ item.kategori }} · {{ item.il or '—' }} / {{ item.ilce or '—' }}</div>
+        </div>
+        <span class="badge text-bg-success">{{ item.durum }}</span>
+      </article>
       {% else %}
       <p class="text-muted">Henüz açık kurumsal ilan yok.</p>
       {% endfor %}
     </div>
 
     <div class="col-lg-5">
-      <h5 class="mb-3">İlanlarım</h5>
-      <ul class="list-group list-group-flush shadow-sm rounded mb-4">
-        {% for item in mine %}
-        <li class="list-group-item d-flex justify-content-between">
-          <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}">{{ item.baslik }}</a>
-          <span class="badge bg-secondary">{{ item.durum }}</span>
-        </li>
-        {% else %}
-        <li class="list-group-item text-muted">Henüz ilan yayınlamadınız.</li>
-        {% endfor %}
-      </ul>
-
-      <h5 class="mb-3">Tekliflerim</h5>
-      <ul class="list-group list-group-flush shadow-sm rounded mb-4">
-        {% for o in offers %}
-        <li class="list-group-item d-flex justify-content-between">
-          <a href="{{ url_for('marketplace.detail', listing_id=o.listing_id) }}">#{{ o.listing_id }}</a>
-          <span class="badge bg-info text-dark">{{ o.durum }}</span>
-        </li>
-        {% else %}
-        <li class="list-group-item text-muted">Teklif yok.</li>
-        {% endfor %}
-      </ul>
-
-      <h5 class="mb-3">Geçmiş İşlemler</h5>
-      <ul class="list-group list-group-flush shadow-sm rounded">
-        {% for e in history[:12] %}
-        <li class="list-group-item small">
-          <span class="badge bg-light text-dark border">{{ e.action }}</span>
-          {{ e.detail or '' }}
-        </li>
-        {% else %}
-        <li class="list-group-item text-muted">Kayıt yok.</li>
-        {% endfor %}
-      </ul>
+      <div class="mp-side-block mb-3">
+        <h6>İlanlarım</h6>
+        <ul class="list-unstyled mb-0">
+          {% for item in mine[:6] %}
+          <li class="d-flex justify-content-between py-1">
+            <a href="{{ url_for('marketplace.detail', listing_id=item.id) }}">{{ item.baslik }}</a>
+            <span class="badge text-bg-secondary">{{ item.durum }}</span>
+          </li>
+          {% else %}
+          <li class="text-muted">Henüz ilan yok.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="mp-side-block mb-3">
+        <h6>Tekliflerim</h6>
+        <ul class="list-unstyled mb-0">
+          {% for o in offers[:6] %}
+          <li class="d-flex justify-content-between py-1">
+            <a href="{{ url_for('marketplace.detail', listing_id=o.listing_id) }}">#{{ o.listing_id }}</a>
+            <span class="badge text-bg-info">{{ o.durum }}</span>
+          </li>
+          {% else %}
+          <li class="text-muted">Teklif yok.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="mp-side-block">
+        <div class="d-flex justify-content-between">
+          <h6>Son işlemler</h6>
+          <a href="{{ url_for('marketplace.gecmis') }}" class="small">Geçmiş →</a>
+        </div>
+        <ul class="list-unstyled mb-0">
+          {% for e in history[:8] %}
+          <li class="small py-1">
+            <span class="badge text-bg-light border">{{ e.action }}</span>
+            {{ e.detail or '' }}
+          </li>
+          {% else %}
+          <li class="text-muted">Kayıt yok.</li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
   </div>
 </div>

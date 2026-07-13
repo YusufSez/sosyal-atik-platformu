@@ -146,7 +146,7 @@ def test_panel_allowed_for_company(client, mp_data):
     _login(client, "firma_mp@test.com")
     resp = client.get("/marketplace/panel")
     assert resp.status_code == 200
-    assert b"Kurumsal Marketplace" in resp.data
+    assert b"B2B" in resp.data or b"Kaynak" in resp.data
 
 
 def test_panel_allowed_for_legacy_kurum(client, mp_data):
@@ -399,3 +399,69 @@ def test_marketplace_does_not_create_kaynak(app, mp_data):
         )
         assert Kaynak.query.count() == before
         assert MarketplaceListing.query.filter_by(baslik="İzolasyon").count() == 1
+
+
+def test_b2b_pages_and_message_rating(client, app, mp_data):
+    _login(client, "firma_mp@test.com")
+    for path in (
+        "/marketplace/panel",
+        "/marketplace/tedarikciler",
+        "/marketplace/talep-havuzu",
+        "/marketplace/eslesmeler",
+        "/marketplace/fiyat-analizi",
+        "/marketplace/yakin-kurumlar",
+        "/marketplace/ai-aciklama",
+        "/marketplace/gecmis",
+    ):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+
+    with app.app_context():
+        publisher = db.session.get(User, mp_data["company_id"])
+        offerer = db.session.get(User, mp_data["institution_id"])
+        listing = create_listing(
+            publisher,
+            {
+                "baslik": "B2B Mesaj",
+                "aciklama": "Mesaj ve puan",
+                "kategori": "Ambalaj",
+                "miktar": 40,
+                "birim": "adet",
+                "latitude": 40.77,
+                "longitude": 30.39,
+            },
+        )
+        offer = submit_offer(listing, offerer, {"mesaj": "Alırım", "miktar": 20})
+        accept_offer(listing, offer, publisher)
+        confirm_agreement(listing, offerer)
+        mark_delivered(listing, publisher)
+        listing_id = listing.id
+        offerer_id = offerer.id
+
+    _login(client, "firma_mp@test.com")
+    resp = client.post(
+        f"/marketplace/ilan/{listing_id}/mesaj",
+        data={"mesaj": "Teslim için teşekkürler"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    resp = client.post(
+        f"/marketplace/ilan/{listing_id}/puan",
+        data={"puan": "5", "hedef_id": str(offerer_id), "yorum": "Çok iyi"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    with app.app_context():
+        events = MarketplaceEvent.query.filter_by(listing_id=listing_id).all()
+        actions = [e.action for e in events]
+        assert "mesaj" in actions
+        assert "puan" in actions
+
+    with patch("services.marketplace_ai.get_client", return_value=None):
+        match_resp = client.get(f"/marketplace/api/matches/{listing_id}")
+    assert match_resp.status_code == 200
+    match_data = match_resp.get_json()
+    assert "matches" in match_data
+    assert "explanation" in match_data

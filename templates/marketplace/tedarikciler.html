@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+  <div class="mp-page-head mb-3">
+    <h3 class="fw-bold mb-1">Tedarikçiler</h3>
+    <p class="text-muted mb-0">Firma ve kurum dizini · puan · teslim · ilan aktivitesi</p>
+  </div>
+
+  <form method="GET" class="row g-2 mb-4">
+    <div class="col-sm-6 col-md-4">
+      <input type="text" name="il" value="{{ secili_il }}" class="form-control" placeholder="İl filtre">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-success">Filtrele</button>
+      <a href="{{ url_for('marketplace.tedarikciler') }}" class="btn btn-outline-secondary">Temizle</a>
+    </div>
+  </form>
+
+  <div class="row g-3">
+    {% for s in suppliers %}
+    <div class="col-sm-6 col-xl-4">
+      <div class="mp-supplier-card h-100">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-semibold">{{ s.ad }}</div>
+            <div class="small text-muted">{{ s.role }} · {{ s.il or '—' }} / {{ s.ilce or '—' }}</div>
+          </div>
+          {% if s.puan_ortalama %}
+          <span class="badge text-bg-warning">★ {{ s.puan_ortalama }}</span>
+          {% endif %}
+        </div>
+        <div class="mp-supplier-meta mt-3">
+          <span>{{ s.ilan_sayisi }} ilan</span>
+          <span>{{ s.teslim_sayisi }} teslim</span>
+          <span>{{ s.teklif_sayisi }} teklif</span>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12"><p class="text-muted">Tedarikçi bulunamadı.</p></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

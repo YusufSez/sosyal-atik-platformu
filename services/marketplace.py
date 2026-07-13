@@ -6,6 +6,15 @@ from sqlalchemy import or_
 
 from constants import (
     MARKETPLACE_ROLES,
+    MP_EVENT_ANLASMA,
+    MP_EVENT_IPTAL,
+    MP_EVENT_MESAJ,
+    MP_EVENT_PUAN,
+    MP_EVENT_REZERVASYON,
+    MP_EVENT_TEKLIF,
+    MP_EVENT_TEKLIF_IPTAL,
+    MP_EVENT_TESLIM,
+    MP_EVENT_YAYINLA,
     MP_LISTING_ANLASILDI,
     MP_LISTING_IPTAL,
     MP_LISTING_REZERVE,
@@ -62,7 +71,7 @@ def create_listing(publisher: User, data: dict) -> MarketplaceListing:
     )
     db.session.add(listing)
     db.session.flush()
-    _log(listing.id, publisher.id, "yayinla", f"İlan yayınlandı: {listing.baslik}")
+    _log(listing.id, publisher.id, MP_EVENT_YAYINLA, f"İlan yayınlandı: {listing.baslik}")
     db.session.commit()
     return listing
 
@@ -141,7 +150,7 @@ def submit_offer(listing: MarketplaceListing, offerer: User, data: dict) -> Mark
     )
     db.session.add(offer)
     db.session.flush()
-    _log(listing.id, offerer.id, "teklif", "Teklif gönderildi", offer_id=offer.id)
+    _log(listing.id, offerer.id, MP_EVENT_TEKLIF, "Teklif gönderildi", offer_id=offer.id)
     db.session.commit()
     return offer
 
@@ -170,7 +179,7 @@ def accept_offer(listing: MarketplaceListing, offer: MarketplaceOffer, actor: Us
         o.durum = MP_OFFER_RED
         o.responded_at = now
 
-    _log(listing.id, actor.id, "rezervasyon", f"Teklif #{offer.id} kabul — rezervasyon", offer_id=offer.id)
+    _log(listing.id, actor.id, MP_EVENT_REZERVASYON, f"Teklif #{offer.id} kabul — rezervasyon", offer_id=offer.id)
     db.session.commit()
     return listing
 
@@ -187,7 +196,7 @@ def confirm_agreement(listing: MarketplaceListing, actor: User) -> MarketplaceLi
         raise MarketplaceError("Bu işlem için yetkiniz yok.", 403)
 
     listing.durum = MP_LISTING_ANLASILDI
-    _log(listing.id, actor.id, "anlasma", "Anlaşma onaylandı", offer_id=listing.accepted_offer_id)
+    _log(listing.id, actor.id, MP_EVENT_ANLASMA, "Anlaşma onaylandı", offer_id=listing.accepted_offer_id)
     db.session.commit()
     return listing
 
@@ -203,7 +212,7 @@ def mark_delivered(listing: MarketplaceListing, actor: User) -> MarketplaceListi
         raise MarketplaceError("Bu işlem için yetkiniz yok.", 403)
 
     listing.durum = MP_LISTING_TESLIM
-    _log(listing.id, actor.id, "teslim", "Teslim tamamlandı", offer_id=listing.accepted_offer_id)
+    _log(listing.id, actor.id, MP_EVENT_TESLIM, "Teslim tamamlandı", offer_id=listing.accepted_offer_id)
     db.session.commit()
     return listing
 
@@ -222,7 +231,7 @@ def cancel_listing(listing: MarketplaceListing, actor: User, reason: str = "") -
     for o in pending:
         o.durum = MP_OFFER_IPTAL
         o.responded_at = now
-    _log(listing.id, actor.id, "iptal", reason or "İlan iptal edildi")
+    _log(listing.id, actor.id, MP_EVENT_IPTAL, reason or "İlan iptal edildi")
     db.session.commit()
     return listing
 
@@ -234,7 +243,7 @@ def cancel_offer(offer: MarketplaceOffer, actor: User) -> MarketplaceOffer:
         raise MarketplaceError("Yalnızca bekleyen teklif iptal edilebilir.")
     offer.durum = MP_OFFER_IPTAL
     offer.responded_at = utc_now()
-    _log(offer.listing_id, actor.id, "teklif_iptal", "Teklif geri çekildi", offer_id=offer.id)
+    _log(offer.listing_id, actor.id, MP_EVENT_TEKLIF_IPTAL, "Teklif geri çekildi", offer_id=offer.id)
     db.session.commit()
     return offer
 
@@ -275,6 +284,82 @@ def nearby_institutions(
             })
     results.sort(key=lambda x: x["mesafe_km"])
     return results
+
+
+def _listing_parties(listing: MarketplaceListing) -> set[int]:
+    allowed = {listing.publisher_id}
+    if listing.accepted_offer_id:
+        offer = db.session.get(MarketplaceOffer, listing.accepted_offer_id)
+        if offer:
+            allowed.add(offer.offerer_id)
+    return allowed
+
+
+def post_message(listing: MarketplaceListing, actor: User, text: str) -> MarketplaceEvent:
+    """Taraflar arası mesaj — MarketplaceEvent(action=mesaj)."""
+    body = sanitize_input(text, max_length=480)
+    if not body:
+        raise MarketplaceError("Mesaj boş olamaz.")
+    if listing.durum == MP_LISTING_IPTAL:
+        raise MarketplaceError("İptal edilen ilanda mesajlaşılamaz.")
+
+    allowed = _listing_parties(listing)
+    allowed.add(listing.publisher_id)
+    for o in listing.offers:
+        allowed.add(o.offerer_id)
+    if actor.id not in allowed:
+        raise MarketplaceError("Bu ilanda mesaj gönderme yetkiniz yok.", 403)
+
+    _log(listing.id, actor.id, MP_EVENT_MESAJ, body, offer_id=listing.accepted_offer_id)
+    db.session.commit()
+    return (
+        MarketplaceEvent.query.filter_by(listing_id=listing.id, action=MP_EVENT_MESAJ)
+        .order_by(MarketplaceEvent.created_at.desc())
+        .first()
+    )
+
+
+def submit_rating(
+    listing: MarketplaceListing,
+    actor: User,
+    *,
+    puan: int,
+    hedef_id: int,
+    yorum: str = "",
+) -> MarketplaceEvent:
+    """Teslim sonrası puanlama — detail: puan:N|hedef:ID|yorum."""
+    if listing.durum != MP_LISTING_TESLIM:
+        raise MarketplaceError("Puanlama yalnızca teslim sonrası yapılabilir.")
+    parties = _listing_parties(listing)
+    if actor.id not in parties:
+        raise MarketplaceError("Bu işlem için yetkiniz yok.", 403)
+    if hedef_id not in parties or hedef_id == actor.id:
+        raise MarketplaceError("Geçersiz puan hedefi.")
+    try:
+        score = int(puan)
+    except (TypeError, ValueError):
+        raise MarketplaceError("Puan 1–5 arasında olmalıdır.")
+    if score < 1 or score > 5:
+        raise MarketplaceError("Puan 1–5 arasında olmalıdır.")
+
+    existing = MarketplaceEvent.query.filter_by(
+        listing_id=listing.id,
+        actor_id=actor.id,
+        action=MP_EVENT_PUAN,
+    ).all()
+    for e in existing:
+        if e.detail and f"hedef:{hedef_id}" in e.detail:
+            raise MarketplaceError("Bu taraf için zaten puan verdiniz.")
+
+    comment = sanitize_input(yorum, max_length=200) or ""
+    detail = f"puan:{score}|hedef:{hedef_id}|{comment}"[:500]
+    _log(listing.id, actor.id, MP_EVENT_PUAN, detail, offer_id=listing.accepted_offer_id)
+    db.session.commit()
+    return (
+        MarketplaceEvent.query.filter_by(listing_id=listing.id, action=MP_EVENT_PUAN)
+        .order_by(MarketplaceEvent.created_at.desc())
+        .first()
+    )
 
 
 def marketplace_map_points(listings: list[MarketplaceListing] | None = None) -> list:

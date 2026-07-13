@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+  <div class="mp-page-head mb-3">
+    <h3 class="fw-bold mb-1">AI açıklaması</h3>
+    <p class="text-muted mb-0">Platform özeti ve eşleştirme gerekçeleri · Gemini varsa AI, yoksa kural motoru</p>
+  </div>
+
+  <div class="mp-ai-banner mb-4">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+      <strong>Platform özeti</strong>
+      <span class="badge text-bg-secondary">{{ overview.source }}</span>
+    </div>
+    <div class="mp-ai-body">{{ overview.explanation }}</div>
+    <ul class="mt-3 mb-0 small">
+      {% for b in overview.bullets %}
+      <li>{{ b }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="mp-stat"><div class="mp-stat-value">{{ overview.pool_count }}</div><div class="mp-stat-label">Talep havuzu</div></div></div>
+    <div class="col-md-4"><div class="mp-stat"><div class="mp-stat-value">{{ overview.supplier_count }}</div><div class="mp-stat-label">Tedarikçi</div></div></div>
+    <div class="col-md-4"><div class="mp-stat"><div class="mp-stat-value">{{ overview.price_summary.toplam_ilan }}</div><div class="mp-stat-label">Analiz edilen ilan</div></div></div>
+  </div>
+
+  {% if match_report %}
+  <div class="mp-ai-banner">
+    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+      <strong>İlan eşleştirme: {{ match_report.listing_baslik }}</strong>
+      <span class="badge text-bg-secondary">{{ match_report.explanation_source }}</span>
+    </div>
+    <p class="mb-0">{{ match_report.explanation }}</p>
+  </div>
+  {% else %}
+  <p class="text-muted">Belirli bir ilan için
+    <a href="{{ url_for('marketplace.eslesmeler') }}">eşleşmeler</a> sayfasından seçim yapın
+    veya <code>?listing_id=</code> parametresi ekleyin.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}

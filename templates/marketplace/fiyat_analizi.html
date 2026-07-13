@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+  <div class="mp-page-head mb-3">
+    <h3 class="fw-bold mb-1">Fiyat analizi</h3>
+    <p class="text-muted mb-0">Kategori bazlı miktar ve teklif dağılımı (mevcut ilan verisi)</p>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-4">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ analysis.ozet.toplam_ilan }}</div>
+        <div class="mp-stat-label">Toplam ilan</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ analysis.ozet.toplam_teslim }}</div>
+        <div class="mp-stat-label">Teslim</div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="mp-stat">
+        <div class="mp-stat-value">{{ analysis.ozet.kategori_sayisi }}</div>
+        <div class="mp-stat-label">Kategori</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table mp-table align-middle">
+      <thead>
+        <tr>
+          <th>Kategori</th>
+          <th>İlan</th>
+          <th>Ort. miktar</th>
+          <th>Min–Max</th>
+          <th>Ort. teklif miktarı</th>
+          <th>Teslim</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in analysis.kategoriler %}
+        <tr>
+          <td class="fw-semibold">{{ c.kategori }}</td>
+          <td>{{ c.ilan_adet }}</td>
+          <td>{{ c.ortalama_miktar if c.ortalama_miktar is not none else '—' }}</td>
+          <td>
+            {% if c.min_miktar is not none %}{{ c.min_miktar }} – {{ c.max_miktar }}{% else %}—{% endif %}
+          </td>
+          <td>{{ c.ortalama_teklif_miktar if c.ortalama_teklif_miktar is not none else '—' }}</td>
+          <td>{{ c.teslim_adet }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted">Veri yok.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,12 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
-<div class="content-section fade-in" style="max-width:640px;margin:0 auto">
+<div class="content-section fade-in mp-b2b" style="max-width:720px;margin:0 auto">
+  {% include "marketplace/_nav.html" %}
   <div class="page-header mb-3">
-    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">← Marketplace</a>
+    <a href="{{ url_for('marketplace.panel') }}" class="small text-muted text-decoration-none">← B2B Panel</a>
     <h3 class="fw-bold mt-1">Kurumsal Kaynak Yayınla</h3>
   </div>
-  <div class="card shadow-sm">
-    <div class="card-body">
+  <div class="mp-side-block">
       <form method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
@@ -57,7 +57,6 @@
         </div>
         <button class="btn btn-success">Yayınla</button>
       </form>
-    </div>
   </div>
 </div>
 {% endblock %}

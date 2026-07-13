@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="content-section fade-in mp-b2b">
+  {% include "marketplace/_nav.html" %}
+  <div class="mp-page-head mb-3">
+    <h3 class="fw-bold mb-1">Talep Havuzu</h3>
+    <p class="text-muted mb-0">Yayındaki kurumsal kaynak talepleri / arz ilanları</p>
+  </div>
+
+  <form method="GET" class="row g-2 mb-4">
+    <div class="col-6 col-md-3">
+      <select name="kategori" class="form-select">
+        <option value="">Tüm kategoriler</option>
+        {% for k in kategoriler %}
+        <option value="{{ k }}" {% if secili_kategori == k %}selected{% endif %}>{{ k }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <input type="text" name="il" value="{{ secili_il }}" class="form-control" placeholder="İl">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-success">Filtrele</button>
+    </div>
+  </form>
+
+  <div class="table-responsive d-none d-md-block">
+    <table class="table align-middle mp-table">
+      <thead>
+        <tr>
+          <th>İlan</th>
+          <th>Kategori</th>
+          <th>Miktar</th>
+          <th>Konum</th>
+          <th>Yayıncı</th>
+          <th>Teklif</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in pool %}
+        <tr>
+          <td class="fw-semibold">{{ row.baslik }}</td>
+          <td>{{ row.kategori }}</td>
+          <td>{% if row.miktar %}{{ row.miktar }} {{ row.birim or '' }}{% else %}—{% endif %}</td>
+          <td>{{ row.il or '—' }} / {{ row.ilce or '—' }}</td>
+          <td>{{ row.publisher }}</td>
+          <td>{{ row.teklif_bekleyen }}</td>
+          <td>
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('marketplace.detail', listing_id=row.id) }}">İncele</a>
+            <a class="btn btn-sm btn-link" href="{{ url_for('marketplace.eslesmeler', listing_id=row.id) }}">Eşleştir</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-muted">Havuz boş.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-md-none">
+    {% for row in pool %}
+    <article class="mp-listing-row">
+      <div>
+        <a class="mp-listing-title" href="{{ url_for('marketplace.detail', listing_id=row.id) }}">{{ row.baslik }}</a>
+        <div class="small text-muted">{{ row.kategori }} · {{ row.il or '—' }} · {{ row.teklif_bekleyen }} teklif</div>
+      </div>
+    </article>
+    {% else %}
+    <p class="text-muted">Havuz boş.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
