@@ -42,36 +42,40 @@
         radarCanvas.classList.add("d-none");
       }
     } else {
-      if (UI) UI.markDemo(radarCanvas, demoSource);
-      new Chart(radarCanvas, {
-        type: "radar",
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: "Kategori puanı",
-              data: values,
-              borderColor: accent,
-              backgroundColor: "rgba(15, 118, 110, 0.18)",
-              pointBackgroundColor: accent,
-              borderWidth: 2,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: {
-            r: {
-              min: 0,
-              max: 100,
-              ticks: { stepSize: 20, backdrop: false },
-              pointLabels: { font: { size: 11 } },
-            },
+      function paintRadar() {
+        if (UI) UI.markDemo(radarCanvas, demoSource);
+        new Chart(radarCanvas, {
+          type: "radar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Kategori puanı",
+                data: values,
+                borderColor: accent,
+                backgroundColor: "rgba(15, 118, 110, 0.18)",
+                pointBackgroundColor: accent,
+                borderWidth: 2,
+              },
+            ],
           },
-          plugins: { legend: { display: false } },
-        },
-      });
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+              r: {
+                min: 0,
+                max: 100,
+                ticks: { stepSize: 20, backdrop: false },
+                pointLabels: { font: { size: 11 } },
+              },
+            },
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+      if (UI && UI.whenCanvasReady) UI.whenCanvasReady(radarCanvas, paintRadar);
+      else paintRadar();
     }
   }
 
@@ -90,40 +94,44 @@
         histCanvas.classList.add("d-none");
       }
     } else {
-      if (UI) UI.markDemo(histCanvas, demoSource);
-      new Chart(histCanvas, {
-        type: "line",
-        data: {
-          labels: hLabels,
-          datasets: [
-            {
-              label: "Aylık puan",
-              data: hValues,
-              borderColor: accent,
-              backgroundColor: "rgba(15, 118, 110, 0.12)",
-              fill: true,
-              tension: 0.3,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          scales: {
-            y: { min: 0, max: 100, beginAtZero: true },
+      function paintHist() {
+        if (UI) UI.markDemo(histCanvas, demoSource);
+        new Chart(histCanvas, {
+          type: "line",
+          data: {
+            labels: hLabels,
+            datasets: [
+              {
+                label: "Aylık puan",
+                data: hValues,
+                borderColor: accent,
+                backgroundColor: "rgba(15, 118, 110, 0.12)",
+                fill: true,
+                tension: 0.3,
+              },
+            ],
           },
-          plugins: {
-            legend: { display: false },
-            title: {
-              display: !!history.change_pct || history.change_pct === 0,
-              text:
-                "Trend: " +
-                (history.trend || "—") +
-                (history.change_pct != null ? " (" + history.change_pct + "%)" : ""),
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+              y: { min: 0, max: 100, beginAtZero: true },
+            },
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: !!history.change_pct || history.change_pct === 0,
+                text:
+                  "Trend: " +
+                  (history.trend || "—") +
+                  (history.change_pct != null ? " (" + history.change_pct + "%)" : ""),
+              },
             },
           },
-        },
-      });
+        });
+      }
+      if (UI && UI.whenCanvasReady) UI.whenCanvasReady(histCanvas, paintHist);
+      else paintHist();
     }
   }
 })();

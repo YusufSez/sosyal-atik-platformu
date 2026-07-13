@@ -25,7 +25,10 @@
 
   var noktalar = config.isi_noktalari || [];
   var center = config.mapCenter || {};
-  var map = L.map("belediyeIsiHaritasi").setView(
+  var mapEl = document.getElementById("belediyeIsiHaritasi");
+  if (!mapEl) return;
+
+  var map = L.map(mapEl, { preferCanvas: true }).setView(
     [center.lat || 39.0, center.lng || 35.0],
     center.zoom || (noktalar.length ? 11 : 6)
   );
@@ -40,20 +43,68 @@
     }
   ).addTo(map);
 
-  if (noktalar.length && L.heatLayer) {
-    L.heatLayer(noktalar, {
-      radius: 28,
-      blur: 20,
-      maxZoom: 15,
-      minOpacity: 0.35,
-      gradient: gradients[yogunluk] || gradients.atik,
-    }).addTo(map);
-    var bounds = noktalar.map(function (p) {
-      return [p[0], p[1]];
-    });
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
+  function containerReady(el) {
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
   }
-  setTimeout(function () {
+
+  function addHeatOrFallback(pts) {
+    if (!pts.length) return;
+    try {
+      if (typeof L.heatLayer === "function") {
+        L.heatLayer(pts, {
+          radius: 28,
+          blur: 20,
+          maxZoom: 15,
+          minOpacity: 0.35,
+          gradient: gradients[yogunluk] || gradients.atik,
+        }).addTo(map);
+        map.fitBounds(
+          pts.map(function (p) {
+            return [p[0], p[1]];
+          }),
+          { padding: [40, 40], maxZoom: 13 }
+        );
+        return;
+      }
+    } catch (e) {
+      /* heat başarısız */
+    }
+    pts.forEach(function (p) {
+      L.circleMarker([p[0], p[1]], {
+        radius: 6 + Math.min(10, (p[2] || 0.5) * 10),
+        color: "#0f766e",
+        fillColor: "#14b8a6",
+        fillOpacity: 0.55,
+        weight: 1,
+      }).addTo(map);
+    });
+    map.fitBounds(
+      pts.map(function (p) {
+        return [p[0], p[1]];
+      }),
+      { padding: [40, 40], maxZoom: 13 }
+    );
+  }
+
+  function afterReady(tries) {
+    tries = tries == null ? 40 : tries;
     map.invalidateSize();
-  }, 120);
+    if (!containerReady(mapEl)) {
+      if (tries <= 0) return;
+      requestAnimationFrame(function () {
+        afterReady(tries - 1);
+      });
+      return;
+    }
+    addHeatOrFallback(noktalar);
+    map.invalidateSize();
+  }
+
+  map.whenReady(function () {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(afterReady);
+    });
+  });
 })();

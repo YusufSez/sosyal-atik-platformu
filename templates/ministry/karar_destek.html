@@ -195,7 +195,7 @@
               <thead>
                 <tr>
                   <th>Belediye</th>
-                  <th style="width:45%">Puan</th>
+                  <th class="ds-col-puan">Puan</th>
                   <th class="text-end">Skor</th>
                 </tr>
               </thead>
@@ -208,7 +208,7 @@
                   </td>
                   <td>
                     <div class="progress ds-progress" role="progressbar" aria-valuenow="{{ r.puan }}" aria-valuemin="0" aria-valuemax="100">
-                      <div class="progress-bar bg-success" style="width: {{ r.puan }}%"></div>
+                      <div class="progress-bar bg-success" data-pct="{{ r.puan }}"></div>
                     </div>
                   </td>
                   <td class="text-end fw-bold">{{ r.puan }}</td>
@@ -222,7 +222,7 @@
                   </td>
                   <td>
                     <div class="progress ds-progress" role="progressbar" aria-valuenow="{{ r.puan }}" aria-valuemin="0" aria-valuemax="100">
-                      <div class="progress-bar bg-warning" style="width: {{ r.puan }}%"></div>
+                      <div class="progress-bar bg-warning" data-pct="{{ r.puan }}"></div>
                     </div>
                   </td>
                   <td class="text-end fw-bold">{{ r.puan }}</td>
@@ -287,60 +287,6 @@
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/chart.js/4.4.1/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/csp-data-styles.js') }}"></script>
 <script src="{{ url_for('static', filename='js/decision-support.js') }}"></script>
-<style>
-.ds-center {
-  --ds-ink: #062f2a;
-  --ds-accent: #0f766e;
-  --ds-soft: #e6f7f3;
-  --ds-line: rgba(6, 47, 42, 0.12);
-}
-[data-bs-theme="dark"] .ds-center {
-  --ds-ink: #e7f8f4;
-  --ds-accent: #2dd4bf;
-  --ds-soft: rgba(45, 212, 191, 0.1);
-  --ds-line: rgba(231, 248, 244, 0.12);
-}
-.ds-hero {
-  background:
-    radial-gradient(circle at 90% 10%, rgba(45, 212, 191, 0.35), transparent 40%),
-    linear-gradient(135deg, #0b3f39 0%, #0f766e 55%, #115e59 100%);
-  color: #f0fdfa;
-  border-radius: 1.4rem;
-  padding: 1.6rem 1.7rem;
-}
-.ds-kicker { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .85; font-weight: 700; }
-.ds-title { font-weight: 800; letter-spacing: -.02em; }
-.ds-lead { max-width: 40rem; opacity: .9; }
-.ds-stat, .ds-panel {
-  border: 1px solid var(--ds-line);
-  border-radius: 1rem;
-  background: var(--bs-body-bg);
-}
-.ds-stat { padding: 1rem; height: 100%; }
-.ds-stat-value { font-size: 1.45rem; font-weight: 800; color: var(--ds-ink); }
-.ds-stat-label { font-size: .8rem; color: var(--bs-secondary-color); }
-.ds-ai-banner {
-  border-radius: 1rem;
-  border: 1px solid rgba(15, 118, 110, .25);
-  background: var(--ds-soft);
-  padding: 1rem 1.15rem;
-}
-.ds-panel-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: .9rem 1.1rem; border-bottom: 1px solid var(--ds-line);
-}
-.ds-panel-body { padding: 1rem 1.1rem; }
-.ds-mini { text-align: center; padding: .55rem; border-radius: .75rem; background: var(--ds-soft); }
-.ds-mini strong { display: block; color: var(--ds-ink); }
-.ds-mini span { font-size: .72rem; color: var(--bs-secondary-color); }
-.ds-card-item { padding-bottom: .75rem; border-bottom: 1px solid var(--ds-line); }
-.ds-risk-dusuk { background: #bbf7d0; color: #14532d; }
-.ds-risk-orta { background: #fde68a; color: #92400e; }
-.ds-risk-yuksek { background: #fecaca; color: #991b1b; }
-.ds-progress { height: .55rem; background: rgba(6,47,42,.08); border-radius: 999px; }
-.ds-progress .progress-bar { border-radius: 999px; }
-.ds-compare-table th { font-size: .75rem; color: var(--bs-secondary-color); border-bottom-color: var(--ds-line); }
-.ds-compare-table td { border-color: var(--ds-line); vertical-align: middle; }
-</style>
 {% endblock %}

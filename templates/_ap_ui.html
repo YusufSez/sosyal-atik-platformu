@@ -10,7 +10,7 @@
 {% macro ap_skeleton(rows=3) -%}
 <div class="ap-skeleton" aria-hidden="true">
   {% for i in range(rows) %}
-  <div class="ap-skeleton-line" style="width:{{ 92 - (i * 12) }}%"></div>
+  <div class="ap-skeleton-line" data-pct="{{ 92 - (i * 12) }}"></div>
   {% endfor %}
 </div>
 {%- endmacro %}

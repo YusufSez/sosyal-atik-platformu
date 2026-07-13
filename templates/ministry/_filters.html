@@ -1,4 +1,5 @@
-<form method="GET" class="row g-2 align-items-end mb-3 ministry-filters" id="ministryFilterForm">
+<form method="GET" class="row g-2 align-items-end mb-3 ministry-filters" id="ministryFilterForm"
+      data-drill-url="{{ url_for('admin_ministry.api_drilldown') }}">
   <div class="col-6 col-md-4 col-lg">
     <label class="form-label small mb-1">İl</label>
     <select name="il" id="minFiltreIl" class="form-select form-select-sm">
@@ -70,69 +71,4 @@
     <a href="{{ url_for('admin_ministry.dashboard') }}" class="btn btn-sm btn-outline-secondary">Temizle</a>
   </div>
 </form>
-<script>
-(function () {
-  var il = document.getElementById("minFiltreIl");
-  var ilce = document.getElementById("minFiltreIlce");
-  var bel = document.getElementById("minFiltreBelediye");
-  var kurum = document.getElementById("minFiltreKurum");
-  if (!il) return;
-
-  function fillSimple(el, items, selected) {
-    var first = el.options[0] ? el.options[0].outerHTML : '<option value="">Tümü</option>';
-    el.innerHTML = first;
-    (items || []).forEach(function (v) {
-      var opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = v;
-      if (selected && selected === v) opt.selected = true;
-      el.appendChild(opt);
-    });
-  }
-
-  function fillEntities(el, items, selected) {
-    var first = el.options[0] ? el.options[0].outerHTML : '<option value="">Tümü</option>';
-    el.innerHTML = first;
-    (items || []).forEach(function (item) {
-      var opt = document.createElement("option");
-      opt.value = item.id;
-      opt.textContent = item.ad + (item.ilce ? " (" + item.ilce + ")" : "");
-      if (selected && String(selected) === String(item.id)) opt.selected = true;
-      el.appendChild(opt);
-    });
-  }
-
-  function loadDrill() {
-    var params = new URLSearchParams();
-    if (il.value) params.set("il", il.value);
-    if (ilce.value) params.set("ilce", ilce.value);
-    if (bel.value) params.set("belediye_id", bel.value);
-    fetch("{{ url_for('admin_ministry.api_drilldown') }}?" + params.toString(), {
-      credentials: "same-origin",
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        fillSimple(ilce, data.ilceler || [], ilce.value);
-        fillEntities(bel, data.belediyeler || [], bel.value);
-        fillEntities(kurum, data.kurumlar || [], kurum.value);
-      })
-      .catch(function () {});
-  }
-
-  il.addEventListener("change", function () {
-    ilce.value = "";
-    bel.value = "";
-    kurum.value = "";
-    loadDrill();
-  });
-  ilce.addEventListener("change", function () {
-    bel.value = "";
-    kurum.value = "";
-    loadDrill();
-  });
-  bel.addEventListener("change", function () {
-    kurum.value = "";
-    loadDrill();
-  });
-})();
-</script>
+<script src="{{ url_for('static', filename='js/ministry-geo-filters.js') }}"></script>

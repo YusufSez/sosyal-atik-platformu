@@ -10,6 +10,7 @@
     <link href="{{ url_for('static', filename='css/layout-shell.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/atikport-dashboard.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/dashboard-csp.css') }}" rel="stylesheet">
 </head>
 <body data-authenticated="{{ '1' if current_user.is_authenticated else '0' }}"
       data-giris-url="{{ url_for('auth.giris') }}"
@@ -44,7 +45,7 @@
     </div>
     {% endif %}
     {% if show_demo_mode_banner %}
-    <div class="alert alert-warning border-0 shadow-sm mb-3" role="status" style="background:#fff3e0;border-left:4px solid #ef6c00!important;">
+    <div class="alert alert-warning border-0 shadow-sm mb-3 ap-demo-banner" role="status">
         <strong><i class="bi bi-exclamation-triangle me-1"></i>Demo Modu Aktif</strong>
         <div class="small mt-1 mb-0">Gösterilen veriler sunum amaçlı örnek veriler içerebilir.</div>
     </div>
@@ -60,6 +61,7 @@
 
 <script src="{{ url_for('static', filename='vendor/bootstrap/5.3.3/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
+<script src="{{ url_for('static', filename='js/csp-data-styles.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dynamic-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='js/favori-actions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sikayet.js') }}"></script>

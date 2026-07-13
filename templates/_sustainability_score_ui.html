@@ -43,7 +43,7 @@
     <div class="ops-panel-body">
       <div class="row g-4 align-items-center">
         <div class="col-lg-5 text-center">
-          <div class="ss-ring mx-auto" style="--pct: {{ score_pct }};" role="img"
+          <div class="ss-ring mx-auto" data-pct="{{ score_pct }}" data-ring role="img"
                aria-label="Skor {{ cur.puan }}, not {{ cur.grade }}">
             <div class="ss-ring-inner">
               <div class="ss-grade">{{ cur.grade }}</div>
@@ -139,7 +139,7 @@
             </div>
             <div class="progress ss-progress {{ bar_colors[loop.index0 % 7] }}">
               <div class="progress-bar"
-                   style="width: {{ c.score }}%"
+                   data-pct="{{ c.score }}"
                    role="progressbar"
                    aria-valuenow="{{ c.score }}"
                    aria-valuemin="0"
@@ -314,252 +314,6 @@
   </div>
 </div>
 
-<style>
-.belediye-ops-center {
-  --ops-ink: #0f3d36;
-  --ops-accent: #0f766e;
-  --ops-soft: #e7f5f2;
-  --ops-line: rgba(15, 61, 54, 0.12);
-}
-[data-bs-theme="dark"] .belediye-ops-center {
-  --ops-ink: #e8f5f2;
-  --ops-accent: #2dd4bf;
-  --ops-soft: rgba(45, 212, 191, 0.1);
-  --ops-line: rgba(232, 245, 242, 0.14);
-}
-.ops-hero {
-  background:
-    radial-gradient(circle at 88% 12%, rgba(45, 212, 191, 0.22), transparent 42%),
-    linear-gradient(135deg, var(--ops-soft), transparent 65%);
-  border: 1px solid var(--ops-line);
-  border-radius: 1.25rem;
-  padding: 1.15rem 1.35rem;
-}
-.ops-kicker {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--ops-accent);
-}
-.ops-title {
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--ops-ink);
-  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
-  margin: 0;
-}
-.ops-updated { color: var(--bs-secondary-color); }
-.ops-section-title {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--bs-secondary-color);
-  margin-bottom: 0.65rem;
-}
-.ops-panel {
-  border: 1px solid var(--ops-line);
-  border-radius: 1rem;
-  background: var(--bs-body-bg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.ops-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--ops-line);
-  font-weight: 700;
-  color: var(--ops-ink);
-}
-.ops-panel-body { padding: 1.15rem 1.25rem; flex: 1 1 auto; }
-
-.ss-ring {
-  --pct: 0;
-  width: min(220px, 70vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    radial-gradient(closest-side, var(--bs-body-bg) 72%, transparent 73% 100%),
-    conic-gradient(#0f766e calc(var(--pct) * 1%), #d1fae5 0);
-  display: grid;
-  place-items: center;
-  box-shadow: 0 12px 36px rgba(15, 118, 110, 0.18);
-}
-.ss-ring-inner {
-  width: 72%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--bs-body-bg);
-}
-.ss-grade {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: #0f766e;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-.ss-score {
-  font-size: 2.6rem;
-  font-weight: 800;
-  color: var(--ops-ink);
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-.ss-score-caption {
-  font-size: 0.75rem;
-  color: var(--bs-secondary-color);
-  font-weight: 600;
-}
-
-.ss-rank-card {
-  border: 1px solid var(--ops-line);
-  border-radius: 0.9rem;
-  padding: 1rem 1.1rem;
-  background: var(--ops-soft);
-  min-height: 7rem;
-  display: flex;
-  flex-direction: column;
-}
-.ss-rank-label {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  color: #64748b;
-  margin-bottom: 0.35rem;
-}
-.ss-rank-value {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--ops-ink);
-  line-height: 1.1;
-}
-.ss-rank-sub { font-size: 0.8rem; color: var(--bs-secondary-color); margin-top: auto; }
-.ss-compare-msg {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #0f766e;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  background: rgba(15, 118, 110, 0.06);
-  border: 1px solid rgba(15, 118, 110, 0.12);
-}
-
-.ss-radar-body { padding-top: 0.5rem; padding-bottom: 1.5rem; }
-.ss-radar-wrap {
-  max-width: 560px;
-  margin: 0 auto;
-  min-height: 360px;
-  position: relative;
-}
-.ss-radar-wrap canvas { width: 100% !important; height: auto !important; max-height: 480px; }
-.ss-history-wrap { min-height: 260px; position: relative; }
-.ss-history-wrap canvas { width: 100% !important; max-height: 300px; }
-
-.ss-equal-cards > [class*="col-"] > * { height: 100%; }
-.ss-cat-card {
-  border: 1px solid var(--ops-line);
-  border-radius: 1rem;
-  padding: 1rem 1.1rem;
-  background: var(--bs-body-bg);
-  min-height: 7.5rem;
-}
-.ss-cat-icon {
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 0.75rem;
-  background: #ccfbf1;
-  color: #0f766e;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-.ss-cat-label { font-weight: 700; color: var(--ops-ink); font-size: 0.92rem; }
-.ss-cat-pct { font-weight: 800; color: #0f766e; font-size: 1.05rem; white-space: nowrap; }
-.ss-progress { height: 0.55rem; border-radius: 999px; background: #e2e8f0; }
-.ss-progress .progress-bar { border-radius: 999px; }
-.ss-cat-meta { font-size: 0.75rem; color: var(--bs-secondary-color); }
-
-.ss-similar-card {
-  border: 1px solid var(--ops-line);
-  border-radius: 1rem;
-  padding: 1.1rem;
-  background: linear-gradient(160deg, #f0fdfa 0%, #fff 70%);
-  display: flex;
-  flex-direction: column;
-  min-height: 9rem;
-}
-.ss-similar-name { font-weight: 700; color: var(--ops-ink); }
-.ss-similar-geo { font-size: 0.82rem; color: var(--bs-secondary-color); }
-
-.ss-ai-summary {
-  font-size: 0.95rem;
-  color: #134e4a;
-  line-height: 1.5;
-  padding: 0.85rem 1rem;
-  border-radius: 0.75rem;
-  background: rgba(15, 118, 110, 0.05);
-  border: 1px solid rgba(15, 118, 110, 0.1);
-}
-.ss-ai-group-label {
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.65rem;
-}
-.ss-ai-card {
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 0.9rem;
-  padding: 1rem 1.05rem;
-  min-height: 8.5rem;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-.ss-ai-strength { background: linear-gradient(160deg, #ecfdf5 0%, #fff 65%); border-color: rgba(16, 185, 129, 0.2); }
-.ss-ai-improve { background: linear-gradient(160deg, #fffbeb 0%, #fff 65%); border-color: rgba(245, 158, 11, 0.22); }
-.ss-ai-reco { background: linear-gradient(160deg, #eff6ff 0%, #fff 65%); border-color: rgba(59, 130, 246, 0.2); }
-.ss-ai-gain {
-  background: linear-gradient(160deg, #f0fdfa 0%, #ecfeff 100%);
-  border-color: rgba(15, 118, 110, 0.22);
-  min-height: auto;
-}
-.ss-ai-card-kicker {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  color: #64748b;
-  margin-bottom: 0.45rem;
-}
-.ss-ai-card-text {
-  font-size: 0.9rem;
-  color: #134e4a;
-  line-height: 1.45;
-  flex: 1 1 auto;
-}
-.badge.bg-teal { background: #ccfbf1 !important; }
-
-@media (max-width: 767.98px) {
-  .ss-radar-wrap { min-height: 280px; }
-  .ss-score { font-size: 2.1rem; }
-  .ss-grade { font-size: 1.4rem; }
-}
-</style>
-
 <script type="application/json" id="sustainability-chart-config">{{ {
   'radar': dash.radar or {},
   'history': dash.history or {},
@@ -567,4 +321,5 @@
 }|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/chart.js/4.4.1/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/atikport-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/csp-data-styles.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sustainability-charts.js') }}"></script>

@@ -16,7 +16,7 @@
   function drawOrSkip(canvas, hasData, build) {
     if (!canvas) return;
     if (!hasData) {
-      if (demoSource) return; // Demo'da empty-state yok; sunucu dolu gelmeli
+      if (demoSource) return;
       if (UI && UI.wrapChartOrEmpty) {
         UI.wrapChartOrEmpty(canvas, false, {
           title: "Bu metrik için yeterli veri oluşmamıştır.",
@@ -25,8 +25,12 @@
       }
       return;
     }
-    if (UI) UI.markDemo(canvas, demoSource);
-    build();
+    function run() {
+      if (UI) UI.markDemo(canvas, demoSource);
+      build();
+    }
+    if (UI && UI.whenCanvasReady) UI.whenCanvasReady(canvas, run);
+    else run();
   }
 
   var part = cfg.participation || {};

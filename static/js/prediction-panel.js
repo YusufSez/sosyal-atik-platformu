@@ -367,6 +367,7 @@
     var canvas = document.getElementById("predictionHistoryChart");
     if (!canvas) return;
 
+    function paintHistory() {
     historyChart = new Chart(canvas, {
       type: "line",
       data: {
@@ -486,6 +487,13 @@
         data: { labels: [], datasets: [] },
         options: { responsive: false, plugins: { legend: { display: false } } },
       });
+    }
+    }
+
+    if (window.AtikPortUI && window.AtikPortUI.whenCanvasReady) {
+      window.AtikPortUI.whenCanvasReady(canvas, paintHistory);
+    } else {
+      paintHistory();
     }
   }
 

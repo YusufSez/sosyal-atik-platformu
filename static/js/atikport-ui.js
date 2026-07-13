@@ -152,6 +152,27 @@
     }
   }
 
+  function canvasReady(canvas) {
+    if (!canvas) return false;
+    var rect = canvas.getBoundingClientRect();
+    var parent = canvas.parentElement;
+    var pw = parent ? parent.getBoundingClientRect().width : 0;
+    var ph = parent ? parent.getBoundingClientRect().height : 0;
+    return (rect.width > 0 || pw > 0) && (rect.height > 0 || ph > 0 || canvas.height > 0);
+  }
+
+  function whenCanvasReady(canvas, fn, tries) {
+    tries = tries == null ? 24 : tries;
+    if (canvasReady(canvas)) {
+      fn();
+      return;
+    }
+    if (tries <= 0) return;
+    requestAnimationFrame(function () {
+      whenCanvasReady(canvas, fn, tries - 1);
+    });
+  }
+
   applyChartTheme();
 
   global.AtikPortUI = {
@@ -166,5 +187,7 @@
     hasNumericSeries: hasNumericSeries,
     sum: sum,
     markDemo: markDemo,
+    canvasReady: canvasReady,
+    whenCanvasReady: whenCanvasReady,
   };
 })(window);

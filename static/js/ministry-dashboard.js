@@ -9,6 +9,24 @@
     return;
   }
 
+  var UI = window.AtikPortUI || null;
+
+  (function stampLastUpdated() {
+    var stamp = document.getElementById("ncLastUpdated");
+    if (!stamp) return;
+    try {
+      stamp.textContent = new Date().toLocaleString("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (e) {
+      stamp.textContent = new Date().toISOString();
+    }
+  })();
+
   function renkHex(renk) {
     if (renk === "yesil") return "#16a34a";
     if (renk === "sari") return "#f59e0b";
@@ -16,83 +34,130 @@
     return "#94a3b8";
   }
 
-  if (typeof L !== "undefined") {
-    var UI = window.AtikPortUI;
-    var map = L.map("ministryIsiHaritasi").setView([39.0, 35.0], 6);
-    L.tileLayer(
-      (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        attribution:
-          (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
-          "© OpenStreetMap",
-      }
-    ).addTo(map);
+  function containerReady(mapEl) {
+    if (!mapEl) return false;
+    if (mapEl.classList.contains("d-none") || mapEl.hasAttribute("hidden")) return false;
+    var rect = mapEl.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
 
-    var heat = config.heat || [];
-    if (heat.length && typeof L.heatLayer === "function") {
-      L.heatLayer(heat, {
-        radius: 28,
-        blur: 22,
-        maxZoom: 10,
-        gradient: {
-          0.2: "#bbf7d0",
-          0.45: "#86efac",
-          0.65: "#fbbf24",
-          0.85: "#f97316",
-          1: "#dc2626",
-        },
-      }).addTo(map);
+  function addHeatOrFallback(map, heat) {
+    if (!heat || !heat.length) return;
+    try {
+      if (typeof L.heatLayer === "function") {
+        L.heatLayer(heat, {
+          radius: 28,
+          blur: 22,
+          maxZoom: 10,
+          gradient: {
+            0.2: "#bbf7d0",
+            0.45: "#86efac",
+            0.65: "#fbbf24",
+            0.85: "#f97316",
+            1: "#dc2626",
+          },
+        }).addTo(map);
+        return;
+      }
+    } catch (e) {
+      /* heat başarısız → circleMarker */
     }
-
-    var byIl = {};
-    (config.il_merkezleri || []).forEach(function (c) {
-      if (c && c.il) byIl[c.il] = c;
+    heat.forEach(function (p) {
+      if (!p || p.length < 2) return;
+      L.circleMarker([p[0], p[1]], {
+        radius: 5 + Math.min(8, (p[2] || 0.4) * 8),
+        color: "#dc2626",
+        fillColor: "#f97316",
+        fillOpacity: 0.45,
+        weight: 1,
+      }).addTo(map);
     });
+  }
 
-    var allProvinces = window.ATIKPORT_IL_MERKEZLERI || [];
-    allProvinces.forEach(function (base) {
-      var c = byIl[base.il] || {};
-      var hasData = !!(byIl[base.il] && (c.puan != null || c.intensity != null || c.renk));
-      var color = hasData ? renkHex(c.renk) : "#94a3b8";
-      if (hasData && !c.renk) {
-        color =
-          (c.intensity || 0) >= 0.7
-            ? "#16a34a"
-            : (c.intensity || 0) >= 0.4
-              ? "#f59e0b"
-              : "#dc2626";
+  if (typeof L !== "undefined") {
+    var mapEl = document.getElementById("ministryIsiHaritasi");
+    if (mapEl) {
+      var map = L.map(mapEl, { preferCanvas: true }).setView([39.0, 35.0], 6);
+      L.tileLayer(
+        (UI && UI.leafletTileUrl && UI.leafletTileUrl()) ||
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          attribution:
+            (UI && UI.leafletAttribution && UI.leafletAttribution()) ||
+            "© OpenStreetMap",
+        }
+      ).addTo(map);
+
+      var heat = config.heat || [];
+
+      function afterReady(tries) {
+        tries = tries == null ? 40 : tries;
+        map.invalidateSize();
+        if (!containerReady(mapEl)) {
+          if (tries <= 0) return;
+          requestAnimationFrame(function () {
+            afterReady(tries - 1);
+          });
+          return;
+        }
+        addHeatOrFallback(map, heat);
+        map.invalidateSize();
       }
-      var puan = c.puan != null ? c.puan : hasData ? Math.round((c.intensity || 0) * 100) : null;
-      var lat = c.lat != null ? c.lat : base.lat;
-      var lng = c.lng != null ? c.lng : base.lng;
-      L.circleMarker([lat, lng], {
-        radius: hasData ? 7 + Math.min(1, (c.intensity || (puan || 0) / 100)) * 8 : 5,
-        color: color,
-        fillColor: color,
-        fillOpacity: hasData ? 0.7 : 0.35,
-        weight: hasData ? 1.5 : 1,
-      })
-        .bindPopup(
-          "<strong>" +
-            base.il +
-            "</strong><br>" +
-            (hasData
-              ? "Performans: " +
-                (c.performans || "—") +
-                (puan != null ? " (" + puan + ")" : "") +
-                "<br>Kullanıcı: " +
-                (c.kullanici || "—")
-              : "Bu il için henüz yeterli veri oluşmamıştır.")
-        )
-        .addTo(map);
-    });
+
+      map.whenReady(function () {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(afterReady);
+        });
+      });
+
+      var byIl = {};
+      (config.il_merkezleri || []).forEach(function (c) {
+        if (c && c.il) byIl[c.il] = c;
+      });
+
+      var allProvinces = window.ATIKPORT_IL_MERKEZLERI || [];
+      allProvinces.forEach(function (base) {
+        var c = byIl[base.il] || {};
+        var hasData = !!(byIl[base.il] && (c.puan != null || c.intensity != null || c.renk));
+        var color = hasData ? renkHex(c.renk) : "#94a3b8";
+        if (hasData && !c.renk) {
+          color =
+            (c.intensity || 0) >= 0.7
+              ? "#16a34a"
+              : (c.intensity || 0) >= 0.4
+                ? "#f59e0b"
+                : "#dc2626";
+        }
+        var puan = c.puan != null ? c.puan : hasData ? Math.round((c.intensity || 0) * 100) : null;
+        var lat = c.lat != null ? c.lat : base.lat;
+        var lng = c.lng != null ? c.lng : base.lng;
+        L.circleMarker([lat, lng], {
+          radius: hasData ? 7 + Math.min(1, (c.intensity || (puan || 0) / 100)) * 8 : 5,
+          color: color,
+          fillColor: color,
+          fillOpacity: hasData ? 0.7 : 0.35,
+          weight: hasData ? 1.5 : 1,
+        })
+          .bindPopup(
+            "<strong>" +
+              base.il +
+              "</strong><br>" +
+              (hasData
+                ? "Performans: " +
+                  (c.performans || "—") +
+                  (puan != null ? " (" + puan + ")" : "") +
+                  "<br>Kullanıcı: " +
+                  (c.kullanici || "—")
+                : "Bu il için henüz yeterli veri oluşmamıştır.")
+          )
+          .addTo(map);
+      });
+    }
   }
 
   function buildBar(canvasId, rows, color) {
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return;
-    var UI = window.AtikPortUI || null;
     if (UI && UI.applyChartTheme) UI.applyChartTheme();
     var labels = (rows || []).map(function (r) {
       return r.il;
@@ -100,13 +165,11 @@
     var values = (rows || []).map(function (r) {
       return r.puan;
     });
-    // MASTER charts.bars — sunucu boş satır gelirse
     if (!labels.length && config.charts && config.charts.bars) {
       labels = (config.charts.bars.labels || []).slice();
       values = (config.charts.bars.values || []).slice();
     }
     if (!labels.length) {
-      // Demo açıkken empty-state yok; live'da boş bırak
       if (!config.demoSource && UI && UI.wrapChartOrEmpty) {
         UI.wrapChartOrEmpty(canvas, false, {
           title: "Bu metrik için yeterli veri oluşmamıştır.",
@@ -115,28 +178,32 @@
       }
       return;
     }
-    if (config.demoSource && UI) UI.markDemo(canvas, true);
-    new Chart(canvas, {
-      type: "bar",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: "Puan",
-            data: values,
-            backgroundColor: color,
-            borderRadius: 6,
-          },
-        ],
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, max: 100 } },
-      },
-    });
+    function paint() {
+      if (config.demoSource && UI) UI.markDemo(canvas, true);
+      new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Puan",
+              data: values,
+              backgroundColor: color,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, max: 100 } },
+        },
+      });
+    }
+    if (UI && UI.whenCanvasReady) UI.whenCanvasReady(canvas, paint);
+    else paint();
   }
 
   buildBar("ministryTopChart", config.top || [], "#10b981");
