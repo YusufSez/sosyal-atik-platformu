@@ -162,7 +162,8 @@ def test_unread_cache_cleared_on_logout(client, app):
         data={"email": "logout_cache@test.com", "password": "TestPass1"},
         follow_redirects=True,
     )
-    client.get("/cikis", follow_redirects=True)
+    # GET /cikis oturumu silmez (CSRF); cache temizliği POST çıkışta yapılır.
+    client.post("/cikis", follow_redirects=True)
 
     with app.app_context():
         assert get_message_unread_count(receiver.id, warm_if_missing=False) == 0

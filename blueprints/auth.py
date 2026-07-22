@@ -201,10 +201,18 @@ def profil_tamamla():
 @auth_bp.route("/giris", methods=["GET", "POST"])
 @limiter.limit(RATE_LOGIN, methods=["POST"])
 def giris():
-    if current_user.is_authenticated:
+    # GET: zaten girişliyse panele dön. POST: hesap değiştirmeye izin ver
+    # (GET /cikis artık oturumu silmediği için test/UX'te yeniden giriş gerekir).
+    if request.method == "GET" and current_user.is_authenticated:
         return redirect(post_login_url(current_user))
 
     if request.method == "POST":
+        if current_user.is_authenticated:
+            from services.message_unread_cache import clear_unread_cache
+
+            clear_unread_cache(current_user.id)
+            logout_user()
+
         captcha_err = captcha_hatasi()
         if captcha_err:
             flash(captcha_err, "danger")
