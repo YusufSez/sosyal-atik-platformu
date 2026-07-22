@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-5" style="max-width: 420px;">
+  <h1 class="h4 mb-3">Çıkış yap</h1>
+  <p class="text-muted">Oturumunuzu sonlandırmak istediğinize emin misiniz?</p>
+  <form method="post" action="{{ url_for('auth.cikis') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-danger">Çıkış Yap</button>
+    <a href="{{ url_for('main.anasayfa') }}" class="btn btn-outline-secondary">Vazgeç</a>
+  </form>
+</div>
+{% endblock %}

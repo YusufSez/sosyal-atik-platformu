@@ -9,6 +9,10 @@ venv/
 .env
 .env.*
 !.env.example
+.git/
+.gitignore
+*.pem
+*.key
 *.db
 *.sqlite
 backups/

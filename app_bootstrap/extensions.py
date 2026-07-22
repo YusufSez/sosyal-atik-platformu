@@ -50,4 +50,11 @@ def init_extensions(app):
             return None
         if uid <= 0:
             return None
-        return db.session.get(User, uid)
+        user = db.session.get(User, uid)
+        if not user:
+            return None
+        from services.session_security import session_matches_password
+
+        if not session_matches_password(user):
+            return None
+        return user

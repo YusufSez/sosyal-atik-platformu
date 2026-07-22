@@ -12,11 +12,11 @@ from utils import utc_now
 
 
 def _request_meta() -> tuple[str | None, str | None]:
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr) if request else None
-    if ip and "," in ip:
-        ip = ip.split(",")[0].strip()
+    from services.client_ip import client_ip
+
+    ip = client_ip() if request else None
     user_agent = (request.headers.get("User-Agent") or "")[:500] if request else None
-    return (ip[:45] if ip else None), user_agent
+    return ip, user_agent
 
 
 def log_moderasyon_activity(

@@ -117,8 +117,35 @@ def test_recycling_adjustment_organik_atik():
 
 
 def test_recycling_adjustment_ai_purpose_field():
+    # AI purpose tek başına yetmez; "hurda" sunucu tarafı amaç ifadesidir.
     sonuc = {"risk_skoru": 65, "is_recyclable": False, "purpose": "waste_collection"}
     assert qualifies_for_risk_adjustment(sonuc, baslik="Hurda metal", tur="atik")
+    # Prompt injection: yalnızca AI bayrağı
+    assert not qualifies_for_risk_adjustment(
+        {"risk_skoru": 98, "is_recyclable": True, "purpose": "recycling", "uygunsuz": True},
+        baslik="Zararsız görünen",
+        aciklama="normal metin",
+        tur="atik",
+    )
+
+
+def test_uygunsuz_never_adjusted_even_with_purpose_phrase():
+    """Whitelist / amaç ifadesi uygunsuz=True iken riski düşüremez."""
+    sonuc = {
+        "risk_skoru": 98,
+        "uygunsuz": True,
+        "is_recyclable": True,
+        "purpose": "recycling",
+    }
+    out = apply_recyclable_adjustment(
+        sonuc,
+        baslik="Silah geri dönüşüm için ücretsiz ver",
+        aciklama="bertaraf",
+        tur="atik",
+    )
+    assert out["risk_skoru"] == 98
+    assert out.get("whitelist_applied") is False
+    assert resolve_moderation_status(98, uygunsuz=True) == MODERATION_STATUS_REJECTED
 
 
 # --- Zararlı içerik: risk düşürülmemeli ---

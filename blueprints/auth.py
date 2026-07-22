@@ -22,6 +22,7 @@ from services.email_tokens import (
     verify_email_token,
     verify_reset_token,
 )
+from services.session_security import stamp_login_session
 from services.portal_redirect import post_login_url
 from services.user_moderation import is_user_banned
 from utils import (
@@ -187,6 +188,7 @@ def profil_tamamla():
         db.session.commit()
         session.pop("temp_user_id", None)
         login_user(user)
+        stamp_login_session(user)
         from services.message_unread_cache import refresh_unread_cache
 
         refresh_unread_cache(user.id)
@@ -240,6 +242,7 @@ def giris():
             return redirect(url_for("auth.profil_tamamla"))
 
         login_user(user)
+        stamp_login_session(user)
         from services.message_unread_cache import refresh_unread_cache
 
         refresh_unread_cache(user.id)
@@ -251,13 +254,18 @@ def giris():
     return render_template("login.html", title="Giriş Yap", ban_notice=session.pop("ban_notice", None))
 
 
-@auth_bp.route("/cikis")
+@auth_bp.route("/cikis", methods=["GET", "POST"])
 @login_required
 def cikis():
     from services.message_unread_cache import clear_unread_cache
 
+    # GET yalnızca uyumluluk; state değişikliği POST + CSRF ile yapılmalı.
+    if request.method == "GET":
+        return render_template("cikis_onay.html", title="Çıkış")
+
     user_id = current_user.id
     logout_user()
+    session.clear()
     clear_unread_cache(user_id)
     flash("Çıkış yapıldı.", "success")
     return redirect(url_for("main.anasayfa"))
@@ -325,7 +333,8 @@ def sifre_degistir():
 
         current_user.password = hash_password(yeni)
         db.session.commit()
-        flash("Şifreniz güncellendi.", "success")
+        stamp_login_session(current_user)
+        flash("Şifreniz güncellendi. Diğer oturumlar sonlandırıldı.", "success")
         return redirect(url_for("auth.profil"))
 
     return render_template("sifre_degistir.html", title="Şifre Değiştir")
@@ -416,7 +425,7 @@ def sifre_sifirla(token):
             return redirect(url_for("auth.sifremi_unuttum"))
         return render_template("sifre_sifirla.html", title="Şifre Sıfırla", token=token)
 
-    user, error = verify_reset_token(token)
+    user, error = peek_token(token, "reset")
     if error == "expired":
         flash("Şifre sıfırlama bağlantısının süresi dolmuş.", "warning")
         return redirect(url_for("auth.sifremi_unuttum"))
@@ -433,6 +442,12 @@ def sifre_sifirla(token):
     if not valid:
         flash(msg, "danger")
         return render_template("sifre_sifirla.html", title="Şifre Sıfırla", token=token)
+
+    # Token yalnızca şifre kabul edildikten sonra tüketilir.
+    user, error = verify_reset_token(token)
+    if error or not user:
+        flash("Geçersiz veya kullanılmış şifre sıfırlama bağlantısı.", "danger")
+        return redirect(url_for("auth.sifremi_unuttum"))
 
     user.password = hash_password(yeni)
     db.session.commit()

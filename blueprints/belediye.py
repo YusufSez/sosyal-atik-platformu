@@ -24,10 +24,32 @@ belediye_bp = Blueprint("belediye", __name__, url_prefix="/belediye")
 
 
 def _filters_from_request():
-    """İstek filtreleri; belediye kullanıcısında il boşsa hesap iline kilitlenir."""
+    """İstek filtreleri; belediye rolünde coğrafya hesap iline kilitlenir."""
+    from constants import ROLE_MUNICIPALITY
+
+    role = getattr(current_user, "role", None) if current_user.is_authenticated else None
+    account_il = (
+        (getattr(current_user, "il", None) or "").strip() or None
+        if current_user.is_authenticated
+        else None
+    )
+    account_ilce = (
+        (getattr(current_user, "ilce", None) or "").strip() or None
+        if current_user.is_authenticated
+        else None
+    )
+
+    # Belediye hesabı başka şehirleri ?il= ile göremez (admin/superadmin serbest).
+    if role == ROLE_MUNICIPALITY:
+        return {
+            "il": account_il,
+            "ilce": account_ilce,
+            "mahalle": None,
+        }
+
     il = request.args.get("il") or None
     if not il and current_user.is_authenticated:
-        il = (getattr(current_user, "il", None) or "").strip() or None
+        il = account_il
     return {
         "il": il,
         "ilce": request.args.get("ilce") or None,

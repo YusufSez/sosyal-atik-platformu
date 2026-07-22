@@ -44,7 +44,9 @@ def _err(exc: MarketplaceError):
     if request.is_json or request.path.startswith("/marketplace/api/"):
         return jsonify({"error": exc.message}), exc.status
     flash(exc.message, "danger")
-    return redirect(request.referrer or url_for("marketplace.panel"))
+    from utils import safe_redirect_url
+
+    return redirect(safe_redirect_url(request.referrer, "marketplace.panel"))
 
 
 @marketplace_bp.route("/")

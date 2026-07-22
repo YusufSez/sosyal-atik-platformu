@@ -8,12 +8,9 @@ from flask import request
 
 
 def request_ip() -> str | None:
-    if not request:
-        return None
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    if ip and "," in ip:
-        ip = ip.split(",")[0].strip()
-    return (ip or "")[:45] or None
+    from services.client_ip import client_ip
+
+    return client_ip()
 
 
 def request_user_agent() -> str | None:

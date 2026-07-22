@@ -67,6 +67,10 @@ def test_mesaj_uygun_mu_ai_izin_verir(app, monkeypatch):
         uygun, hata = mesaj_uygun_mu("Ürün hâlâ mevcut mu?")
         assert uygun is True
         assert hata == ""
+        # AI onaylasa bile kelime listesi engeller (prompt injection bypass).
+        uygun, hata = mesaj_uygun_mu("amk ne diyorsun")
+        assert uygun is False
+        assert "uygunsuz" in hata.lower()
 
 
 def _iki_kullanici(app):

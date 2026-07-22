@@ -93,11 +93,11 @@ def _validate_storage_uri(uri: str) -> str:
         except Exception as exc:
             if strict:
                 raise RuntimeError(
-                    f"RATELIMIT_STRICT etkin: Redis'e bağlanılamadı ({uri})"
+                    f"RATELIMIT_STRICT etkin: Redis'e bağlanılamadı ({_redact_uri(uri)})"
                 ) from exc
             logger.warning(
                 "Redis'e bağlanılamadı (%s); rate limit memory:// backend'ine düşürüldü: %s",
-                uri,
+                _redact_uri(uri),
                 exc,
             )
             return "memory://"

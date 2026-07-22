@@ -26,9 +26,9 @@ def log_admin_action(
     ip = None
     user_agent = None
     if has_request_context():
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-        if ip and "," in ip:
-            ip = ip.split(",")[0].strip()
+        from services.client_ip import client_ip
+
+        ip = client_ip()
         user_agent = (request.headers.get("User-Agent") or "")[:500]
 
     kayit = AdminAuditLog(

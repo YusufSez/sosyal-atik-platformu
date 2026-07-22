@@ -67,12 +67,17 @@ def mesaj_uygun_mu(metin: str) -> tuple[bool, str]:
 
     ai_sonuc = ai_mesaj_moderasyon(metin)
 
+    # Kelime listesi her zaman uygulanır (AI onaylasa bile) — prompt injection bypass önlemi.
+    liste_ok, liste_msg = _liste_ile_kontrol(metin)
+    if not liste_ok:
+        return False, liste_msg
+
     if ai_sonuc.get("kaynak") == "ai":
         if not ai_sonuc.get("uygun", True):
             return False, ai_sonuc.get("mesaj") or _AI_UYGUNSUZ_MESAJ
         return True, ""
 
-    return _liste_ile_kontrol(metin)
+    return True, ""
 
 
 def yorum_uygun_mu(metin: str) -> tuple[bool, str]:

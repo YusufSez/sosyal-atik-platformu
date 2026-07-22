@@ -14,11 +14,11 @@ from utils import sanitize_input, tr_time
 
 
 def _request_meta() -> tuple[str | None, str | None]:
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    if ip and "," in ip:
-        ip = ip.split(",")[0].strip()
+    from services.client_ip import client_ip
+
+    ip = client_ip()
     user_agent = (request.headers.get("User-Agent") or "")[:500]
-    return (ip or None), user_agent or None
+    return ip, user_agent or None
 
 
 def _validate_guest_name(value: str, label: str) -> str:

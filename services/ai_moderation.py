@@ -188,13 +188,9 @@ def qualifies_for_risk_adjustment(
     kategori_secim: str | None = None,
     tur: str = "atik",
 ) -> bool:
-    """Risk düşürme yalnızca amaç veya platform bağlamı kanıtlandığında uygulanır."""
-    if sonuc.get("is_recyclable"):
-        return True
+    """Risk düşürme yalnızca sunucu tarafı kanıtla uygulanır (AI bayraklarına güvenilmez)."""
+    # Model çıktısı prompt injection ile is_recyclable/purpose uydurabilir — yok say.
     if detect_recycling_purpose(baslik, aciklama):
-        return True
-    purpose = (sonuc.get("purpose") or "").lower()
-    if purpose in ("recycling", "reuse", "waste_collection", "resource_sharing"):
         return True
 
     material = detect_waste_material_mention(baslik, aciklama)
@@ -202,9 +198,6 @@ def qualifies_for_risk_adjustment(
         if material and detect_recycling_purpose(baslik, aciklama):
             return True
         if material and kategori_secim and kategori_secim.strip() not in ("", "Diğer"):
-            return True
-        if material and not kategori_secim:
-            # Atık ilanında malzeme + bağlam (ör. "eski piller toplanacak")
             return True
     if tur == "kaynak" and material and detect_recycling_purpose(baslik, aciklama):
         return True
@@ -305,13 +298,28 @@ def apply_recyclable_adjustment(
     tur: str = "atik",
 ) -> dict:
     """Geri dönüşüm amacı kanıtlandığında AI'nın şişirdiği risk skorunu düşürür."""
-    if not qualifies_for_risk_adjustment(
-        sonuc, baslik=baslik, aciklama=aciklama, kategori_secim=kategori_secim, tur=tur
-    ):
-        return sonuc
-
     out = dict(sonuc)
     risk = int(out.get("risk_skoru", 0))
+    uygunsuz = bool(out.get("uygunsuz", False))
+    out["initial_risk"] = int(out.get("initial_risk", risk))
+
+    # Güvenlik: uygunsuz veya red eşiği üstü risk asla düşürülmez (prompt/whitelist bypass).
+    if uygunsuz or risk >= AI_RISK_REJECT_MIN:
+        out["final_risk"] = risk
+        out["risk_adjustment"] = 0
+        out["whitelist_applied"] = False
+        out["moderation_status"] = resolve_moderation_status(risk, uygunsuz=uygunsuz)
+        out["guvenli"] = out["moderation_status"] != MODERATION_STATUS_REJECTED
+        out["matched_rules"] = compute_matched_rules(
+            out, baslik=baslik, aciklama=aciklama, kategori_secim=kategori_secim, tur=tur
+        )
+        return out
+
+    if not qualifies_for_risk_adjustment(
+        out, baslik=baslik, aciklama=aciklama, kategori_secim=kategori_secim, tur=tur
+    ):
+        return out
+
     initial_risk = risk
     out["initial_risk"] = initial_risk
     if risk <= AI_RISK_AUTO_APPROVE_MAX:
