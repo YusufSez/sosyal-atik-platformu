@@ -78,6 +78,83 @@ def test_http_mesajlar_getir_rejects_unauthorized(client, app):
     assert response.status_code == 403
 
 
+def test_http_mesajlar_page_rejects_unauthorized(client, app):
+    """HTML /mesajlar URL manipülasyonu — yabancı sohbet 403."""
+    with app.app_context():
+        sender = _make_user("page_a", "page_a@test.com")
+        receiver = _make_user("page_b", "page_b@test.com")
+        _make_user("page_c", "page_c@test.com")
+        db.session.add(
+            Mesaj(sender_id=sender.id, receiver_id=receiver.id, content="özel-ab")
+        )
+        db.session.commit()
+        sender_id = sender.id
+
+    _login(client, "page_c@test.com")
+    response = client.get(f"/mesajlar/{sender_id}/0/0")
+    assert response.status_code == 403
+
+
+def test_owner_cannot_open_chat_with_arbitrary_user_via_url(client, app):
+    """İlan sahibi, mesaj geçmişi olmadan rastgele user_id ile sohbet açamaz."""
+    with app.app_context():
+        owner = _make_user("own_url", "own_url@test.com")
+        stranger = _make_user("str_url", "str_url@test.com")
+        kaynak = Kaynak(
+            user_id=owner.id,
+            baslik="URL-IDOR",
+            aciklama="Test",
+            durum="Temiz",
+            kategori="Diğer",
+            latitude=41.0,
+            longitude=29.0,
+            ilan_durumu="Aktif",
+            moderation_status="approved",
+        )
+        db.session.add(kaynak)
+        db.session.commit()
+        stranger_id = stranger.id
+        kaynak_id = kaynak.id
+
+    _login(client, "own_url@test.com")
+    assert client.get(f"/mesajlar/{stranger_id}/{kaynak_id}/0").status_code == 403
+    assert client.get(f"/mesajlar_getir/{stranger_id}/{kaynak_id}/0").status_code == 403
+
+
+def test_dual_listing_ids_rejected(client, app):
+    with app.app_context():
+        owner = _make_user("dual_o", "dual_o@test.com")
+        buyer = _make_user("dual_b", "dual_b@test.com")
+        kaynak = Kaynak(
+            user_id=owner.id,
+            baslik="Dual",
+            aciklama="Test",
+            durum="Temiz",
+            kategori="Diğer",
+            latitude=41.0,
+            longitude=29.0,
+            ilan_durumu="Aktif",
+            moderation_status="approved",
+        )
+        atik = Atik(
+            user_id=owner.id,
+            baslik="DualAtik",
+            aciklama="Test",
+            latitude=41.0,
+            longitude=29.0,
+            kategori="Plastik",
+            ilan_durumu="Aktif",
+            moderation_status="approved",
+        )
+        db.session.add_all([kaynak, atik])
+        db.session.commit()
+        owner_id = owner.id
+        kid, aid = kaynak.id, atik.id
+
+    _login(client, "dual_b@test.com")
+    assert client.get(f"/mesajlar/{owner_id}/{kid}/{aid}").status_code == 403
+
+
 def test_http_send_message_allows_ilan_context(client, app):
     with app.app_context():
         owner = _make_user("ilan_owner", "ilan_owner@test.com")

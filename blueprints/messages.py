@@ -4,8 +4,9 @@ from flask_login import current_user, login_required
 from constants import RATE_MESSAGE, RATE_MESSAGE_FETCH
 from decorators import email_verified_required
 from extensions import db, limiter, rate_limit_user_or_ip
-from models import Atik, Kaynak, Mesaj, User
+from models import Mesaj
 from services.content_filter import mesaj_uygun_mu
+from services.conversation_access import resolve_authorized_conversation
 from services.message_unread_cache import get_message_unread_count
 from services.messaging_queries import (
     fetch_inbox_threads,
@@ -14,30 +15,31 @@ from services.messaging_queries import (
 )
 from services.notifications import bildirim_olustur
 from socket_events import (
-    canonical_conversation_id,
     emit_after_message_created,
     emit_messages_marked_read,
     presence_payload,
     serialize_message,
-    user_can_access_conversation,
 )
 from utils import sanitize_input, utc_now
 
 messages_bp = Blueprint("messages", __name__)
 
 
-def _norm_conversation_ids(kaynak_id, atik_id) -> tuple[int, int]:
-    return int(kaynak_id or 0), int(atik_id or 0)
-
-
-def _require_conversation_access(partner_id: int, kaynak_id, atik_id):
-    """Socket ile aynı yetki kontrolü; yetkisizse yanıt döner."""
-    k_id, a_id = _norm_conversation_ids(kaynak_id, atik_id)
-    if user_can_access_conversation(current_user.id, int(partner_id), k_id, a_id):
-        return None
+def _deny_conversation():
+    """Yetkisiz sohbet erişimi — JSON uçlarında 403 gövde, HTML'de abort(403)."""
     if request.is_json or request.path.endswith("/send_message") or "/mesajlar_getir/" in request.path:
         return jsonify({"error": "Yetkisiz"}), 403
     abort(403)
+
+
+def _require_context(partner_id, kaynak_id, atik_id):
+    """URL anahtarından yetkili bağlam; yoksa deny yanıtı."""
+    ctx = resolve_authorized_conversation(
+        current_user.id, partner_id, kaynak_id, atik_id
+    )
+    if ctx is None:
+        return None, _deny_conversation()
+    return ctx, None
 
 
 def _persist_message(sender, receiver_id, content, kaynak_id, atik_id):
@@ -103,27 +105,38 @@ def inject_unread_from_cache():
 @limiter.limit(RATE_MESSAGE, methods=["POST"], key_func=rate_limit_user_or_ip)
 @limiter.limit(RATE_MESSAGE_FETCH, methods=["GET"], key_func=rate_limit_user_or_ip)
 def mesajlar(user_id, kaynak_id, atik_id):
-    denied = _require_conversation_access(user_id, kaynak_id, atik_id)
+    ctx, denied = _require_context(user_id, kaynak_id, atik_id)
     if denied:
         return denied
 
-    alici = User.query.get_or_404(user_id)
-    urun = None
-
-    if kaynak_id != 0:
-        urun = Kaynak.query.get_or_404(kaynak_id)
-    if atik_id != 0:
-        urun = Atik.query.get_or_404(atik_id)
+    alici = ctx.partner
+    urun = ctx.urun
+    kaynak_id = ctx.kaynak_id
+    atik_id = ctx.atik_id
 
     if request.method == "POST":
         icerik = sanitize_input(request.form.get("icerik"), max_length=2000)
         uygun, hata = mesaj_uygun_mu(icerik)
         if icerik and not uygun:
             flash(hata, "danger")
-            return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
+            return redirect(
+                url_for(
+                    "messages.mesajlar",
+                    user_id=alici.id,
+                    kaynak_id=kaynak_id,
+                    atik_id=atik_id,
+                )
+            )
         if icerik:
             _persist_message(current_user, alici.id, icerik, kaynak_id, atik_id)
-        return redirect(url_for("messages.mesajlar", user_id=alici.id, kaynak_id=kaynak_id, atik_id=atik_id))
+        return redirect(
+            url_for(
+                "messages.mesajlar",
+                user_id=alici.id,
+                kaynak_id=kaynak_id,
+                atik_id=atik_id,
+            )
+        )
 
     return render_template(
         "mesajlar.html",
@@ -131,33 +144,32 @@ def mesajlar(user_id, kaynak_id, atik_id):
         kaynak_id=kaynak_id,
         atik_id=atik_id,
         urun=urun,
-        conversation_id=f"{alici.id}-{kaynak_id}-{atik_id}",
-        canonical_conversation_id=canonical_conversation_id(
-            current_user.id, alici.id, kaynak_id, atik_id
-        ),
+        conversation_id=ctx.conversation_id,
+        canonical_conversation_id=ctx.canonical_conversation_id,
         partner_presence=presence_payload(alici, alici.id),
     )
 
 
 @messages_bp.route("/mesajlar_getir/<int:alici_id>/<int:kaynak_id>/<int:atik_id>")
 @login_required
+@email_verified_required
 @limiter.limit(RATE_MESSAGE_FETCH, key_func=rate_limit_user_or_ip)
 def mesajlar_getir(alici_id, kaynak_id, atik_id):
-    denied = _require_conversation_access(alici_id, kaynak_id, atik_id)
+    ctx, denied = _require_context(alici_id, kaynak_id, atik_id)
     if denied:
         return denied
 
     before_id = request.args.get("before_id", type=int)
     mesajlar_list, has_more, oldest_id = fetch_message_page(
         current_user.id,
-        alici_id,
-        kaynak_id,
-        atik_id,
+        ctx.partner.id,
+        ctx.kaynak_id,
+        ctx.atik_id,
         before_id=before_id,
     )
 
     if before_id is None:
-        _mark_conversation_read(alici_id, kaynak_id, atik_id)
+        _mark_conversation_read(ctx.partner.id, ctx.kaynak_id, ctx.atik_id)
 
     return jsonify({
         "messages": [serialize_fetched_message(m) for m in mesajlar_list],
@@ -187,7 +199,7 @@ def send_message():
     if not alici_id or not content:
         return jsonify({"error": "Eksik veri"}), 400
 
-    denied = _require_conversation_access(int(alici_id), kaynak_id or 0, atik_id or 0)
+    ctx, denied = _require_context(int(alici_id), kaynak_id or 0, atik_id or 0)
     if denied:
         return denied
 
@@ -195,7 +207,13 @@ def send_message():
     if not uygun:
         return jsonify({"error": hata}), 400
 
-    mesaj = _persist_message(current_user, alici_id, content, kaynak_id or 0, atik_id or 0)
+    mesaj = _persist_message(
+        current_user,
+        ctx.partner.id,
+        content,
+        ctx.kaynak_id,
+        ctx.atik_id,
+    )
 
     return jsonify({
         "success": True,
