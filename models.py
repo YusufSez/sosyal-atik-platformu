@@ -117,6 +117,49 @@ class AtikMerkezi(db.Model):
     adres = db.Column(db.String(255))
 
 
+class MunicipalWasteCenter(db.Model):
+    """Belediye resmi atık toplama / getirme noktaları (İBB, Konya, …)."""
+
+    __tablename__ = "municipal_waste_centers"
+    __table_args__ = (
+        db.UniqueConstraint("source", "external_key", name="uq_mwc_source_external_key"),
+        db.Index("ix_mwc_source_city", "source", "city"),
+        db.Index("ix_mwc_coords", "latitude", "longitude"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    facility_type = db.Column(db.String(120), nullable=True)
+    address = db.Column(db.String(255), nullable=True)
+    district = db.Column(db.String(100), nullable=True)
+    city = db.Column(db.String(100), nullable=False, index=True)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
+    waste_types = db.Column(db.Text, nullable=True)  # JSON list
+    description = db.Column(db.Text, nullable=True)
+    source = db.Column(db.String(40), nullable=False, index=True)
+    source_name = db.Column(db.String(150), nullable=False)
+    # external_key: SHA256(source:lat:lng) — 64 hex; 120 legacy uyumu
+    external_key = db.Column(db.String(120), nullable=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=tr_time)
+    updated_at = db.Column(db.DateTime, default=tr_time, onupdate=tr_time)
+
+    @property
+    def waste_types_list(self) -> list:
+        if not self.waste_types:
+            return []
+        try:
+            import json
+
+            data = json.loads(self.waste_types)
+            return data if isinstance(data, list) else []
+        except (TypeError, ValueError):
+            return []
+
+
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)

@@ -1,7 +1,14 @@
-{% macro leaflet_assets(heat=false) %}
+{% macro leaflet_assets(heat=false, cluster=false) %}
 <meta name="leaflet-icon-base" content="{{ url_for('static', filename='vendor/leaflet/1.9.4/images/') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/1.9.4/leaflet.css') }}">
+{% if cluster %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet.markercluster/1.5.3/MarkerCluster.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet.markercluster/1.5.3/MarkerCluster.Default.css') }}">
+{% endif %}
 <script src="{{ url_for('static', filename='vendor/leaflet/1.9.4/leaflet.js') }}"></script>
+{% if cluster %}
+<script src="{{ url_for('static', filename='vendor/leaflet.markercluster/1.5.3/leaflet.markercluster.js') }}"></script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/leaflet-icons.js') }}"></script>
 <script src="{{ url_for('static', filename='js/map-locate.js') }}"></script>
 {% if heat %}

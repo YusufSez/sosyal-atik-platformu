@@ -46,6 +46,7 @@ from models import (
     Kaynak,
     KullaniciRozet,
     Mesaj,
+    MunicipalWasteCenter,
     Sikayet,
     User,
 )
@@ -55,6 +56,7 @@ from services.database_config import is_postgres_uri, is_sqlite_uri, resolve_dat
 COPY_MODELS = (
     User,
     AtikMerkezi,
+    MunicipalWasteCenter,
     Kaynak,
     Atik,
     IlanResim,

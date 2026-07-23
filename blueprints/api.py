@@ -1,6 +1,3 @@
-import re
-
-import requests
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -8,6 +5,9 @@ from constants import RATE_PUBLIC_API
 from extensions import db, limiter
 from models import AtikMerkezi, Atik, Bildirim, Favori, Goruntulenme, Kaynak, Mesaj, Sikayet
 from services.admin_notifications import notify_admins
+from services.municipal_waste.providers.ibb import fetch_ibb_merkezleri_live, filter_ibb_live_centers
+from services.municipal_waste.query import filter_meta, parse_request_args, query_centers
+from services.turkey_geo import list_districts, list_provinces, province_exists
 from services.user_moderation import resolve_reported_user_id
 from services.notifications import bildirim_olustur
 from socket_events import emit_notification_sync, emit_unread_count_updated
@@ -15,44 +15,12 @@ from utils import format_datetime, safe_notification_link, mesafe_hesapla, sanit
 
 api_bp = Blueprint("api", __name__)
 
-IBB_ATIK_RESOURCE_ID = "0124b01f-cfe7-4af8-ac80-88cb44ab5d64"
 
-
-def get_ibb_merkezleri(limit=200):
-    """İBB açık veri API'sinden atık toplama merkezlerini çeker."""
-    url = (
-        "https://data.ibb.gov.tr/api/3/action/datastore_search"
-        f"?resource_id={IBB_ATIK_RESOURCE_ID}&limit={limit}"
-    )
-    try:
-        r = requests.get(url, timeout=10)
-        data = r.json()
-    except requests.RequestException:
-        return []
-
-    results = data.get("result", {}).get("records", [])
-    merkezler = []
-    for i, item in enumerate(results):
-        try:
-            shape = item.get("shape")
-            lat, lng = None, None
-            if shape:
-                match = re.search(r"POINT\s*\(([^ ]+)\s+([^)]+)\)", shape)
-                if match:
-                    lng = float(match.group(1))
-                    lat = float(match.group(2))
-            if lat is None or lng is None:
-                continue
-            merkezler.append({
-                "id": i,
-                "ad": item.get("facility_name") or "Atık Merkezi",
-                "lat": lat,
-                "lng": lng,
-                "adres": item.get("address", ""),
-            })
-        except (TypeError, ValueError):
-            continue
-    return merkezler
+def get_ibb_merkezleri(**filters):
+    """İBB açık veri API'sinden atık toplama merkezlerini çeker (opsiyonel filtreler)."""
+    fetch_limit = max(int(filters.get("limit") or 200), 200)
+    raw = fetch_ibb_merkezleri_live(limit=min(fetch_limit, 500), timeout=10)
+    return filter_ibb_live_centers(raw, **filters)
 
 
 def get_yerel_merkezler():
@@ -71,7 +39,79 @@ def get_yerel_merkezler():
 @api_bp.route("/api/ibb_atik_merkezleri")
 @limiter.limit(RATE_PUBLIC_API)
 def ibb_atik_merkezleri():
-    return jsonify(get_ibb_merkezleri())
+    """
+    İBB canlı CKAN katmanı.
+
+    Opsiyonel filtreler (municipal ile uyumlu): city, district, facility_type,
+    waste_type, nearby+lat+lng, bbox (north/south/east/west), limit.
+    city≠İstanbul ise boş liste; facility/waste eşleşmezse İBB sıfırlanmaz.
+    """
+    kwargs = parse_request_args(request.args)
+    # source=konya gibi açıkça başka kaynak istendiğinde İBB gizlenir
+    source = kwargs.pop("source", None)
+    kwargs.pop("include_inactive", None)
+    if source and source != "ibb":
+        return jsonify([])
+    if not kwargs.get("limit"):
+        kwargs["limit"] = 500
+    return jsonify(get_ibb_merkezleri(**kwargs))
+
+
+@api_bp.route("/api/municipal_waste_centers")
+@limiter.limit(RATE_PUBLIC_API)
+def api_municipal_waste_centers():
+    """
+    Kalıcı belediye merkezleri (PostgreSQL).
+
+    Filtreler: source, city, district, facility_type, waste_type
+    BBox: north,south,east,west
+    Nearby: nearby=1&lat=&lng=&limit=20
+
+    Not: İBB canlı katmanı /api/ibb_atik_merkezleri üzerinden gelir;
+    source=ibb ile bu endpoint DB'deki İBB senkron kayıtlarını döner (varsa).
+    """
+    kwargs = parse_request_args(request.args)
+    return jsonify(query_centers(**kwargs))
+
+
+@api_bp.route("/api/municipal_waste_centers/meta")
+@limiter.limit(RATE_PUBLIC_API)
+def api_municipal_waste_centers_meta():
+    """Harita filtre paneli: tesis/atık türleri + coğrafya endpoint ipuçları."""
+    source = (request.args.get("source") or "").strip().lower() or None
+    return jsonify(filter_meta(source=source))
+
+
+@api_bp.route("/api/turkey/provinces")
+@limiter.limit(RATE_PUBLIC_API)
+def api_turkey_provinces():
+    """Türkiye'nin resmi 81 ili (statik sözlük; DB bağımsız)."""
+    try:
+        provinces = list_provinces()
+        if not provinces:
+            current_app.logger.error("turkey_geo: provinces listesi boş döndü")
+            return jsonify({"provinces": [], "count": 0, "error": "empty_provinces"}), 500
+        return jsonify({"provinces": provinces, "count": len(provinces)})
+    except Exception:
+        current_app.logger.exception("turkey_geo: /api/turkey/provinces başarısız")
+        return jsonify({"provinces": [], "count": 0, "error": "provinces_load_failed"}), 500
+
+
+@api_bp.route("/api/turkey/districts")
+@limiter.limit(RATE_PUBLIC_API)
+def api_turkey_districts():
+    """Seçilen ile ait resmi ilçeler (statik sözlük; DB bağımsız)."""
+    city = (request.args.get("city") or request.args.get("il") or "").strip()
+    if not city:
+        return jsonify({"city": None, "districts": [], "error": "city_required"}), 400
+    try:
+        if not province_exists(city):
+            return jsonify({"city": city, "districts": [], "error": "unknown_province"}), 404
+        districts = list_districts(city)
+        return jsonify({"city": city, "districts": districts, "count": len(districts)})
+    except Exception:
+        current_app.logger.exception("turkey_geo: /api/turkey/districts başarısız city=%s", city)
+        return jsonify({"city": city, "districts": [], "error": "districts_load_failed"}), 500
 
 
 @api_bp.route("/api/atik_merkezleri")
@@ -88,6 +128,17 @@ def api_atik_merkezleri():
 @limiter.limit(RATE_PUBLIC_API)
 def en_yakin_merkezler(lat, lng):
     merkezler = get_ibb_merkezleri()
+    # Belediye noktaları: tüm tabloyu çekmek yerine yakındakiler
+    for row in query_centers(nearby=True, lat=lat, lng=lng, limit=50):
+        merkezler.append(
+            {
+                "id": row["id"],
+                "ad": row["ad"],
+                "lat": row["lat"],
+                "lng": row["lng"],
+                "adres": row.get("adres", ""),
+            }
+        )
     if not merkezler:
         merkezler = get_yerel_merkezler()
 

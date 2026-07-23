@@ -1,7 +1,15 @@
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
-APP_TIMEZONE = ZoneInfo("Europe/Istanbul")
+try:
+    from zoneinfo import ZoneInfo
+
+    APP_TIMEZONE = ZoneInfo("Europe/Istanbul")
+except Exception:
+    # Windows'ta IANA tz verisi yoksa tzdata / pytz gerekir
+    from pytz import timezone as pytz_timezone
+
+    APP_TIMEZONE = pytz_timezone("Europe/Istanbul")
+
 UTC = timezone.utc
 
 

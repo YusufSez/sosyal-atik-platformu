@@ -8,6 +8,7 @@ from pathlib import Path
 from constants import ITEMS_PER_PAGE, MAX_UPLOAD_BYTES
 from services.database_config import is_sqlite_uri, resolve_database_uri
 from utils import env_to_bool
+from utils.env import is_development_runtime, is_production_env
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,21 @@ def _validate_secret_key(secret_key, is_testing):
 
 
 def _is_production_runtime(app) -> bool:
+    """Production fail-fast yalnızca gerçek production ortamında çalışır.
+
+    Local: APP_ENV/FLASK_ENV=development veya DEBUG=True → False
+    Test: TESTING / FLASK_ENV=testing → False
+    VPS/Docker: DEBUG=False ve production env (veya varsayılan) → True
+    """
     if app.config.get("TESTING"):
         return False
     if app.config.get("DEBUG"):
         return False
     if skip_startup_hooks():
         return False
-    return True
+    if is_development_runtime():
+        return False
+    return is_production_env()
 
 
 def validate_production_runtime(app) -> None:

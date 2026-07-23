@@ -194,12 +194,37 @@ def test_production_fail_fast_missing_site_url(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "a" * 32)
     monkeypatch.setenv("FORCE_HTTPS", "true")
     monkeypatch.setenv("DEBUG", "false")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("FLASK_ENV", raising=False)
     monkeypatch.delenv("SITE_URL", raising=False)
     monkeypatch.setenv("SOCKETIO_CORS_ORIGINS", "https://example.com")
     monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.delenv("SKIP_DOTENV", raising=False)
 
     with pytest.raises(RuntimeError, match="SITE_URL"):
         create_app()
+
+
+def test_production_fail_fast_skipped_when_app_env_development(monkeypatch):
+    """Local APP_ENV=development: FORCE_HTTPS/CORS zorunluluğu uygulanmaz."""
+    from flask import Flask
+
+    from app_bootstrap.config import configure_app
+
+    monkeypatch.setenv("SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("DEBUG", "false")
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    monkeypatch.setenv("FORCE_HTTPS", "false")
+    monkeypatch.delenv("SOCKETIO_CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("SITE_URL", raising=False)
+    monkeypatch.delenv("TESTING", raising=False)
+    monkeypatch.setenv("SKIP_DOTENV", "1")
+
+    app = Flask(__name__)
+    configure_app(app, {"SQLALCHEMY_DATABASE_URI": "sqlite://"})
+    assert app.config["DEBUG"] is False
+    assert app.config["FORCE_HTTPS"] is False
 
 
 def test_production_fail_fast_skipped_in_testing(app):
