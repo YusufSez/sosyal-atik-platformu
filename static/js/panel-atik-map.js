@@ -173,7 +173,7 @@
 
     var mapLocate = window.MapLocate ? MapLocate.init(map, { popupText: "📍 Sen buradasın" }) : null;
     var fetchTimer = null;
-    var requestSeq = 0;
+    var municipalLoadId = 0;
     var statusEl = document.getElementById("mw-map-status");
 
     markerKonumlari(haritaNoktalari).forEach(function (m) {
@@ -196,16 +196,17 @@
     }
 
     function ilanlaraOrtala(extraBounds) {
-      if (ilanSinirlar.length === 1) {
-        map.setView(ilanSinirlar[0], 14);
-        return;
-      }
-      if (ilanSinirlar.length > 1) {
-        map.fitBounds(ilanSinirlar, { padding: [40, 40], maxZoom: 14 });
-        return;
-      }
+      // Kullanıcı ilanları + İBB/Konya birlikte ortalansın (yalnızca ilanlara kilitlenme).
+      var all = ilanSinirlar.slice();
       if (extraBounds && extraBounds.length) {
-        map.fitBounds(extraBounds, { padding: [40, 40], maxZoom: 12 });
+        for (var i = 0; i < extraBounds.length; i++) all.push(extraBounds[i]);
+      }
+      if (all.length === 1) {
+        map.setView(all[0], 12);
+        return;
+      }
+      if (all.length > 1) {
+        map.fitBounds(all, { padding: [40, 40], maxZoom: 11 });
       }
     }
 
@@ -245,11 +246,22 @@
     function fillLayer(layer, merkezler, options) {
       if (layer.clearLayers) layer.clearLayers();
       var bounds = [];
+      var markers = [];
       (merkezler || []).forEach(function (m) {
-        if (typeof m.lat !== "number" || typeof m.lng !== "number") return;
-        bounds.push([m.lat, m.lng]);
-        makeCircleMarker(m, options).addTo(layer);
+        var lat = Number(m.lat);
+        var lng = Number(m.lng);
+        if (!isFinite(lat) || !isFinite(lng)) return;
+        bounds.push([lat, lng]);
+        var row = Object.assign({}, m, { lat: lat, lng: lng });
+        markers.push(makeCircleMarker(row, options));
       });
+      if (typeof layer.addLayers === "function") {
+        layer.addLayers(markers);
+      } else {
+        markers.forEach(function (mk) {
+          mk.addTo(layer);
+        });
+      }
       return bounds;
     }
 
@@ -364,8 +376,12 @@
 
     function fetchIbbData() {
       if (!shouldLoadIbb()) return Promise.resolve([]);
-      return fetch(buildIbbQuery())
+      return fetch(buildIbbQuery(), { credentials: "same-origin", cache: "no-store" })
         .then(function (res) {
+          if (!res.ok) {
+            console.error("İBB HTTP", res.status);
+            return [];
+          }
           return res.json();
         })
         .then(function (data) {
@@ -379,14 +395,21 @@
 
     function fetchMunicipalData() {
       if (!shouldLoadMunicipal()) return Promise.resolve([]);
-      var seq = ++requestSeq;
-      return fetch(buildMunicipalQuery())
+      var loadId = ++municipalLoadId;
+      var url = buildMunicipalQuery();
+      return fetch(url, { credentials: "same-origin", cache: "no-store" })
         .then(function (res) {
+          if (!res.ok) {
+            console.error("Belediye HTTP", res.status, url);
+            return [];
+          }
           return res.json();
         })
         .then(function (data) {
-          if (seq !== requestSeq) return null;
-          return Array.isArray(data) ? data : [];
+          if (loadId !== municipalLoadId) return null;
+          var list = Array.isArray(data) ? data : [];
+          console.info("Belediye yüklendi:", list.length, url);
+          return list;
         })
         .catch(function (err) {
           console.error("Belediye harita hatası:", err);
@@ -425,7 +448,6 @@
       if (fetchTimer) clearTimeout(fetchTimer);
       var run = function () {
         setStatus("Merkezler yükleniyor…");
-        // Nearby birleşik sıralama için her kaynaktan daha geniş aday havuzu
         var prevLimit = state.nearbyLimit;
         if (state.nearby) state.nearbyLimit = Math.max(prevLimit, 40);
 
@@ -469,15 +491,18 @@
             setStatus(EMPTY_REGION_MSG);
           } else {
             setStatus(
-              (state.nearby ? "Yakınımdakiler: " : state.city ? "Seçilen bölge: " : "Görünen alan: ") +
+              (state.nearby ? "Yakınımdakiler: " : state.city ? "Seçilen bölge: " : "") +
                 total +
-                " nokta" +
-                (ibbCount && mwCount ? " (İBB " + ibbCount + " + belediye " + mwCount + ")" : "") +
-                (hasCluster ? " (cluster)" : "")
+                " nokta (İBB " +
+                ibbCount +
+                " + belediye " +
+                mwCount +
+                ")" +
+                (hasCluster ? " · cluster" : "")
             );
           }
 
-          if (options.fitBounds) {
+          if (options.fitBounds || (state.city && mwCount > 0)) {
             var allBounds = (ibbBounds || []).concat(mwBounds || []);
             if (allBounds.length) {
               map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 12 });
