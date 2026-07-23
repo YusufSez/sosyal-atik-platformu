@@ -280,14 +280,10 @@
         return "/api/municipal_waste_centers?" + q.toString();
       }
 
-      // İl/ilçe seçiliyse bbox uygulama — bölge filtresi tüm kayıtları kapsar
-      if (!state.city) {
-        var b = map.getBounds();
-        q.set("north", String(b.getNorth()));
-        q.set("south", String(b.getSouth()));
-        q.set("east", String(b.getEast()));
-        q.set("west", String(b.getWest()));
-      }
+      // İl seçili değilken bbox UYGULAMA.
+      // Varsayılan harita İstanbul'da açıldığı için bbox Konya'yı (ve diğer
+      // şehirleri) kesiyordu; filtresiz modda İBB + Konya birlikte görünmeli.
+      // İl seçiliyse zaten tüm il kayıtları gelir (bbox yok).
       q.set("limit", "2500");
       return "/api/municipal_waste_centers?" + q.toString();
     }
@@ -777,7 +773,22 @@
 
     map.on("moveend", function () {
       if (state.nearby || state.city) return;
-      refreshLayers(false);
+      // Belediye katmanı bbox kullanmaz (Konya kaybolmasın).
+      // Pan'de yalnızca İBB canlı katmanını viewport'a göre yenile.
+      if (fetchTimer) clearTimeout(fetchTimer);
+      fetchTimer = setTimeout(function () {
+        fetchIbbData().then(function (ibbList) {
+          if (!shouldLoadIbb()) {
+            if (ibbKatmani.clearLayers) ibbKatmani.clearLayers();
+            return;
+          }
+          fillLayer(ibbKatmani, ibbList || [], {
+            label: "İBB Atık Merkezi",
+            color: "#dc3545",
+            fillColor: "#ff4444",
+          });
+        });
+      }, 280);
     });
 
     wireFilters();
@@ -797,8 +808,7 @@
         var mwCount = mwResult.count || 0;
         var total = ibbCount + mwCount;
         setStatus(
-          "Görünen alan: " +
-            total +
+          total +
             " nokta" +
             (ibbCount && mwCount ? " (İBB " + ibbCount + " + belediye " + mwCount + ")" : "") +
             (hasCluster ? " (cluster)" : "")
